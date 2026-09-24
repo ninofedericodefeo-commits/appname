@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { mockStations } from '@/features/stations/mockData';
+import { fetchNearbyStations } from '@/features/stations/api';
 import type { FuelType, NearbyStationsResponse, SortOption } from '@/types/stations';
 
 export function useNearbyStations({
@@ -18,14 +18,10 @@ export function useNearbyStations({
 }) {
   return useQuery({
     queryKey: ['nearby-stations', latitude, longitude, radius, fuelType, sortOrder],
+    enabled: Number.isFinite(latitude) && Number.isFinite(longitude),
     queryFn: async (): Promise<NearbyStationsResponse> => {
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
-      const stations = mockStations
-        .map((station) => ({
-          ...station,
-          prices: station.prices.map((price) => ({ ...price, fuelType: price.fuelType })),
-        }))
+      const { stations } = await fetchNearbyStations({ latitude, longitude, radius, fuelType });
+      const sortedStations = stations
         .sort((a, b) => {
           const aPrice = a.prices.find((price) => price.fuelType === fuelType)?.price ?? Number.POSITIVE_INFINITY;
           const bPrice = b.prices.find((price) => price.fuelType === fuelType)?.price ?? Number.POSITIVE_INFINITY;
@@ -36,7 +32,7 @@ export function useNearbyStations({
         });
 
       return {
-        stations,
+        stations: sortedStations,
       };
     },
   });

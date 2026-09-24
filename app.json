@@ -28,6 +28,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow GasFinder to use your location to find nearby gas stations."
+        }
+      ],
       "expo-status-bar"
     ]
   }

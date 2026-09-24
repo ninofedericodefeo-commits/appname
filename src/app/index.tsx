@@ -50,9 +50,9 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const { data, isLoading, isFetching } = useNearbyStations({
-    latitude: location?.latitude ?? 39.9526,
-    longitude: location?.longitude ?? -75.1652,
+  const { data, isLoading, isFetching, isError, error, refetch } = useNearbyStations({
+    latitude: location?.latitude ?? Number.NaN,
+    longitude: location?.longitude ?? Number.NaN,
     radius: selectedRadius,
     fuelType: selectedFuelType,
     sortOrder,
@@ -163,10 +163,20 @@ export default function HomeScreen() {
               </View>
             )}
 
-            {!isLoading && !isFetching && stations.length === 0 && (
+            {!isError && !isLoading && !isFetching && stations.length === 0 && (
               <View style={styles.emptyCard}>
                 <Text style={styles.emptyTitle}>No gas stations found nearby.</Text>
                 <Text style={styles.emptyText}>Try expanding your search radius.</Text>
+              </View>
+            )}
+
+            {isError && (
+              <View style={styles.errorCard}>
+                <Text style={styles.errorTitle}>Could not load online stations</Text>
+                <Text style={styles.errorText}>{error instanceof Error ? error.message : 'Check your connection and try again.'}</Text>
+                <Pressable style={styles.primaryButton} onPress={() => void refetch()}>
+                  <Text style={styles.primaryButtonText}>Try Again</Text>
+                </Pressable>
               </View>
             )}
           </>
