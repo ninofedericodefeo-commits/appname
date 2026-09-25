@@ -8,9 +8,7 @@ export default function RootLayout() {
     <QueryClientProvider client={queryClient}>
       <Stack
         screenOptions={{
-          headerTitle: 'GasFinder',
-          headerStyle: { backgroundColor: '#ffffff' },
-          headerShadowVisible: false,
+          headerShown: false,
         }}
       />
     </QueryClientProvider>
