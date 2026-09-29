@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { calculateContribution } from '@/features/investing/calculations';
 import { useInvestmentStore } from '@/stores/investmentStore';
 import type {
   ContributionOption,
@@ -32,37 +33,6 @@ const contributionOptions: { value: Exclude<ContributionOption, 'none' | 'round-
   { value: 'fixed', label: 'Specific amount' },
 ];
 const roundingIncrements: RoundingIncrement[] = [1, 10, 100];
-
-function calculateContribution({
-  amount,
-  option,
-  fixedAmount,
-  feePercent,
-  maxExtraPayment,
-  roundingIncrement,
-}: {
-  amount: number;
-  option: ContributionOption | null;
-  fixedAmount: string;
-  feePercent: number;
-  maxExtraPayment: number;
-  roundingIncrement: RoundingIncrement;
-}) {
-  if (!option || option === 'none') return 0;
-
-  const paymentCents = Math.round(amount * 100);
-  let contributionCents = 0;
-  if (option === 'fee') {
-    contributionCents = Math.round((paymentCents * feePercent) / 100);
-  } else if (option === 'round-up') {
-    const incrementCents = roundingIncrement * 100;
-    contributionCents = Math.ceil(paymentCents / incrementCents) * incrementCents - paymentCents;
-  } else if (option === 'fixed' && fixedAmount.trim() && Number.isFinite(Number(fixedAmount))) {
-    contributionCents = Math.max(0, Math.round(Number(fixedAmount) * 100));
-  }
-
-  return Math.min(contributionCents, Math.round(maxExtraPayment * 100)) / 100;
-}
 
 function InvestmentSettingsPanel({
   feePercent,

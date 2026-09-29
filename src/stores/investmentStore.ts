@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { removeDemoPayment, removeDemoWithdrawal } from '@/features/investing/ledger';
 import type {
   InvestmentDestination,
   InvestmentSettings,
@@ -36,6 +37,8 @@ type InvestmentState = {
     roundingIncrement?: RoundingIncrement,
   ) => void;
   withdrawBalance: () => void;
+  removePayment: (id: string) => boolean;
+  removeWithdrawal: (id: string) => boolean;
 };
 
 function migratedWithdrawalTotal(amount: number, destination: InvestmentDestination): SimulatedWithdrawal[] {
@@ -123,6 +126,24 @@ export const useInvestmentStore = create<InvestmentState>()(
             withdrawals: [withdrawal, ...state.withdrawals],
           };
         }),
+      removePayment: (id) => {
+        let removed = false;
+        set((state) => {
+          const updated = removeDemoPayment(state, id);
+          removed = updated !== null;
+          return updated ?? state;
+        });
+        return removed;
+      },
+      removeWithdrawal: (id) => {
+        let removed = false;
+        set((state) => {
+          const updated = removeDemoWithdrawal(state, id);
+          removed = updated !== null;
+          return updated ?? state;
+        });
+        return removed;
+      },
     }),
     {
       name: 'gasfinder-investment-demo',

@@ -1,43 +1,38 @@
-import React from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 
 import type { FuelType, GasStation } from '@/types/stations';
-
-function getPriceForFuel(station: GasStation, fuelType: FuelType) {
-  return station.prices.find((price) => price.fuelType === fuelType)?.price ?? null;
-}
-
-function getFreshnessText(reportedAt: string) {
-  const minutes = Math.max(1, Math.round((Date.now() - new Date(reportedAt).getTime()) / 60000));
-  return `Updated ${minutes}m ago`;
-}
+import { priceDescription } from '@/features/stations/data';
 
 export function GasStationCard({
   station,
   fuelType,
   isCheapest,
+  isDemo,
+  now,
 }: {
   station: GasStation;
   fuelType: FuelType;
   isCheapest?: boolean;
+  isDemo: boolean;
+  now: number;
 }) {
-  const price = getPriceForFuel(station, fuelType);
+  const price = station.prices.find((item) => item.fuelType === fuelType);
 
   return (
-    <Pressable style={[styles.card, isCheapest && styles.cheapestCard]}>
+    <View style={[styles.card, isCheapest && styles.cheapestCard]}>
       <View style={styles.row}>
         <View style={styles.textBlock}>
           <Text style={styles.name}>{station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
-          <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '0.0'} mi • {getFreshnessText(station.prices[0]?.reportedAt ?? new Date().toISOString())}</Text>
+          <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi · {priceDescription(price, isDemo, now)}</Text>
         </View>
 
         <View style={styles.priceCol}>
-          <Text style={styles.price}>${price?.toFixed(2) ?? 'N/A'}</Text>
+          <Text style={styles.price}>{price ? `$${price.price.toFixed(2)}` : '—'}</Text>
           <Text style={styles.priceLabel}>/gal</Text>
         </View>
       </View>
-    </Pressable>
+    </View>
   );
 }
 

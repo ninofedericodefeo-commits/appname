@@ -14,6 +14,7 @@ type PurchasePauseState = {
   setDelayHours: (hours: PurchasePauseDelayHours) => void;
   addPurchase: (name: string, amount: number) => void;
   recordOutcome: (id: string, outcome: 'bought' | 'skipped') => void;
+  removePurchase: (id: string) => void;
 };
 
 export const usePurchasePauseStore = create<PurchasePauseState>()(
@@ -46,6 +47,7 @@ export const usePurchasePauseStore = create<PurchasePauseState>()(
               : item,
           ),
         })),
+      removePurchase: (id) => set((state) => ({ items: state.items.filter((item) => item.id !== id) })),
     }),
     {
       name: 'gasfinder-purchase-pause-demo',

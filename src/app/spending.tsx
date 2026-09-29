@@ -44,10 +44,11 @@ function Choice({
 }
 
 export default function SpendingScreen() {
-  const { enabled, delayHours, items, setEnabled, setDelayHours, addPurchase, recordOutcome } = usePurchasePauseStore();
+  const { enabled, delayHours, items, setEnabled, setDelayHours, addPurchase, recordOutcome, removePurchase } = usePurchasePauseStore();
   const [purchaseName, setPurchaseName] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [error, setError] = useState('');
+  const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [now, setNow] = useState<number | null>(null);
   const waitingItems = items.filter((item) => item.status === 'waiting');
   const skippedItems = items.filter((item) => item.status === 'skipped');
@@ -97,7 +98,7 @@ export default function SpendingScreen() {
           <Text style={styles.eyebrow}>OPTIONAL · ON THIS DEVICE</Text>
           <Text style={styles.cardTitle}>Pause before an online purchase</Text>
           <Text style={styles.description}>
-            Add something you are considering buying, then give yourself time to decide. This is a reminder and personal tracker only: it does not monitor your accounts or block checkout.
+            Add something you are considering buying, then give yourself time to decide. Review it when you open the app; this planner does not send notifications, monitor accounts, or block checkout.
           </Text>
           <Pressable
             accessibilityRole="switch"
@@ -106,7 +107,7 @@ export default function SpendingScreen() {
             onPress={() => setEnabled(!enabled)}
           >
             <Text style={[styles.toggleText, enabled && styles.toggleTextEnabled]}>
-              {enabled ? 'Pause reminders on' : 'Turn on pause reminders'}
+              {enabled ? 'Pause planner on' : 'Turn on pause planner'}
             </Text>
           </Pressable>
           {enabled && (
@@ -197,6 +198,9 @@ export default function SpendingScreen() {
                     >
                       <Text style={styles.outlineButtonText}>I bought it</Text>
                     </Pressable>
+                    <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(item.id)}>
+                      <Text style={styles.outlineButtonText}>Remove</Text>
+                    </Pressable>
                   </View>
                 </View>
               );
@@ -218,9 +222,24 @@ export default function SpendingScreen() {
                       {new Date(item.outcomeAt ?? item.createdAt).toLocaleDateString()}
                     </Text>
                   </View>
-                  <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                  <View style={styles.historyActions}>
+                    <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                    <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingRemovalId(item.id)}>
+                      <Text style={styles.removeText}>Remove</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
+          </View>
+        )}
+        {pendingRemovalId && (
+          <View style={styles.confirmCard}>
+            <Text style={styles.purchaseName}>Remove this local purchase record?</Text>
+            <Text style={styles.dateText}>The user-reported skipped total will update if needed.</Text>
+            <View style={styles.row}>
+              <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removePurchase(pendingRemovalId); setPendingRemovalId(null); }}><Text style={styles.primaryButtonText}>Remove</Text></Pressable>
+              <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable>
+            </View>
           </View>
         )}
       </ScrollView>
@@ -271,4 +290,8 @@ const styles = StyleSheet.create({
   outlineButton: { borderWidth: 1, borderColor: '#d1d5db', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, flexGrow: 1, alignItems: 'center' },
   outlineButtonText: { color: '#374151', fontSize: 13, fontWeight: '600' },
   historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderTopWidth: 1, borderTopColor: '#edf0f3', paddingTop: 12, marginTop: 12 },
+  historyActions: { alignItems: 'flex-end' },
+  removeButton: { paddingVertical: 8 },
+  removeText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
+  confirmCard: { backgroundColor: '#fef2f2', borderWidth: 1, borderColor: '#fecaca', borderRadius: 14, padding: 15 },
 });

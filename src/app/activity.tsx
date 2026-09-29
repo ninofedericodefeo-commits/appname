@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -13,9 +14,25 @@ function formatContributionRule(option: string, increment?: number) {
 }
 
 export default function ActivityScreen() {
-  const { payments, withdrawals, cashBalance, investedBalance, withdrawnTotal } = useInvestmentStore();
+  const { payments, withdrawals, cashBalance, investedBalance, withdrawnTotal, removePayment, removeWithdrawal } = useInvestmentStore();
+  const [period, setPeriod] = useState<'all' | '30-days'>('all');
+  const [openedAt] = useState(() => Date.now());
+  const [pendingRemove, setPendingRemove] = useState<{ kind: 'payment' | 'withdrawal'; id: string } | null>(null);
+  const [removalError, setRemovalError] = useState('');
   const contributedTotal = payments.reduce((total, payment) => total + payment.surcharge, 0);
   const currentTotal = cashBalance + investedBalance;
+  const cutoff = openedAt - 30 * 24 * 60 * 60 * 1000;
+  const visiblePayments = period === 'all' ? payments : payments.filter((payment) => Date.parse(payment.createdAt) >= cutoff);
+  const visibleWithdrawals = period === 'all' ? withdrawals : withdrawals.filter((withdrawal) => withdrawal.createdAt && Date.parse(withdrawal.createdAt) >= cutoff);
+
+  function confirmRemoval() {
+    if (!pendingRemove) return;
+    const success = pendingRemove.kind === 'payment'
+      ? removePayment(pendingRemove.id)
+      : removeWithdrawal(pendingRemove.id);
+    setPendingRemove(null);
+    setRemovalError(success ? '' : 'That contribution cannot be removed while its amount has already been withdrawn. Restore the withdrawal first.');
+  }
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -44,12 +61,22 @@ export default function ActivityScreen() {
           Contributions are total extra amounts confirmed in the demo. Current balances and withdrawals are shown separately.
         </Text>
 
+        <View style={styles.filterRow}>
+          <Text style={styles.filterLabel}>Activity dates</Text>
+          {(['all', '30-days'] as const).map((value) => (
+            <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: period === value }} style={[styles.filterButton, period === value && styles.filterSelected]} onPress={() => setPeriod(value)}>
+              <Text style={[styles.filterText, period === value && styles.filterTextSelected]}>{value === 'all' ? 'All' : 'Last 30 days'}</Text>
+            </Pressable>
+          ))}
+        </View>
+        {removalError ? <Text style={styles.errorText}>{removalError}</Text> : null}
+
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Contributions ({payments.length})</Text>
-          {payments.length === 0 ? (
-            <Text style={styles.emptyText}>Confirmed demo contributions will appear here.</Text>
+          <Text style={styles.sectionTitle}>Contributions ({visiblePayments.length})</Text>
+          {visiblePayments.length === 0 ? (
+            <Text style={styles.emptyText}>No demo contributions in this period.</Text>
           ) : (
-            payments.map((payment) => (
+            visiblePayments.map((payment) => (
               <View key={payment.id} style={styles.entry}>
                 <View style={styles.entryMain}>
                   <Text style={styles.entryTitle}>{formatContributionRule(payment.contributionOption, payment.roundingIncrement)}</Text>
@@ -57,6 +84,9 @@ export default function ActivityScreen() {
                     {payment.method} payment · ${payment.amount.toFixed(2)} · {new Date(payment.createdAt).toLocaleString()}
                   </Text>
                   <Text style={styles.entryMeta}>Destination: {payment.destination} · simulated</Text>
+                  <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => { setRemovalError(''); setPendingRemove({ kind: 'payment', id: payment.id }); }}>
+                    <Text style={styles.removeText}>Remove demo entry</Text>
+                  </Pressable>
                 </View>
                 <Text style={styles.contributionAmount}>+${payment.surcharge.toFixed(2)}</Text>
               </View>
@@ -65,11 +95,11 @@ export default function ActivityScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Withdrawals ({withdrawals.length})</Text>
-          {withdrawals.length === 0 ? (
-            <Text style={styles.emptyText}>No withdrawals recorded in this demo yet.</Text>
+          <Text style={styles.sectionTitle}>Withdrawals ({visibleWithdrawals.length})</Text>
+          {visibleWithdrawals.length === 0 ? (
+            <Text style={styles.emptyText}>No demo withdrawals in this period.</Text>
           ) : (
-            withdrawals.map((withdrawal) => (
+            visibleWithdrawals.map((withdrawal) => (
               <View key={withdrawal.id} style={styles.entry}>
                 <View style={styles.entryMain}>
                   <Text style={styles.entryTitle}>
@@ -86,12 +116,25 @@ export default function ActivityScreen() {
                           withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleString() : 'Date not recorded'
                         }`}
                   </Text>
+                  <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => { setRemovalError(''); setPendingRemove({ kind: 'withdrawal', id: withdrawal.id }); }}>
+                    <Text style={styles.removeText}>Remove demo entry</Text>
+                  </Pressable>
                 </View>
                 <Text style={styles.withdrawalAmount}>-${withdrawal.amount.toFixed(2)}</Text>
               </View>
             ))
           )}
         </View>
+        {pendingRemove && (
+          <View style={styles.confirmCard}>
+            <Text style={styles.entryTitle}>Remove this local demo entry?</Text>
+            <Text style={styles.entryMeta}>The related demo totals and balance will be corrected on this device.</Text>
+            <View style={styles.confirmRow}>
+              <Pressable accessibilityRole="button" style={styles.confirmButton} onPress={confirmRemoval}><Text style={styles.confirmText}>Remove</Text></Pressable>
+              <Pressable accessibilityRole="button" style={styles.cancelButton} onPress={() => setPendingRemove(null)}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+            </View>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -122,6 +165,13 @@ const styles = StyleSheet.create({
   summaryLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
   summaryAmount: { color: '#111827', fontSize: 24, fontWeight: '800', marginTop: 3 },
   explanation: { color: '#5f6470', fontSize: 12, lineHeight: 18 },
+  filterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  filterLabel: { color: '#374151', fontSize: 13, fontWeight: '700', marginRight: 4 },
+  filterButton: { borderRadius: 999, borderWidth: 1, borderColor: '#d5dbe4', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#fff' },
+  filterSelected: { backgroundColor: '#111827', borderColor: '#111827' },
+  filterText: { color: '#374151', fontSize: 13, fontWeight: '600' },
+  filterTextSelected: { color: '#fff' },
+  errorText: { color: '#b91c1c', fontSize: 13 },
   card: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7ebf0', borderRadius: 16, padding: 15 },
   sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '800', marginBottom: 4 },
   emptyText: { color: '#6b7280', fontSize: 13, marginTop: 8 },
@@ -131,4 +181,12 @@ const styles = StyleSheet.create({
   entryMeta: { color: '#6b7280', fontSize: 11, lineHeight: 16, marginTop: 3 },
   contributionAmount: { color: '#047857', fontSize: 15, fontWeight: '800' },
   withdrawalAmount: { color: '#b45309', fontSize: 15, fontWeight: '800' },
+  removeButton: { alignSelf: 'flex-start', paddingVertical: 7, marginTop: 4 },
+  removeText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
+  confirmCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 15 },
+  confirmRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  confirmButton: { backgroundColor: '#b91c1c', borderRadius: 9, paddingVertical: 10, paddingHorizontal: 16 },
+  confirmText: { color: '#fff', fontWeight: '700' },
+  cancelButton: { backgroundColor: '#fff', borderRadius: 9, borderWidth: 1, borderColor: '#d1d5db', paddingVertical: 10, paddingHorizontal: 16 },
+  cancelText: { color: '#111827', fontWeight: '700' },
 });

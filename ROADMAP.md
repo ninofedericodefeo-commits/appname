@@ -23,6 +23,10 @@ That is a useful foundation for testing the experience, but simulated values mus
 - An optional, on-device purchase-pause planner lets users set a 24-hour, 2-day, or 7-day delay and self-report whether they bought or skipped a planned online purchase.
 - The purchase-pause feature does not monitor accounts, intercept checkout, or block transactions. Its skipped-purchase total is an unverified user-reported estimate, not confirmed savings.
 - Both features are persisted locally for the prototype. This does not make the balances real or suitable for financial decisions.
+- The gas screen now separates a labeled Philadelphia sample from an opt-in online backend contract. Online search requires location permission, validates server data, and shows errors without silently substituting samples. A provider and backend are still required before live fuel prices are available.
+- Local ledger entries can be filtered by date and removed with balance-safe corrections; purchase-pause records can be deleted. Physical-phone verification is tracked in `docs/PHONE_SMOKE_TEST.md`.
+- A mobile receipt-report flow now stores a photo and user-confirmed fuel price, fuel type, date, and station address or on-site GPS on the device. It does not extract receipt text or publish prices to other users. Shared prices require an authenticated backend, duplicate checks, moderation, retention rules, and a plan for handling false reports.
+- A separate savings pocket now earmarks part of a manually entered account balance on this device. It is an estimate within the user's existing account; it cannot verify, transfer, or restrict bank funds. This matches the requested no-bank-connection scope.
 
 ## Product principles
 
