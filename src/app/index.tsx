@@ -66,8 +66,10 @@ export default function GasScreen() {
         <View style={styles.headerRow}>
           <Text style={styles.title}>GasFinder</Text>
           <View style={styles.headerActions}>
+            <Link href="/subscriptions" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navButtonText}>Subscriptions</Text></Pressable></Link>
             <Link href="/report-receipt" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navButtonText}>Report receipt</Text></Pressable></Link>
             <Link href="/pocket" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navButtonText}>Savings pocket</Text></Pressable></Link>
+            <Link href="/investment" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navButtonText}>Savings goals</Text></Pressable></Link>
           </View>
         </View>
 

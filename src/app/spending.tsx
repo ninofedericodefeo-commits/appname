@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link, router } from 'expo-router';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
+import { usePocketStore } from '@/stores/pocketStore';
 import type { PurchasePauseDelayHours } from '@/stores/purchasePauseStore';
 
 const delays: { hours: PurchasePauseDelayHours; label: string }[] = [
@@ -49,6 +50,10 @@ export default function SpendingScreen() {
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [error, setError] = useState('');
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
+  const [pendingBought, setPendingBought] = useState<{ id: string; name: string; amount: number; waiting: boolean } | null>(null);
+  const [actualAmount, setActualAmount] = useState('');
+  const [buyError, setBuyError] = useState('');
+  const { purchases, addPurchase: addGoalPurchase } = usePocketStore();
   const [now, setNow] = useState<number | null>(null);
   const waitingItems = items.filter((item) => item.status === 'waiting');
   const skippedItems = items.filter((item) => item.status === 'skipped');
@@ -82,6 +87,25 @@ export default function SpendingScreen() {
     setError('');
   }
 
+  function offerToLog(id: string, name: string, amount: number, waiting: boolean) {
+    setPendingBought({ id, name, amount, waiting });
+    setActualAmount(amount.toFixed(2));
+    setBuyError('');
+  }
+
+  function logBoughtPurchase() {
+    if (!pendingBought) return;
+    const amount = actualAmount.trim();
+    const cents = /^\d+(?:\.\d{1,2})?$/.test(amount) ? Math.round(Number(amount) * 100) : NaN;
+    if (!Number.isSafeInteger(cents) || cents <= 0) { setBuyError('Enter the actual amount paid, greater than $0.'); return; }
+    if (!addGoalPurchase(`${Date.now()}-${Math.random().toString(36).slice(2)}`, pendingBought.name, cents, pendingBought.id)) {
+      setBuyError('This purchase has already been logged.'); return;
+    }
+    if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
+    setPendingBought(null);
+    router.push('/investment');
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -89,7 +113,7 @@ export default function SpendingScreen() {
           <Text style={styles.title}>Spending pause</Text>
           <Link href="/investment" asChild>
             <Pressable style={styles.navButton} accessibilityRole="button">
-              <Text style={styles.navButtonText}>Investing</Text>
+              <Text style={styles.navButtonText}>Savings goals</Text>
             </Pressable>
           </Link>
         </View>
@@ -194,7 +218,7 @@ export default function SpendingScreen() {
                     <Pressable
                       accessibilityRole="button"
                       style={styles.outlineButton}
-                      onPress={() => recordOutcome(item.id, 'bought')}
+                      onPress={() => offerToLog(item.id, item.name, item.amount, true)}
                     >
                       <Text style={styles.outlineButtonText}>I bought it</Text>
                     </Pressable>
@@ -227,6 +251,7 @@ export default function SpendingScreen() {
                     <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingRemovalId(item.id)}>
                       <Text style={styles.removeText}>Remove</Text>
                     </Pressable>
+                    {item.status === 'bought' && !purchases.some((purchase) => purchase.sourcePauseId === item.id) && <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => offerToLog(item.id, item.name, item.amount, false)}><Text style={styles.removeText}>Log actual purchase</Text></Pressable>}
                   </View>
                 </View>
               ))}
@@ -242,6 +267,13 @@ export default function SpendingScreen() {
             </View>
           </View>
         )}
+        <Modal animationType="slide" visible={pendingBought !== null} onRequestClose={() => setPendingBought(null)}>
+          <SafeAreaView style={styles.safeArea}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+            <Text style={styles.title}>Log what you paid?</Text>
+            <Text style={styles.description}>This will add the purchase to your savings goal history and offer a set-aside amount. It will not charge you or move money.</Text>
+            <View style={styles.card}><Text style={styles.cardTitle}>{pendingBought?.name}</Text><Text style={styles.label}>Actual amount paid</Text><TextInput style={styles.input} value={actualAmount} onChangeText={setActualAmount} keyboardType="decimal-pad" accessibilityLabel="Actual amount paid" />{buyError ? <Text style={styles.error}>{buyError}</Text> : null}<View style={styles.row}><Pressable accessibilityRole="button" style={styles.primaryButton} onPress={logBoughtPurchase}><Text style={styles.primaryButtonText}>Log purchase</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => { if (pendingBought?.waiting) recordOutcome(pendingBought.id, 'bought'); setPendingBought(null); }}><Text style={styles.outlineButtonText}>Bought without logging</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingBought(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable></View></View>
+          </ScrollView></SafeAreaView>
+        </Modal>
       </ScrollView>
     </SafeAreaView>
   );

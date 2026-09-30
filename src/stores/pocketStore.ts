@@ -3,20 +3,53 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { canReserve } from '@/features/pocket/logic';
+import { DEFAULT_GOAL_SETTINGS, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, startingGoalCents, validDeadline } from '@/features/goals/logic';
+import type { ArchivedGoal, Goal, GoalKind, GoalSettings, LoggedPurchase } from '@/features/goals/logic';
 
-type PocketEntry = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' };
+export type PocketEntry = {
+  id: string;
+  amountCents: number;
+  createdAt: string;
+  kind: 'reserve' | 'release' | 'assign';
+  goalId?: string;
+  purchaseId?: string;
+};
+
+type GoalInput = { title: string; kind: GoalKind; targetCents: number; deadline: string | null };
+
 type PocketState = {
   reportedBalanceCents: number | null;
   balanceUpdatedAt: string | null;
   reservedCents: number;
   entries: PocketEntry[];
+  activeGoal: Goal | null;
+  archivedGoals: ArchivedGoal[];
+  purchases: LoggedPurchase[];
+  goalSettings: GoalSettings;
   setReportedBalance: (cents: number) => void;
   reserve: (cents: number) => boolean;
   release: (cents: number) => boolean;
+  createGoal: (input: GoalInput, assignAll: boolean) => boolean;
+  updateGoal: (input: GoalInput) => boolean;
+  endGoal: () => boolean;
+  reserveForGoal: (cents: number, purchaseId?: string) => boolean;
+  releaseFromGoal: (cents: number) => boolean;
+  addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string) => boolean;
+  updatePurchase: (id: string, title: string, amountCents: number) => boolean;
+  skipPurchase: (id: string) => void;
+  removePurchase: (id: string) => void;
+  updateGoalSettings: (settings: Partial<GoalSettings>) => void;
 };
 
-function entry(kind: PocketEntry['kind'], amountCents: number): PocketEntry {
-  return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, amountCents, createdAt: new Date().toISOString(), kind };
+function entry(kind: PocketEntry['kind'], amountCents: number, goalId?: string, purchaseId?: string): PocketEntry {
+  return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, amountCents, createdAt: new Date().toISOString(), kind, goalId, purchaseId };
+}
+
+function validGoalInput(input: GoalInput, existingDeadline?: string | null) {
+  return input.title.trim().length > 0 && input.title.trim().length <= 80 &&
+    (input.kind === 'item' || input.kind === 'money') &&
+    Number.isSafeInteger(input.targetCents) && input.targetCents > 0 &&
+    (input.deadline === null || input.deadline === existingDeadline || validDeadline(input.deadline));
 }
 
 export const usePocketStore = create<PocketState>()(
@@ -26,6 +59,10 @@ export const usePocketStore = create<PocketState>()(
       balanceUpdatedAt: null,
       reservedCents: 0,
       entries: [],
+      activeGoal: null,
+      archivedGoals: [],
+      purchases: [],
+      goalSettings: DEFAULT_GOAL_SETTINGS,
       setReportedBalance: (cents) => {
         if (Number.isSafeInteger(cents) && cents >= 0) set({ reportedBalanceCents: cents, balanceUpdatedAt: new Date().toISOString() });
       },
@@ -37,11 +74,85 @@ export const usePocketStore = create<PocketState>()(
       },
       release: (cents) => {
         const state = get();
-        if (!Number.isSafeInteger(cents) || cents <= 0 || cents > state.reservedCents) return false;
+        if (!canReleaseUnassigned(cents, state.reservedCents, state.activeGoal)) return false;
         set({ reservedCents: state.reservedCents - cents, entries: [entry('release', cents), ...state.entries] });
         return true;
       },
+      createGoal: (input, assignAll) => {
+        const state = get();
+        if (state.activeGoal || !validGoalInput(input)) return false;
+        const goal: Goal = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          title: input.title.trim(), kind: input.kind, targetCents: input.targetCents,
+          deadline: input.deadline, savedCents: startingGoalCents(state.reservedCents, assignAll),
+          createdAt: new Date().toISOString(),
+        };
+        set({ activeGoal: goal, entries: assignAll && state.reservedCents > 0
+          ? [entry('assign', state.reservedCents, goal.id), ...state.entries]
+          : state.entries });
+        return true;
+      },
+      updateGoal: (input) => {
+        const goal = get().activeGoal;
+        if (!goal || !validGoalInput(input, goal.deadline)) return false;
+        set({ activeGoal: { ...goal, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents, deadline: input.deadline } });
+        return true;
+      },
+      endGoal: () => {
+        const state = get();
+        if (!state.activeGoal) return false;
+        const goal = state.activeGoal;
+        set({ activeGoal: null, archivedGoals: [{ ...goal, endedAt: new Date().toISOString(), result: goal.savedCents >= goal.targetCents ? 'reached' : 'stopped' }, ...state.archivedGoals] });
+        return true;
+      },
+      reserveForGoal: (cents, purchaseId) => {
+        const state = get();
+        const goal = state.activeGoal;
+        if (!goal || !canSetAsideForGoal(cents, goal, state.reportedBalanceCents, state.reservedCents)) return false;
+        const purchase = purchaseId ? state.purchases.find((item) => item.id === purchaseId) : undefined;
+        if (purchaseId && (!purchase || purchase.decision !== 'pending')) return false;
+        set({
+          reservedCents: state.reservedCents + cents,
+          activeGoal: { ...goal, savedCents: goal.savedCents + cents },
+          entries: [entry('reserve', cents, goal.id, purchaseId), ...state.entries],
+          purchases: purchaseId ? state.purchases.map((item) => item.id === purchaseId ? { ...item, decision: 'saved' as const, savedCents: cents } : item) : state.purchases,
+        });
+        return true;
+      },
+      releaseFromGoal: (cents) => {
+        const state = get();
+        const goal = state.activeGoal;
+        if (!goal || !canReleaseFromGoal(cents, goal)) return false;
+        set({ reservedCents: state.reservedCents - cents, activeGoal: { ...goal, savedCents: goal.savedCents - cents }, entries: [entry('release', cents, goal.id), ...state.entries] });
+        return true;
+      },
+      addPurchase: (id, title, amountCents, sourcePauseId) => {
+        const state = get();
+        if (!canLogPurchase(id, title, amountCents, sourcePauseId, state.purchases)) return false;
+        set({ purchases: [{ id, title: title.trim(), amountCents, purchasedAt: new Date().toISOString(), sourcePauseId, decision: 'pending' }, ...state.purchases] });
+        return true;
+      },
+      updatePurchase: (id, title, amountCents) => {
+        const state = get();
+        if (!state.purchases.some((item) => item.id === id) || !title.trim() || title.trim().length > 80 || !Number.isSafeInteger(amountCents) || amountCents <= 0) return false;
+        set({ purchases: state.purchases.map((item) => item.id === id ? { ...item, title: title.trim(), amountCents } : item) });
+        return true;
+      },
+      skipPurchase: (id) => set((state) => ({ purchases: state.purchases.map((item) => item.id === id && item.decision === 'pending' ? { ...item, decision: 'skipped' } : item) })),
+      removePurchase: (id) => set((state) => ({ purchases: state.purchases.filter((item) => item.id !== id) })),
+      updateGoalSettings: (settings) => set((state) => ({ goalSettings: {
+        suggestionsEnabled: settings.suggestionsEnabled ?? state.goalSettings.suggestionsEnabled,
+        maxSuggestionCents: Number.isSafeInteger(settings.maxSuggestionCents) && (settings.maxSuggestionCents ?? 0) >= 0 ? settings.maxSuggestionCents! : state.goalSettings.maxSuggestionCents,
+        maxPurchasePercent: Number.isFinite(settings.maxPurchasePercent) && (settings.maxPurchasePercent ?? -1) >= 0 && (settings.maxPurchasePercent ?? 101) <= 100 ? settings.maxPurchasePercent! : state.goalSettings.maxPurchasePercent,
+        widgetEnabled: settings.widgetEnabled ?? state.goalSettings.widgetEnabled,
+        widgetShowAmounts: settings.widgetShowAmounts ?? state.goalSettings.widgetShowAmounts,
+      } })),
     }),
-    { name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 1 },
+    {
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 2,
+      migrate: (persisted) => ({
+        ...(persisted as object), activeGoal: null, archivedGoals: [], purchases: [], goalSettings: DEFAULT_GOAL_SETTINGS,
+      }),
+    },
   ),
 );

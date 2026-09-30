@@ -13,7 +13,7 @@ The roadmap prioritizes learning and safe testing before connecting accounts or 
 
 ## Where the app is today
 
-GasFinder is an Expo/React Native mobile app with separate gas and investing screens. The gas finder currently uses bundled sample stations. The investing screen is a local simulation with configurable contribution rules and cash/stock-style demo balances. The local prototype now also includes a savings ledger and an optional online-purchase cooling-off planner. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; or execute trades.
+GasFinder is an Expo/React Native mobile app with separate gas and savings-goal screens. The gas finder currently uses bundled sample stations. Savings goals use manually logged purchases and the on-device savings pocket; the previous simulated investing ledger remains in a read-only archive. The local prototype also includes an optional online-purchase cooling-off planner. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; or execute trades.
 
 That is a useful foundation for testing the experience, but simulated values must remain clearly identified as demo data until backed by a real, reviewed financial integration.
 
@@ -27,6 +27,8 @@ That is a useful foundation for testing the experience, but simulated values mus
 - Local ledger entries can be filtered by date and removed with balance-safe corrections; purchase-pause records can be deleted. Physical-phone verification is tracked in `docs/PHONE_SMOKE_TEST.md`.
 - A mobile receipt-report flow now stores a photo and user-confirmed fuel price, fuel type, date, and station address or on-site GPS on the device. It does not extract receipt text or publish prices to other users. Shared prices require an authenticated backend, duplicate checks, moderation, retention rules, and a plan for handling false reports.
 - A separate savings pocket now earmarks part of a manually entered account balance on this device. It is an estimate within the user's existing account; it cannot verify, transfer, or restrict bank funds. This matches the requested no-bank-connection scope.
+- One active savings goal can use all or none of an existing pocket amount, accept confirmed set-asides, and show suggestions based on manually logged purchases and an optional deadline. An optional iPhone widget shows goal progress, with amounts hidden by default. Neither goals nor the widget represent a verified balance or an investment.
+- A local subscription tracker now records monthly or yearly renewal dates and user-entered prices. It prompts for each renewal on the preceding calendar day and can schedule optional local 9 AM notifications. A plan-to-cancel decision is a reminder to act with the provider, not a cancellation or blocked charge.
 
 ## Product principles
 

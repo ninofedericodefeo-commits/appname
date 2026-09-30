@@ -1,192 +1,42 @@
 import { useState } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { useInvestmentStore } from '@/stores/investmentStore';
+import { parseDollars } from '@/features/pocket/logic';
+import { usePocketStore } from '@/stores/pocketStore';
 
-function formatContributionRule(option: string, increment?: number) {
-  if (option === 'round-up') return `Round up to $${increment ?? 1}`;
-  if (option === 'fee') return 'Configured fee';
-  if (option === 'fixed') return 'Specific amount';
-  if (option === 'none') return 'No extra';
-  return 'Contribution';
-}
+const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 
 export default function ActivityScreen() {
-  const { payments, withdrawals, cashBalance, investedBalance, withdrawnTotal, removePayment, removeWithdrawal } = useInvestmentStore();
-  const [period, setPeriod] = useState<'all' | '30-days'>('all');
-  const [openedAt] = useState(() => Date.now());
-  const [pendingRemove, setPendingRemove] = useState<{ kind: 'payment' | 'withdrawal'; id: string } | null>(null);
-  const [removalError, setRemovalError] = useState('');
-  const contributedTotal = payments.reduce((total, payment) => total + payment.surcharge, 0);
-  const currentTotal = cashBalance + investedBalance;
-  const cutoff = openedAt - 30 * 24 * 60 * 60 * 1000;
-  const visiblePayments = period === 'all' ? payments : payments.filter((payment) => Date.parse(payment.createdAt) >= cutoff);
-  const visibleWithdrawals = period === 'all' ? withdrawals : withdrawals.filter((withdrawal) => withdrawal.createdAt && Date.parse(withdrawal.createdAt) >= cutoff);
+  const { entries, purchases, archivedGoals, activeGoal, reservedCents, updatePurchase, removePurchase } = usePocketStore();
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [title, setTitle] = useState('');
+  const [amount, setAmount] = useState('');
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [error, setError] = useState('');
 
-  function confirmRemoval() {
-    if (!pendingRemove) return;
-    const success = pendingRemove.kind === 'payment'
-      ? removePayment(pendingRemove.id)
-      : removeWithdrawal(pendingRemove.id);
-    setPendingRemove(null);
-    setRemovalError(success ? '' : 'That contribution cannot be removed while its amount has already been withdrawn. Restore the withdrawal first.');
+  function saveEdit() {
+    if (!editingId) return;
+    const cents = parseDollars(amount);
+    if (cents === null || !updatePurchase(editingId, title, cents)) { setError('Enter a title and an amount greater than $0.'); return; }
+    setEditingId(null);
+    setError('');
   }
-
-  return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Savings tracker</Text>
-          <Link href="/investment" asChild>
-            <Pressable style={styles.navButton} accessibilityRole="button">
-              <Text style={styles.navButtonText}>Investing</Text>
-            </Pressable>
-          </Link>
-        </View>
-        <View style={styles.notice}>
-          <Text style={styles.noticeTitle}>Local demo ledger</Text>
-          <Text style={styles.noticeText}>
-            These figures are saved on this device and are not real cash or investment values.
-          </Text>
-        </View>
-
-        <View style={styles.summaryGrid}>
-          <Summary label="Total contributions" amount={contributedTotal} />
-          <Summary label="Current demo balances" amount={currentTotal} />
-          <Summary label="Withdrawn in demo" amount={withdrawnTotal} />
-        </View>
-        <Text style={styles.explanation}>
-          Contributions are total extra amounts confirmed in the demo. Current balances and withdrawals are shown separately.
-        </Text>
-
-        <View style={styles.filterRow}>
-          <Text style={styles.filterLabel}>Activity dates</Text>
-          {(['all', '30-days'] as const).map((value) => (
-            <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: period === value }} style={[styles.filterButton, period === value && styles.filterSelected]} onPress={() => setPeriod(value)}>
-              <Text style={[styles.filterText, period === value && styles.filterTextSelected]}>{value === 'all' ? 'All' : 'Last 30 days'}</Text>
-            </Pressable>
-          ))}
-        </View>
-        {removalError ? <Text style={styles.errorText}>{removalError}</Text> : null}
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Contributions ({visiblePayments.length})</Text>
-          {visiblePayments.length === 0 ? (
-            <Text style={styles.emptyText}>No demo contributions in this period.</Text>
-          ) : (
-            visiblePayments.map((payment) => (
-              <View key={payment.id} style={styles.entry}>
-                <View style={styles.entryMain}>
-                  <Text style={styles.entryTitle}>{formatContributionRule(payment.contributionOption, payment.roundingIncrement)}</Text>
-                  <Text style={styles.entryMeta}>
-                    {payment.method} payment · ${payment.amount.toFixed(2)} · {new Date(payment.createdAt).toLocaleString()}
-                  </Text>
-                  <Text style={styles.entryMeta}>Destination: {payment.destination} · simulated</Text>
-                  <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => { setRemovalError(''); setPendingRemove({ kind: 'payment', id: payment.id }); }}>
-                    <Text style={styles.removeText}>Remove demo entry</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.contributionAmount}>+${payment.surcharge.toFixed(2)}</Text>
-              </View>
-            ))
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Withdrawals ({visibleWithdrawals.length})</Text>
-          {visibleWithdrawals.length === 0 ? (
-            <Text style={styles.emptyText}>No demo withdrawals in this period.</Text>
-          ) : (
-            visibleWithdrawals.map((withdrawal) => (
-              <View key={withdrawal.id} style={styles.entry}>
-                <View style={styles.entryMain}>
-                  <Text style={styles.entryTitle}>
-                    {withdrawal.legacy
-                      ? 'Previous demo withdrawals (combined)'
-                      : withdrawal.destination === 'cash'
-                        ? 'Cash withdrawal'
-                        : 'Simulated sale'}
-                  </Text>
-                  <Text style={styles.entryMeta}>
-                    {withdrawal.legacy
-                      ? 'Original withdrawal dates were not recorded in the earlier demo'
-                      : `${withdrawal.destination} · ${
-                          withdrawal.createdAt ? new Date(withdrawal.createdAt).toLocaleString() : 'Date not recorded'
-                        }`}
-                  </Text>
-                  <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => { setRemovalError(''); setPendingRemove({ kind: 'withdrawal', id: withdrawal.id }); }}>
-                    <Text style={styles.removeText}>Remove demo entry</Text>
-                  </Pressable>
-                </View>
-                <Text style={styles.withdrawalAmount}>-${withdrawal.amount.toFixed(2)}</Text>
-              </View>
-            ))
-          )}
-        </View>
-        {pendingRemove && (
-          <View style={styles.confirmCard}>
-            <Text style={styles.entryTitle}>Remove this local demo entry?</Text>
-            <Text style={styles.entryMeta}>The related demo totals and balance will be corrected on this device.</Text>
-            <View style={styles.confirmRow}>
-              <Pressable accessibilityRole="button" style={styles.confirmButton} onPress={confirmRemoval}><Text style={styles.confirmText}>Remove</Text></Pressable>
-              <Pressable accessibilityRole="button" style={styles.cancelButton} onPress={() => setPendingRemove(null)}><Text style={styles.cancelText}>Cancel</Text></Pressable>
-            </View>
-          </View>
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-function Summary({ label, amount }: { label: string; amount: number }) {
-  return (
-    <View style={styles.summary}>
-      <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryAmount}>${amount.toFixed(2)}</Text>
-    </View>
-  );
+  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
+    <View style={styles.header}><Text style={styles.title}>Savings activity</Text><Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.nav}><Text style={styles.navText}>Goals</Text></Pressable></Link></View>
+    <View style={styles.notice}><Text style={styles.noticeTitle}>On-device estimate</Text><Text style={styles.hint}>Purchases and set-asides are recorded by you. The app does not verify your account balance or move money.</Text><Text style={styles.total}>{money(reservedCents)} earmarked in pocket</Text>{activeGoal && <Text style={styles.hint}>{money(activeGoal.savedCents)} assigned to {activeGoal.title}</Text>}</View>
+    <View style={styles.card}><Text style={styles.section}>Pocket changes</Text>{entries.length === 0 ? <Text style={styles.hint}>No pocket changes yet.</Text> : entries.map((entry) => <View key={entry.id} style={styles.entry}><View style={styles.entryMain}><Text style={styles.entryTitle}>{entry.kind === 'assign' ? 'Assigned existing pocket money' : entry.kind === 'reserve' ? 'Set aside' : 'Released'}{entry.goalId ? ' · goal' : ''}</Text><Text style={styles.hint}>{new Date(entry.createdAt).toLocaleString()}{entry.purchaseId ? ' · after purchase' : ''}</Text></View><Text style={styles.amount}>{entry.kind === 'release' ? '−' : entry.kind === 'assign' ? '' : '+'}{money(entry.amountCents)}</Text></View>)}</View>
+    <View style={styles.card}><Text style={styles.section}>Logged purchases</Text>{purchases.length === 0 ? <Text style={styles.hint}>No purchases logged yet.</Text> : purchases.map((purchase) => <View key={purchase.id} style={styles.entry}><View style={styles.entryMain}><Text style={styles.entryTitle}>{purchase.title} · {money(purchase.amountCents)}</Text><Text style={styles.hint}>{new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside` : purchase.decision === 'skipped' ? 'Skipped set-aside' : 'Awaiting decision'}</Text><View style={styles.row}><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => { setEditingId(purchase.id); setTitle(purchase.title); setAmount((purchase.amountCents / 100).toFixed(2)); setError(''); }}><Text style={styles.smallText}>Edit</Text></Pressable><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => setPendingDeleteId(purchase.id)}><Text style={styles.smallText}>Delete</Text></Pressable></View>{editingId === purchase.id && <View style={styles.editor}><TextInput style={styles.input} value={title} onChangeText={setTitle} maxLength={80} accessibilityLabel="Edit purchase name" /><TextInput style={styles.input} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" accessibilityLabel="Edit purchase amount" /><View style={styles.row}><Pressable accessibilityRole="button" style={styles.smallButton} onPress={saveEdit}><Text style={styles.smallText}>Save</Text></Pressable><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => setEditingId(null)}><Text style={styles.smallText}>Cancel</Text></Pressable></View><Text style={styles.hint}>Editing this purchase leaves confirmed set-asides unchanged.</Text></View>}{pendingDeleteId === purchase.id && <View style={styles.editor}><Text style={styles.hint}>Delete this purchase? Confirmed set-asides remain in the pocket.</Text><View style={styles.row}><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => { removePurchase(purchase.id); setPendingDeleteId(null); }}><Text style={styles.smallText}>Delete purchase</Text></Pressable><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => setPendingDeleteId(null)}><Text style={styles.smallText}>Cancel</Text></Pressable></View></View>}</View></View>)}</View>
+    {error ? <Text style={styles.error}>{error}</Text> : null}
+    {archivedGoals.length > 0 && <View style={styles.card}><Text style={styles.section}>Past goals</Text>{archivedGoals.map((goal) => <View key={goal.id} style={styles.entry}><View style={styles.entryMain}><Text style={styles.entryTitle}>{goal.title}</Text><Text style={styles.hint}>{goal.result === 'reached' ? 'Reached' : 'Ended'} {new Date(goal.endedAt).toLocaleDateString()} · {money(goal.savedCents)} of {money(goal.targetCents)}</Text></View></View>)}</View>}
+    <Link href="/legacy-investment" asChild><Pressable accessibilityRole="button" style={styles.legacy}><Text style={styles.legacyText}>Previous investing demo records</Text></Pressable></Link>
+  </ScrollView></SafeAreaView>;
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f3f5f7' },
-  container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 40, gap: 14 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { color: '#111827', fontSize: 27, fontWeight: '800' },
-  navButton: { backgroundColor: '#111827', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 999 },
-  navButtonText: { color: '#ffffff', fontWeight: '700' },
-  notice: { backgroundColor: '#fff7ed', borderColor: '#fed7aa', borderWidth: 1, borderRadius: 14, padding: 14 },
-  noticeTitle: { color: '#9a3412', fontWeight: '800', fontSize: 14 },
-  noticeText: { color: '#7c2d12', fontSize: 12, lineHeight: 17, marginTop: 4 },
-  summaryGrid: { gap: 9 },
-  summary: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7ebf0', borderRadius: 14, padding: 14 },
-  summaryLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
-  summaryAmount: { color: '#111827', fontSize: 24, fontWeight: '800', marginTop: 3 },
-  explanation: { color: '#5f6470', fontSize: 12, lineHeight: 18 },
-  filterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  filterLabel: { color: '#374151', fontSize: 13, fontWeight: '700', marginRight: 4 },
-  filterButton: { borderRadius: 999, borderWidth: 1, borderColor: '#d5dbe4', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#fff' },
-  filterSelected: { backgroundColor: '#111827', borderColor: '#111827' },
-  filterText: { color: '#374151', fontSize: 13, fontWeight: '600' },
-  filterTextSelected: { color: '#fff' },
-  errorText: { color: '#b91c1c', fontSize: 13 },
-  card: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7ebf0', borderRadius: 16, padding: 15 },
-  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '800', marginBottom: 4 },
-  emptyText: { color: '#6b7280', fontSize: 13, marginTop: 8 },
-  entry: { borderTopWidth: 1, borderTopColor: '#edf0f3', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
-  entryMain: { flex: 1 },
-  entryTitle: { color: '#111827', fontSize: 14, fontWeight: '700' },
-  entryMeta: { color: '#6b7280', fontSize: 11, lineHeight: 16, marginTop: 3 },
-  contributionAmount: { color: '#047857', fontSize: 15, fontWeight: '800' },
-  withdrawalAmount: { color: '#b45309', fontSize: 15, fontWeight: '800' },
-  removeButton: { alignSelf: 'flex-start', paddingVertical: 7, marginTop: 4 },
-  removeText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
-  confirmCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 15 },
-  confirmRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  confirmButton: { backgroundColor: '#b91c1c', borderRadius: 9, paddingVertical: 10, paddingHorizontal: 16 },
-  confirmText: { color: '#fff', fontWeight: '700' },
-  cancelButton: { backgroundColor: '#fff', borderRadius: 9, borderWidth: 1, borderColor: '#d1d5db', paddingVertical: 10, paddingHorizontal: 16 },
-  cancelText: { color: '#111827', fontWeight: '700' },
+  safe: { flex: 1, backgroundColor: '#f3f5f7' }, content: { padding: 20, paddingBottom: 44, gap: 14 },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: '#111827', fontSize: 28, fontWeight: '800', flexShrink: 1 }, nav: { backgroundColor: '#111827', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 11 }, navText: { color: '#fff', fontWeight: '700' },
+  notice: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 16, padding: 16, gap: 6 }, noticeTitle: { color: '#1e3a8a', fontSize: 16, fontWeight: '800' }, total: { color: '#1e3a8a', fontSize: 22, fontWeight: '800' },
+  hint: { color: '#64748b', fontSize: 12, lineHeight: 18 }, card: { backgroundColor: '#fff', borderColor: '#e2e8f0', borderWidth: 1, borderRadius: 17, padding: 16 }, section: { color: '#111827', fontSize: 18, fontWeight: '800', marginBottom: 8 }, entry: { flexDirection: 'row', gap: 8, justifyContent: 'space-between', paddingVertical: 10, borderTopColor: '#e2e8f0', borderTopWidth: 1 }, entryMain: { flex: 1 }, entryTitle: { color: '#111827', fontSize: 14, fontWeight: '700' }, amount: { color: '#111827', fontSize: 14, fontWeight: '800' }, legacy: { padding: 14, alignSelf: 'center' }, legacyText: { color: '#475569', fontWeight: '700' }, row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 6 }, smallButton: { borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 9, paddingHorizontal: 12, paddingVertical: 9, minHeight: 40, justifyContent: 'center' }, smallText: { color: '#0f172a', fontSize: 12, fontWeight: '700' }, editor: { marginTop: 8, gap: 8 }, input: { borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 9, paddingHorizontal: 11, paddingVertical: 10, minHeight: 44 }, error: { color: '#b91c1c', fontSize: 13 },
 });

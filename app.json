@@ -34,6 +34,7 @@
     "plugins": [
       "./plugins/withIosBuildScriptAccess",
       "expo-router",
+      "expo-notifications",
       [
         "expo-location",
         {
@@ -48,7 +49,30 @@
           "microphonePermission": false
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "widgets": [
+            {
+              "name": "GoalProgressWidget",
+              "displayName": "Savings goal",
+              "description": "See your goal progress at a glance.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"]
+              }
+            }
+          ]
+        }
+      ]
     ]
   }
 }
