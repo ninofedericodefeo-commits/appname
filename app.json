@@ -31,9 +31,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow GasFinder to use your location to find nearby gas stations."
+          "locationWhenInUsePermission": "Allow GasFinder to use your location to estimate fuel use during trips and find nearby gas stations.",
+          "locationAlwaysAndWhenInUsePermission": "Allow GasFinder to use your location in the background to estimate fuel use while you travel and send low-fuel alerts.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
+      "expo-notifications",
       "expo-status-bar"
     ]
   }
