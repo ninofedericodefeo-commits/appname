@@ -7,11 +7,15 @@ export const demoLocation = { latitude: 39.9526, longitude: -75.1652 };
 export const stationApiBaseUrl = process.env.EXPO_PUBLIC_STATIONS_API_URL?.replace(/\/$/, '') ?? '';
 export const sampleApiBaseUrl = process.env.EXPO_PUBLIC_SAMPLE_API_URL?.replace(/\/$/, '') ?? '';
 
-function validatedSampleApiUrl() {
+export function validatedSampleApiUrl() {
   if (!sampleApiBaseUrl) throw new Error('Sample station API is not configured.');
   const url = new URL(sampleApiBaseUrl);
-  if (url.protocol !== 'https:' && !(__DEV__ && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
-    throw new Error('Sample station API must use HTTPS outside local development.');
+  const host = url.hostname;
+  const localHost = ['localhost', '127.0.0.1'].includes(host) || host.endsWith('.local') ||
+    /^192\.168\.\d{1,3}\.\d{1,3}$/.test(host) || /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(host);
+  if (url.protocol !== 'https:' && !(__DEV__ && url.protocol === 'http:' && localHost)) {
+    throw new Error('Sample station API requires HTTPS or a local development address.');
   }
   return sampleApiBaseUrl;
 }

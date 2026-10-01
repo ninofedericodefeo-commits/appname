@@ -1,6 +1,8 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Link } from 'expo-router';
+import { useQueryClient } from '@tanstack/react-query';
 
 import type { FuelType, GasStation } from '@/types/stations';
 import { priceDescription, reportStationPrice } from '@/features/stations/data';
@@ -24,6 +26,7 @@ export function GasStationCard({
   onReported?: () => void;
 }) {
   const price = station.prices.find((item) => item.fuelType === fuelType);
+  const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [priceInput, setPriceInput] = useState('');
   const [error, setError] = useState('');
@@ -39,6 +42,7 @@ export function GasStationCard({
     setError('');
     try {
       await reportStationPrice(station.id, fuelType, value);
+      await queryClient.invalidateQueries({ queryKey: ['price-history', station.id, fuelType] });
       setEditing(false);
       setPriceInput('');
       onReported?.();
@@ -71,6 +75,7 @@ export function GasStationCard({
       </View>
       {canReport && (
         <View style={styles.reportArea}>
+          <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>
           {editing ? <>
             <Text style={styles.reportNote}>Report the pump price you saw. This unverified price is shared with everyone using this API. No receipt photo is uploaded.</Text>
             <TextInput value={priceInput} onChangeText={setPriceInput} keyboardType="decimal-pad" placeholder="Price per gallon" accessibilityLabel={`${station.name} ${fuelType} price per gallon`} style={styles.input} maxLength={7} />
@@ -88,6 +93,7 @@ export function GasStationCard({
 
 const styles = StyleSheet.create({
   reportArea: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12 },
+  historyLink: { marginBottom: 10 },
   reportNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 9 },
   input: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, padding: 10, minHeight: 44, color: colors.ink },
   error: { color: colors.danger, fontSize: 12, marginTop: 6 },

@@ -12,7 +12,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.gasfinder"
+      "bundleIdentifier": "com.anonymous.gasfinder",
+      "infoPlist": {
+        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
+        "NSLocalNetworkUsageDescription": "Allow GasFinder to connect to the sample gas price API running on your local network."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -55,6 +59,9 @@
         {
           "ios": {
             "enableSceneSupport": true
+          },
+          "android": {
+            "usesCleartextTraffic": true
           }
         }
       ],
