@@ -1,0 +1,17 @@
+export const colors = {
+  paper: '#F4F0E7',
+  surface: '#FFFEF9',
+  ink: '#173A35',
+  inkSoft: '#38574F',
+  muted: '#61756B',
+  line: '#D8DDD3',
+  lineStrong: '#B9C8BA',
+  primary: '#245A4B',
+  accent: '#D85B34',
+  accentDark: '#A63F21',
+  paleGreen: '#E8EFDD',
+  paleOrange: '#FCEDDE',
+  lime: '#D7E7A7',
+  danger: '#A33124',
+  dangerPale: '#FBE8E2',
+} as const;

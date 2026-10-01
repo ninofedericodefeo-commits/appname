@@ -1,3 +1,4 @@
+import { colors } from '@/theme';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
@@ -152,25 +153,25 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f3f5f7' },
-  content: { padding: 22, paddingBottom: 42, gap: 14 },
-  eyebrow: { color: '#4f46e5', fontWeight: '800', fontSize: 12, letterSpacing: 1 },
-  title: { color: '#111827', fontSize: 32, fontWeight: '800' },
-  description: { color: '#475569', fontSize: 15, lineHeight: 22 },
-  summary: { backgroundColor: '#eef2ff', borderColor: '#c7d2fe', borderWidth: 1, borderRadius: 18, padding: 18 },
-  summaryLabel: { color: '#4338ca', fontSize: 13, fontWeight: '700' },
-  summaryAmount: { color: '#312e81', fontSize: 32, fontWeight: '800', marginTop: 4 },
-  card: { backgroundColor: '#ffffff', borderColor: '#e7ebf0', borderWidth: 1, borderRadius: 18, padding: 17 },
+  safeArea: { flex: 1, backgroundColor: colors.paper },
+  content: { paddingHorizontal: 22, paddingTop: 28, paddingBottom: 42, gap: 17 },
+  eyebrow: { color: colors.accentDark, fontWeight: '800', fontSize: 11, letterSpacing: 1.6 },
+  title: { color: colors.ink, fontSize: 40, lineHeight: 43, letterSpacing: -1.6, fontWeight: '800' },
+  description: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
+  summary: { backgroundColor: colors.ink, borderRadius: 12, padding: 21 },
+  summaryLabel: { color: colors.lime, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase' },
+  summaryAmount: { color: colors.surface, fontSize: 43, letterSpacing: -1.4, fontWeight: '800', marginTop: 6, fontVariant: ['tabular-nums'] },
+  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 18 },
   cardHeading: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  name: { color: '#111827', fontSize: 18, fontWeight: '800', flex: 1 },
-  amount: { color: '#111827', fontSize: 18, fontWeight: '800' },
-  meta: { color: '#64748b', fontSize: 13, marginTop: 5 },
+  name: { color: colors.ink, fontSize: 18, fontWeight: '800', flex: 1 },
+  amount: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  meta: { color: colors.muted, fontSize: 13, marginTop: 5 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  keepButton: { backgroundColor: '#4f46e5', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
-  keepText: { color: '#ffffff', fontWeight: '700' },
-  cancelButton: { backgroundColor: '#f1f5f9', borderRadius: 10, padding: 12, flex: 1, alignItems: 'center' },
-  cancelText: { color: '#334155', fontWeight: '700' },
-  note: { color: '#64748b', fontSize: 12, lineHeight: 18 },
+  keepButton: { backgroundColor: colors.accentDark, borderRadius: 6, padding: 12, flex: 1, alignItems: 'center' },
+  keepText: { color: colors.surface, fontWeight: '700' },
+  cancelButton: { backgroundColor: colors.paleGreen, borderRadius: 7, padding: 12, flex: 1, alignItems: 'center' },
+  cancelText: { color: colors.inkSoft, fontWeight: '700' },
+  note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   laterButton: { alignSelf: 'center', padding: 12 },
-  laterText: { color: '#475569', fontWeight: '700' },
+  laterText: { color: colors.inkSoft, fontWeight: '700' },
 });

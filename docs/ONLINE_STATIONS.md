@@ -1,44 +1,26 @@
-# Online stations contract and release gate
+# Online station search
 
-The app starts in **Philadelphia sample** mode. Sample stations and prices are fictional. Setting `EXPO_PUBLIC_STATIONS_API_URL` exposes a separate **Search near me** action; it does not turn sample records into online results. [Expo embeds `EXPO_PUBLIC_` values](https://docs.expo.dev/guides/environment-variables/) in the app bundle, so this variable may contain only a public HTTPS backend URL. Keep provider credentials on the backend.
+GasFinder now has an opt-in nearby search backed by [Google Places (New) Nearby Search](https://developers.google.com/maps/documentation/places/web-service/nearby-search). The app still opens with clearly labeled Philadelphia sample data. Online results can include provider fuel reports, but many stations have no fuel price. The app shows their locations with “Price unavailable” instead of inventing a value. Prices include the provider's update time; reports older than 24 hours are marked stale.
 
-## Backend request
+## Try it in an iOS simulator
+
+1. For no cost testing, get a [Maps Demo Key](https://developers.google.com/maps/demo-key). Google lists Places API (New) as supported, requires no billing information, and pauses use at its daily quota. The demo key is restricted to evaluation and testing, even when you are the only user. Google does not explicitly confirm that the demo key returns the `fuelOptions` field used for prices, so verify it with a real request. If that field is unavailable, the app cannot get Google fuel prices through the demo key.
+2. Copy `.env.example` to `.env.local`. Set `GOOGLE_PLACES_API_KEY` to your demo key there. Leave `EXPO_PUBLIC_STATIONS_API_URL=http://localhost:8787` for the iOS simulator. Never prefix the key with `EXPO_PUBLIC_`, commit it, or put it in the app binary.
+3. In one terminal, run `npm run stations:dev`. In another, run `npx expo start`, open the iOS simulator, and choose **Search near me**. You can set the simulator's location under **Features → Location**.
+4. Check `http://localhost:8787/health`. It reports `ready` when the server key is present, or `missing-key` otherwise. It does not verify that Google accepts the key.
+
+The server searches up to 25 miles and returns at most 20 stations per request. It discards stations outside the US because the current UI labels prices in USD per gallon. It requests fresh data per search, keeps no station database, caps searches at 100 per day by default, and returns `Cache-Control: no-store`. The cap is in memory and resets on server restart; it is a local development budget guard, not production abuse protection.
+
+## Test on a physical phone or publish
+
+`localhost` on an iPhone is the phone itself. Host `server/index.mjs` behind HTTPS and set `EXPO_PUBLIC_STATIONS_API_URL` to that public URL when building the app. Keep `GOOGLE_PLACES_API_KEY` only in the server environment. Add authentication or another abuse control and persistent usage limits before exposing the endpoint publicly, and restrict the Google key according to [Google's API key security guidance](https://developers.google.com/maps/api-security-best-practices). Verify actual fuel-price coverage, units, timestamps, and billing with the intended launch area and a real provider response. No Google key or hosted endpoint is included in this repository, so live results cannot be verified from source alone.
+
+For ongoing use, Google says the demo key cannot be used in production. A standard Places key needs billing enabled. Requests for `fuelOptions` use the [Nearby Search Enterprise + Atmosphere SKU](https://developers.google.com/maps/documentation/places/web-service/nearby-search); Google currently lists a monthly free usage cap, but usage beyond that cap is billable. If you want a strict no-billing app, keep the locally saved receipt reports and sample station mode instead of enabling the Google online provider for everyday use.
+
+Google Maps attribution and any place-specific provider attributions are shown with results. Before release, include the required Google Maps [terms and privacy disclosures](https://developers.google.com/maps/documentation/places/web-service/policies) in the app's public legal pages. Receipt photo reports remain separate and stored locally; they do not change Google results or upload reports.
+
+## App service contract
 
 `GET {EXPO_PUBLIC_STATIONS_API_URL}/v1/stations/nearby?latitude=39.95&longitude=-75.16&radiusMiles=5&fuelType=regular`
 
-- Coordinates are device location after foreground permission. Radius is in miles and fuel type is `regular`, `midgrade`, `premium`, or `diesel`.
-- Backend should enforce geographic bounds, request limits, caching, provider timeout, and provider usage terms. It should return `200` with `{ "stations": [...] }` for a valid empty result.
-- Mobile requests time out after 10 seconds. Non-2xx responses, invalid records, and timeouts show an error; the client never substitutes sample prices for an online failure.
-
-## Response
-
-```json
-{
-  "stations": [
-    {
-      "id": "provider-station-id",
-      "name": "Example Fuel",
-      "latitude": 39.95,
-      "longitude": -75.16,
-      "address": "1 Example St",
-      "city": "Philadelphia",
-      "state": "PA",
-      "prices": [
-        {
-          "fuelType": "regular",
-          "price": 3.49,
-          "currency": "USD",
-          "reportedAt": "2026-09-28T14:00:00Z",
-          "source": "Provider display name"
-        }
-      ]
-    }
-  ]
-}
-```
-
-Omit a fuel price when it is unavailable. The app calculates distance and radius filtering from station coordinates. Price cards display the source and reported age; reports older than 24 hours are marked stale. A report more than five minutes in the future is marked as having an unavailable time. The backend must supply the attribution text required by its provider and must avoid retaining location longer than needed for the request.
-
-## Release decision
-
-No provider has been selected or approved. Before configuring an endpoint for users, choose a launch geography and verify station coverage, price freshness, display rights, attribution, rate limits, cost, outage ownership, and support handling. Test missing prices, stale reports, malformed data, empty results, timeouts, and permission denial on physical phones. The current endpoint integration is a client contract, not a claim that real prices are available.
+The JSON response has `provider: "Google Maps"` and `stations: [...]`. Each station has a stable ID, name, coordinates, address, city, state, `prices`, and optional `attributions`. Each price has a fuel type, USD amount, report timestamp, and source. An empty `prices` array is valid. The client validates records, computes distance, and sorts by price or distance. Backend errors, timeouts, and invalid data appear as errors; sample prices are never substituted for an online failure.

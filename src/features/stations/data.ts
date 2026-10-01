@@ -1,4 +1,3 @@
-import { mockStations } from '@/features/stations/mockData';
 import { parseStationsResponse, prepareStations } from '@/features/stations/logic';
 import type { StationSearch } from '@/features/stations/logic';
 
@@ -6,13 +5,40 @@ export { priceDescription } from '@/features/stations/logic';
 
 export const demoLocation = { latitude: 39.9526, longitude: -75.1652 };
 export const stationApiBaseUrl = process.env.EXPO_PUBLIC_STATIONS_API_URL?.replace(/\/$/, '') ?? '';
+export const sampleApiBaseUrl = process.env.EXPO_PUBLIC_SAMPLE_API_URL?.replace(/\/$/, '') ?? '';
 
-export function demoStations(search: Pick<StationSearch, 'radius' | 'fuelType' | 'sortOrder'>) {
-  return prepareStations(mockStations, { ...demoLocation, ...search });
+function validatedSampleApiUrl() {
+  if (!sampleApiBaseUrl) throw new Error('Sample station API is not configured.');
+  const url = new URL(sampleApiBaseUrl);
+  if (url.protocol !== 'https:' && !(__DEV__ && url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) {
+    throw new Error('Sample station API must use HTTPS outside local development.');
+  }
+  return sampleApiBaseUrl;
+}
+
+export async function demoStations(search: Pick<StationSearch, 'radius' | 'fuelType' | 'sortOrder'>, signal: AbortSignal) {
+  const response = await fetch(`${validatedSampleApiUrl()}/v1/stations/sample`, { signal });
+  if (!response.ok) throw new Error(`Sample station API unavailable (${response.status}).`);
+  const payload: unknown = await response.json();
+  return prepareStations(parseStationsResponse(payload), { ...demoLocation, ...search });
+}
+
+export async function reportStationPrice(stationId: string, fuelType: string, price: number) {
+  const response = await fetch(`${validatedSampleApiUrl()}/v1/stations/${encodeURIComponent(stationId)}/prices`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fuel_type: fuelType, price }),
+  });
+  if (!response.ok) throw new Error(`Could not save price (${response.status}).`);
 }
 export async function fetchOnlineStations(search: StationSearch, signal: AbortSignal) {
   if (!stationApiBaseUrl) throw new Error('Online station search is not configured.');
-  if (!stationApiBaseUrl.startsWith('https://')) throw new Error('Station service must use HTTPS.');
+  const serviceUrl = new URL(stationApiBaseUrl);
+  const isLocalDevelopment = __DEV__ && serviceUrl.protocol === 'http:' &&
+    ['localhost', '127.0.0.1'].includes(serviceUrl.hostname);
+  if (serviceUrl.protocol !== 'https:' && !isLocalDevelopment) {
+    throw new Error('Station service must use HTTPS outside local development.');
+  }
   const url = `${stationApiBaseUrl}/v1/stations/nearby?latitude=${encodeURIComponent(search.latitude)}` +
     `&longitude=${encodeURIComponent(search.longitude)}&radiusMiles=${encodeURIComponent(search.radius)}` +
     `&fuelType=${encodeURIComponent(search.fuelType)}`;
@@ -23,8 +49,15 @@ export async function fetchOnlineStations(search: StationSearch, signal: AbortSi
   const timeout = setTimeout(abort, 10_000);
   try {
     const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`Station service unavailable (${response.status}).`);
-    return prepareStations(parseStationsResponse(await response.json()), search);
+    const payload: unknown = await response.json();
+    if (!response.ok) {
+      const message = typeof payload === 'object' && payload !== null && 'error' in payload && typeof payload.error === 'string'
+        ? payload.error : `Station service unavailable (${response.status}).`;
+      throw new Error(message);
+    }
+    const provider = typeof payload === 'object' && payload !== null && 'provider' in payload && payload.provider === 'Google Maps'
+      ? 'Google Maps' : 'station provider';
+    return { stations: prepareStations(parseStationsResponse(payload), search), provider };
   } finally {
     clearTimeout(timeout);
     signal.removeEventListener('abort', abort);

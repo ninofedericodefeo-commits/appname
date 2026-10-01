@@ -1,3 +1,4 @@
+import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { Link } from 'expo-router';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -129,11 +130,12 @@ export default function SubscriptionsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
+        <Text style={styles.kicker}>MONEY  /  03</Text>
+    <View style={styles.header}>
           <Text style={styles.title}>Subscriptions</Text>
           <Link href="/" asChild><Pressable style={styles.homeButton} accessibilityRole="button"><Text style={styles.homeButtonText}>Gas prices</Text></Pressable></Link>
         </View>
-        <Text style={styles.intro}>See tomorrow’s renewals before they charge, and decide which subscriptions still earn their place.</Text>
+        <Text style={styles.intro}>See what renews tomorrow, what it costs, and what you decided.</Text>
 
         {due.length > 0 && (
           <View style={styles.reviewCard}>
@@ -222,51 +224,52 @@ export default function SubscriptionsScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f3f5f7' },
-  content: { padding: 20, paddingBottom: 45, gap: 14 },
+  safeArea: { flex: 1, backgroundColor: colors.paper },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 45, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  title: { color: '#111827', fontSize: 30, fontWeight: '800' },
-  homeButton: { backgroundColor: '#111827', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 999 },
-  homeButtonText: { color: '#ffffff', fontWeight: '700' },
-  intro: { color: '#475569', fontSize: 14, lineHeight: 21 },
-  card: { backgroundColor: '#ffffff', borderColor: '#e7ebf0', borderWidth: 1, borderRadius: 18, padding: 18 },
-  reviewCard: { backgroundColor: '#eef2ff', borderColor: '#c7d2fe', borderWidth: 1, borderRadius: 18, padding: 18 },
-  sectionTitle: { color: '#111827', fontSize: 18, fontWeight: '800' },
-  reviewTotal: { color: '#4338ca', fontSize: 14, fontWeight: '700', marginTop: 4 },
-  bodyText: { color: '#5f6470', fontSize: 13, lineHeight: 19, marginTop: 7 },
-  reminderButton: { backgroundColor: '#f1f5f9', borderRadius: 11, padding: 13, alignItems: 'center', marginTop: 13 },
-  reminderOn: { backgroundColor: '#4f46e5' },
-  reminderLabel: { color: '#334155', fontWeight: '700' },
-  reminderOnLabel: { color: '#ffffff' },
-  input: { borderColor: '#d5dbe4', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, marginTop: 12, backgroundColor: '#ffffff' },
-  fieldLabel: { color: '#4b5563', fontSize: 13, fontWeight: '700', marginTop: 15 },
+  title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
+  homeButton: { backgroundColor: colors.ink, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
+  homeButtonText: { color: colors.surface, fontWeight: '700' },
+  intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
+  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 19 },
+  reviewCard: { backgroundColor: colors.paleOrange, borderLeftColor: colors.accent, borderLeftWidth: 4, borderRadius: 8, padding: 18 },
+  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.4 },
+  reviewTotal: { color: colors.accentDark, fontSize: 16, fontWeight: '800', marginTop: 4 },
+  bodyText: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 7 },
+  reminderButton: { backgroundColor: colors.paleGreen, borderRadius: 7, padding: 13, alignItems: 'center', marginTop: 13 },
+  reminderOn: { backgroundColor: colors.ink },
+  reminderLabel: { color: colors.inkSoft, fontWeight: '700' },
+  reminderOnLabel: { color: colors.surface },
+  input: { borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 11, fontSize: 15, marginTop: 12, backgroundColor: colors.surface },
+  fieldLabel: { color: colors.inkSoft, fontSize: 13, fontWeight: '700', marginTop: 15 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 11 },
-  choice: { borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: '#f8fafc' },
-  choiceActive: { backgroundColor: '#111827', borderColor: '#111827' },
-  choiceLabel: { color: '#334155', fontWeight: '700', fontSize: 13 },
-  choiceActiveLabel: { color: '#ffffff' },
+  choice: { borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 6, paddingHorizontal: 13, paddingVertical: 9, backgroundColor: colors.paper, minHeight: 44, justifyContent: 'center' },
+  choiceActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  choiceLabel: { color: colors.inkSoft, fontWeight: '700', fontSize: 13 },
+  choiceActiveLabel: { color: colors.surface },
   months: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 12 },
-  monthChoice: { minWidth: 48, borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 8, alignItems: 'center' },
-  smallNote: { color: '#64748b', fontSize: 12, lineHeight: 17, marginTop: 9 },
-  error: { color: '#b91c1c', fontSize: 13, lineHeight: 18, marginTop: 10 },
-  saveButton: { backgroundColor: '#4f46e5', borderRadius: 11, alignItems: 'center', padding: 13, marginTop: 16 },
-  saveLabel: { color: '#ffffff', fontWeight: '800' },
+  monthChoice: { minWidth: 48, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 8, alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  smallNote: { color: colors.muted, fontSize: 12, lineHeight: 17, marginTop: 9 },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 18, marginTop: 10 },
+  saveButton: { backgroundColor: colors.accentDark, borderRadius: 6, alignItems: 'center', padding: 14, marginTop: 16 },
+  saveLabel: { color: colors.surface, fontWeight: '800' },
   cancelEdit: { alignSelf: 'center', padding: 11 },
   listSection: { gap: 10 },
-  subscriptionCard: { backgroundColor: '#ffffff', borderColor: '#e7ebf0', borderWidth: 1, borderRadius: 15, padding: 16 },
+  subscriptionCard: { backgroundColor: colors.surface, borderBottomColor: colors.line, borderBottomWidth: 1, borderRadius: 6, padding: 17 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  subscriptionName: { color: '#111827', fontSize: 16, fontWeight: '800', flex: 1 },
-  subscriptionAmount: { color: '#111827', fontSize: 16, fontWeight: '800' },
-  meta: { color: '#64748b', fontSize: 12, marginTop: 4 },
-  decision: { color: '#4338ca', fontSize: 12, lineHeight: 18, marginTop: 7 },
+  subscriptionName: { color: colors.ink, fontSize: 16, fontWeight: '800', flex: 1 },
+  subscriptionAmount: { color: colors.accentDark, fontSize: 18, fontWeight: '800', fontVariant: ['tabular-nums'] },
+  meta: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  decision: { color: colors.primary, fontSize: 12, lineHeight: 18, marginTop: 7 },
   textButton: { paddingVertical: 7, paddingRight: 9 },
-  textButtonLabel: { color: '#4338ca', fontWeight: '700', fontSize: 13 },
-  removeLabel: { color: '#b91c1c', fontWeight: '700', fontSize: 13 },
-  reviewRow: { borderTopColor: '#c7d2fe', borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
-  primaryButton: { flex: 1, backgroundColor: '#4f46e5', borderRadius: 10, alignItems: 'center', padding: 11 },
-  primaryLabel: { color: '#ffffff', fontWeight: '700' },
-  secondaryButton: { flex: 1, backgroundColor: '#ffffff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, alignItems: 'center', padding: 11 },
-  secondaryLabel: { color: '#334155', fontWeight: '700' },
-  footer: { color: '#64748b', fontSize: 12, lineHeight: 18 },
-  confirmCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 15, padding: 16 },
+  textButtonLabel: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  removeLabel: { color: colors.danger, fontWeight: '700', fontSize: 13 },
+  reviewRow: { borderTopColor: colors.lineStrong, borderTopWidth: 1, marginTop: 12, paddingTop: 12 },
+  primaryButton: { flex: 1, backgroundColor: colors.primary, borderRadius: 7, alignItems: 'center', padding: 11 },
+  primaryLabel: { color: colors.surface, fontWeight: '700' },
+  secondaryButton: { flex: 1, backgroundColor: colors.surface, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, alignItems: 'center', padding: 11 },
+  secondaryLabel: { color: colors.inkSoft, fontWeight: '700' },
+  footer: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  confirmCard: { backgroundColor: colors.dangerPale, borderColor: colors.accent, borderWidth: 1, borderRadius: 10, padding: 16 },
+  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.7, marginBottom: 1 },
 });

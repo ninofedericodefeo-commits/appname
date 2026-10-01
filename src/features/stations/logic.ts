@@ -43,11 +43,15 @@ function isPrice(value: unknown): value is GasPrice {
 
 function isStation(value: unknown): value is GasStation {
   if (!isRecord(value)) return false;
+  const validAttributions = value.attributions === undefined ||
+    (Array.isArray(value.attributions) && value.attributions.every((item: unknown) =>
+      isRecord(item) && typeof item.provider === 'string' && item.provider.length > 0 &&
+      (item.providerUri === undefined || (typeof item.providerUri === 'string' && /^https?:\/\//i.test(item.providerUri)))));
   return typeof value.id === 'string' && value.id.length > 0 &&
     typeof value.name === 'string' && value.name.length > 0 &&
     typeof value.address === 'string' && typeof value.city === 'string' && typeof value.state === 'string' &&
     isCoordinate(value.latitude, 90) && isCoordinate(value.longitude, 180) &&
-    Array.isArray(value.prices) && value.prices.every(isPrice);
+    Array.isArray(value.prices) && value.prices.every(isPrice) && validAttributions;
 }
 
 export function parseStationsResponse(value: unknown): GasStation[] {
@@ -62,7 +66,8 @@ export function parseStationsResponse(value: unknown): GasStation[] {
 
 export function priceDescription(price: GasPrice | undefined, isDemo: boolean, now = Date.now()) {
   if (!price) return 'Price unavailable';
-  if (isDemo) return 'Sample price · not live';
+  if (isDemo && price.source === 'sample') return 'Fictional sample price';
+  if (isDemo) return 'Unverified community report';
   const ageMinutes = Math.floor((now - Date.parse(price.reportedAt)) / 60_000);
   if (!Number.isFinite(ageMinutes)) return `Price age unknown · ${price.source}`;
   if (ageMinutes < -5) return `Price time unavailable · ${price.source}`;
@@ -70,4 +75,8 @@ export function priceDescription(price: GasPrice | undefined, isDemo: boolean, n
   if (displayedAge >= 24 * 60) return `Stale price · ${Math.floor(displayedAge / (24 * 60))}d old · ${price.source}`;
   if (displayedAge >= 60) return `Reported ${Math.floor(displayedAge / 60)}h ago · ${price.source}`;
   return `Reported ${displayedAge}m ago · ${price.source}`;
+}
+
+export function formatFuelPrice(price: number) {
+  return `$${price.toFixed(3).replace(/(\.\d{2})0$/, '$1')}`;
 }

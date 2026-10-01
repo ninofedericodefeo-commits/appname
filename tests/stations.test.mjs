@@ -23,7 +23,8 @@ test('distance is computed from coordinates and controls radius and sorting', ()
 test('price labels distinguish sample, missing, stale and future reports', () => {
   const price = closeStation.prices[0];
   const now = Date.parse('2026-09-29T14:00:00Z');
-  assert.equal(priceDescription(price, true, now), 'Sample price · not live');
+  assert.equal(priceDescription({ ...price, source: 'sample' }, true, now), 'Fictional sample price');
+  assert.equal(priceDescription({ ...price, source: 'community' }, true, now), 'Unverified community report');
   assert.match(priceDescription(price, false, now), /Stale price/);
   assert.equal(priceDescription(undefined, false, now), 'Price unavailable');
   assert.match(priceDescription({ ...price, reportedAt: '2026-09-30T00:00:00Z' }, false, now), /time unavailable/);

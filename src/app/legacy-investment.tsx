@@ -1,3 +1,4 @@
+import { colors } from '@/theme';
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -26,7 +27,8 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.header}>
+        <Text style={styles.kicker}>ARCHIVE  /  01</Text>
+    <View style={styles.header}>
           <Text style={styles.title}>Previous demo records</Text>
           <Link href="/activity" asChild>
             <Pressable style={styles.navButton} accessibilityRole="button">
@@ -122,43 +124,44 @@ function Summary({ label, amount }: { label: string; amount: number }) {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f3f5f7' },
+  safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
-  content: { padding: 20, paddingBottom: 40, gap: 14 },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  title: { color: '#111827', fontSize: 27, fontWeight: '800' },
-  navButton: { backgroundColor: '#111827', paddingHorizontal: 15, paddingVertical: 10, borderRadius: 999 },
-  navButtonText: { color: '#ffffff', fontWeight: '700' },
-  notice: { backgroundColor: '#fff7ed', borderColor: '#fed7aa', borderWidth: 1, borderRadius: 14, padding: 14 },
-  noticeTitle: { color: '#9a3412', fontWeight: '800', fontSize: 14 },
-  noticeText: { color: '#7c2d12', fontSize: 12, lineHeight: 17, marginTop: 4 },
+  title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
+  navButton: { backgroundColor: colors.ink, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
+  navButtonText: { color: colors.surface, fontWeight: '700' },
+  notice: { backgroundColor: colors.paleOrange, borderLeftColor: colors.accent, borderLeftWidth: 4, padding: 16 },
+  noticeTitle: { color: colors.accentDark, fontWeight: '800', fontSize: 14 },
+  noticeText: { color: colors.accentDark, fontSize: 12, lineHeight: 17, marginTop: 4 },
   summaryGrid: { gap: 9 },
-  summary: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7ebf0', borderRadius: 14, padding: 14 },
-  summaryLabel: { color: '#6b7280', fontSize: 12, fontWeight: '600' },
-  summaryAmount: { color: '#111827', fontSize: 24, fontWeight: '800', marginTop: 3 },
-  explanation: { color: '#5f6470', fontSize: 12, lineHeight: 18 },
+  summary: { backgroundColor: colors.surface, borderBottomWidth: 1, borderColor: colors.line, borderRadius: 6, padding: 16 },
+  summaryLabel: { color: colors.muted, fontSize: 11, fontWeight: '800', letterSpacing: 0.7, textTransform: 'uppercase' },
+  summaryAmount: { color: colors.ink, fontSize: 28, fontWeight: '800', letterSpacing: -0.8, marginTop: 5, fontVariant: ['tabular-nums'] },
+  explanation: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   filterRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  filterLabel: { color: '#374151', fontSize: 13, fontWeight: '700', marginRight: 4 },
-  filterButton: { borderRadius: 999, borderWidth: 1, borderColor: '#d5dbe4', paddingVertical: 9, paddingHorizontal: 12, backgroundColor: '#fff' },
-  filterSelected: { backgroundColor: '#111827', borderColor: '#111827' },
-  filterText: { color: '#374151', fontSize: 13, fontWeight: '600' },
-  filterTextSelected: { color: '#fff' },
-  errorText: { color: '#b91c1c', fontSize: 13 },
-  card: { backgroundColor: '#ffffff', borderWidth: 1, borderColor: '#e7ebf0', borderRadius: 16, padding: 15 },
-  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '800', marginBottom: 4 },
-  emptyText: { color: '#6b7280', fontSize: 13, marginTop: 8 },
-  entry: { borderTopWidth: 1, borderTopColor: '#edf0f3', flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+  filterLabel: { color: colors.inkSoft, fontSize: 13, fontWeight: '700', marginRight: 4 },
+  filterButton: { borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: colors.surface, minHeight: 44, justifyContent: 'center' },
+  filterSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
+  filterText: { color: colors.inkSoft, fontSize: 13, fontWeight: '600' },
+  filterTextSelected: { color: colors.surface },
+  errorText: { color: colors.danger, fontSize: 13 },
+  card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 9, padding: 18 },
+  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.4, marginBottom: 4 },
+  emptyText: { color: colors.muted, fontSize: 13, marginTop: 8 },
+  entry: { borderTopWidth: 1, borderTopColor: colors.line, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
   entryMain: { flex: 1 },
-  entryTitle: { color: '#111827', fontSize: 14, fontWeight: '700' },
-  entryMeta: { color: '#6b7280', fontSize: 11, lineHeight: 16, marginTop: 3 },
-  contributionAmount: { color: '#047857', fontSize: 15, fontWeight: '800' },
-  withdrawalAmount: { color: '#b45309', fontSize: 15, fontWeight: '800' },
+  entryTitle: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  entryMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
+  contributionAmount: { color: colors.primary, fontSize: 15, fontWeight: '800' },
+  withdrawalAmount: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   removeButton: { alignSelf: 'flex-start', paddingVertical: 7, marginTop: 4 },
-  removeText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
-  confirmCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 15 },
+  removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
+  confirmCard: { backgroundColor: colors.dangerPale, borderColor: colors.accent, borderWidth: 1, borderRadius: 10, padding: 15 },
   confirmRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
-  confirmButton: { backgroundColor: '#b91c1c', borderRadius: 9, paddingVertical: 10, paddingHorizontal: 16 },
-  confirmText: { color: '#fff', fontWeight: '700' },
-  cancelButton: { backgroundColor: '#fff', borderRadius: 9, borderWidth: 1, borderColor: '#d1d5db', paddingVertical: 10, paddingHorizontal: 16 },
-  cancelText: { color: '#111827', fontWeight: '700' },
+  confirmButton: { backgroundColor: colors.danger, borderRadius: 6, paddingVertical: 10, paddingHorizontal: 16 },
+  confirmText: { color: colors.surface, fontWeight: '700' },
+  cancelButton: { backgroundColor: colors.surface, borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, paddingVertical: 10, paddingHorizontal: 16 },
+  cancelText: { color: colors.ink, fontWeight: '700' },
+  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.7, marginBottom: 1 },
 });

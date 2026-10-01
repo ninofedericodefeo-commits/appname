@@ -1,7 +1,10 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { colors } from '@/theme';
+import { useState } from 'react';
+import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import type { FuelType, GasStation } from '@/types/stations';
-import { priceDescription } from '@/features/stations/data';
+import { priceDescription, reportStationPrice } from '@/features/stations/data';
+import { formatFuelPrice } from '@/features/stations/logic';
 
 export function GasStationCard({
   station,
@@ -9,45 +12,102 @@ export function GasStationCard({
   isCheapest,
   isDemo,
   now,
+  canReport = false,
+  onReported,
 }: {
   station: GasStation;
   fuelType: FuelType;
   isCheapest?: boolean;
   isDemo: boolean;
   now: number;
+  canReport?: boolean;
+  onReported?: () => void;
 }) {
   const price = station.prices.find((item) => item.fuelType === fuelType);
+  const [editing, setEditing] = useState(false);
+  const [priceInput, setPriceInput] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function submitPrice() {
+    const value = Number(priceInput.trim());
+    if (!/^\d+(?:\.\d{1,3})?$/.test(priceInput.trim()) || value <= 0 || value > 30) {
+      setError('Enter a price from $0.001 to $30.000.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await reportStationPrice(station.id, fuelType, value);
+      setEditing(false);
+      setPriceInput('');
+      onReported?.();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Could not save this price.');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <View style={[styles.card, isCheapest && styles.cheapestCard]}>
       <View style={styles.row}>
         <View style={styles.textBlock}>
+          {isCheapest && <Text style={styles.bestLabel}>BEST PRICE IN THIS LIST</Text>}
           <Text style={styles.name}>{station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
           <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi · {priceDescription(price, isDemo, now)}</Text>
+          {station.attributions?.map((attribution, index) => attribution.providerUri ? (
+            <Pressable key={`${attribution.provider}-${index}`} accessibilityRole="link" onPress={() => void Linking.openURL(attribution.providerUri!)}>
+              <Text style={styles.attribution}>{attribution.provider} ↗</Text>
+            </Pressable>
+          ) : <Text key={`${attribution.provider}-${index}`} style={styles.attribution}>{attribution.provider}</Text>)}
         </View>
 
         <View style={styles.priceCol}>
-          <Text style={styles.price}>{price ? `$${price.price.toFixed(2)}` : '—'}</Text>
+          <Text style={styles.price}>{price ? formatFuelPrice(price.price) : '—'}</Text>
           <Text style={styles.priceLabel}>/gal</Text>
         </View>
       </View>
+      {canReport && (
+        <View style={styles.reportArea}>
+          {editing ? <>
+            <Text style={styles.reportNote}>Report the pump price you saw. This unverified price is shared with everyone using this API. No receipt photo is uploaded.</Text>
+            <TextInput value={priceInput} onChangeText={setPriceInput} keyboardType="decimal-pad" placeholder="Price per gallon" accessibilityLabel={`${station.name} ${fuelType} price per gallon`} style={styles.input} maxLength={7} />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.reportActions}>
+              <Pressable accessibilityRole="button" onPress={() => void submitPrice()} disabled={saving} style={styles.reportButton}><Text style={styles.reportButtonText}>{saving ? 'Saving…' : 'Save price'}</Text></Pressable>
+              <Pressable accessibilityRole="button" onPress={() => { setEditing(false); setError(''); }}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+            </View>
+          </> : <Pressable accessibilityRole="button" onPress={() => setEditing(true)}><Text style={styles.editText}>Report a price ↗</Text></Pressable>}
+        </View>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  reportArea: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12 },
+  reportNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 9 },
+  input: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, padding: 10, minHeight: 44, color: colors.ink },
+  error: { color: colors.danger, fontSize: 12, marginTop: 6 },
+  reportActions: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 10 },
+  reportButton: { backgroundColor: colors.accentDark, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 6 },
+  reportButtonText: { color: colors.surface, fontWeight: '700' },
+  cancelText: { color: colors.muted, fontWeight: '700' },
+  editText: { color: colors.accentDark, fontWeight: '700' },
   card: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#e8ebef',
-    marginBottom: 12,
+    backgroundColor: colors.surface,
+    borderRadius: 7,
+    padding: 17,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.line,
+    marginBottom: 7,
   },
   cheapestCard: {
-    borderColor: '#4f8cff',
-    backgroundColor: '#eef4ff',
+    borderLeftWidth: 4,
+    borderLeftColor: colors.accent,
+    backgroundColor: colors.paleOrange,
   },
   row: {
     flexDirection: 'row',
@@ -58,31 +118,35 @@ const styles = StyleSheet.create({
   textBlock: {
     flex: 1,
   },
+  bestLabel: { color: colors.accentDark, fontSize: 10, fontWeight: '800', letterSpacing: 1, marginBottom: 7 },
   name: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1d1d1f',
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.ink,
   },
   address: {
     marginTop: 4,
     fontSize: 13,
-    color: '#5f6470',
+    color: colors.muted,
   },
   meta: {
     marginTop: 4,
     fontSize: 12,
-    color: '#7a7f89',
+    color: colors.muted,
   },
+  attribution: { marginTop: 5, color: colors.muted, fontSize: 12 },
   priceCol: {
     alignItems: 'flex-end',
   },
   price: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#111827',
+    fontSize: 25,
+    fontWeight: '800',
+    letterSpacing: -0.8,
+    color: colors.accentDark,
+    fontVariant: ['tabular-nums'],
   },
   priceLabel: {
     fontSize: 12,
-    color: '#7b8190',
+    color: colors.muted,
   },
 });

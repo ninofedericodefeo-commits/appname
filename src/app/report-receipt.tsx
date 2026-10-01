@@ -1,3 +1,4 @@
+import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { Link } from 'expo-router';
@@ -139,27 +140,31 @@ export default function ReportReceiptScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <View style={styles.header}>
+        <Text style={styles.kicker}>FUEL  /  02</Text>
+    <View style={styles.header}>
           <Text style={styles.title}>Receipt report</Text>
           <Link href="/" asChild><Pressable accessibilityRole="button" style={styles.navButton}><Text style={styles.navText}>Gas prices</Text></Pressable></Link>
         </View>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Saved only on this device</Text>
-          <Text style={styles.noticeText}>A photo supports your report, but the app does not read receipt text automatically or publish prices to other users yet. Check every detail before saving. Cover any payment details you do not want in the photo.</Text>
+          <Text style={styles.noticeText}>Your receipt photo and report stay on this device. The app does not read the receipt or publish prices yet. Check each detail and cover payment information in the photo.</Text>
         </View>
 
         {Platform.OS === 'web' ? (
           <View style={styles.card}><Text style={styles.sectionTitle}>Use the mobile app</Text><Text style={styles.hint}>Receipt photos can be saved in the iOS or Android app. This web preview does not store them.</Text></View>
         ) : (
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>1. Add a receipt photo</Text>
-            <View style={styles.row}>
-              <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void choosePhoto('camera')}><Text style={styles.actionText}>Take photo</Text></Pressable>
-              <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void choosePhoto('library')}><Text style={styles.actionText}>Choose photo</Text></Pressable>
+            <View style={styles.uploadZone}>
+              <Text style={styles.uploadStep}>01 / RECEIPT</Text>
+              <Text style={styles.sectionTitle}>Add a receipt photo</Text>
+              <View style={styles.row}>
+                <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void choosePhoto('camera')}><Text style={styles.actionText}>Take photo</Text></Pressable>
+                <Pressable accessibilityRole="button" style={styles.actionButton} onPress={() => void choosePhoto('library')}><Text style={styles.actionText}>Choose photo</Text></Pressable>
+              </View>
+              {photo && <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" accessibilityLabel="Selected gas receipt" />}
             </View>
-            {photo && <Image source={{ uri: photo.uri }} style={styles.preview} resizeMode="contain" accessibilityLabel="Selected gas receipt" />}
 
-            <Text style={styles.sectionTitle}>2. Confirm the details</Text>
+            <Text style={styles.sectionTitle}>02 / Confirm the details</Text>
             <Text style={styles.label}>Station name</Text>
             <TextInput style={styles.input} value={stationName} onChangeText={setStationName} placeholder="Name on receipt" accessibilityLabel="Station name" maxLength={100} />
             <Text style={styles.label}>Station address</Text>
@@ -182,7 +187,7 @@ export default function ReportReceiptScreen() {
             <Text style={styles.label}>Purchase date (YYYY-MM-DD)</Text>
             <TextInput style={styles.input} value={purchasedOn} onChangeText={setPurchasedOn} placeholder="2026-09-28" accessibilityLabel="Purchase date" maxLength={10} />
 
-            <Text style={styles.sectionTitle}>3. Confirm the station location</Text>
+            <Text style={styles.sectionTitle}>03 / Confirm the station location</Text>
             <Text style={styles.hint}>Use your current GPS location only if you are at the gas station now. A receipt photo does not prove where it was taken.</Text>
             <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => void attachStationLocation()} disabled={busy}><Text style={styles.secondaryText}>{coordinates ? 'Update station GPS location' : 'Use my location at the station'}</Text></Pressable>
             {coordinates && <View><Text style={styles.locationText}>Attached GPS: {coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</Text><Pressable accessibilityRole="button" onPress={() => setCoordinates(null)}><Text style={styles.removeText}>Remove GPS location</Text></Pressable></View>}
@@ -221,43 +226,46 @@ export default function ReportReceiptScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#f3f5f7' },
-  content: { padding: 20, paddingBottom: 40, gap: 14 },
+  safeArea: { flex: 1, backgroundColor: colors.paper },
+  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
-  title: { color: '#111827', fontSize: 27, fontWeight: '800', flexShrink: 1 },
-  navButton: { backgroundColor: '#111827', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 12 },
-  navText: { color: '#fff', fontWeight: '700' },
-  notice: { backgroundColor: '#eff6ff', borderColor: '#bfdbfe', borderWidth: 1, borderRadius: 15, padding: 15 },
-  noticeTitle: { color: '#1e3a8a', fontWeight: '800', fontSize: 15 },
-  noticeText: { color: '#334155', fontSize: 13, lineHeight: 19, marginTop: 5 },
-  card: { backgroundColor: '#fff', borderColor: '#e5e7eb', borderWidth: 1, borderRadius: 17, padding: 16 },
-  sectionTitle: { color: '#111827', fontSize: 17, fontWeight: '800', marginTop: 12, marginBottom: 7 },
-  hint: { color: '#6b7280', fontSize: 12, lineHeight: 18, marginBottom: 5 },
+  title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
+  navButton: { backgroundColor: colors.ink, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 12, minHeight: 44, justifyContent: 'center' },
+  navText: { color: colors.surface, fontWeight: '700' },
+  notice: { backgroundColor: colors.paleGreen, borderLeftColor: colors.primary, borderLeftWidth: 3, padding: 15 },
+  noticeTitle: { color: colors.ink, fontWeight: '800', fontSize: 14 },
+  noticeText: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginTop: 5 },
+  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 18 },
+  sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', letterSpacing: -0.4, marginTop: 18, marginBottom: 10 },
+  hint: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 5 },
+  uploadZone: { backgroundColor: colors.paleOrange, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.accent, borderRadius: 8, padding: 16, marginBottom: 12 },
+  uploadStep: { color: colors.accentDark, fontSize: 10, fontWeight: '800', letterSpacing: 1.5 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, alignItems: 'center', marginBottom: 6 },
-  actionButton: { backgroundColor: '#111827', borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12 },
-  actionText: { color: '#fff', fontWeight: '700', fontSize: 14 },
-  preview: { width: '100%', height: 220, backgroundColor: '#f3f4f6', borderRadius: 12, marginVertical: 10 },
-  label: { color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 11, marginBottom: 5 },
-  input: { backgroundColor: '#fff', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, minHeight: 46, fontSize: 15 },
+  actionButton: { backgroundColor: colors.accentDark, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 12 },
+  actionText: { color: colors.surface, fontWeight: '700', fontSize: 14 },
+  preview: { width: '100%', height: 220, backgroundColor: colors.paper, borderRadius: 8, marginVertical: 10 },
+  label: { color: colors.inkSoft, fontSize: 13, fontWeight: '700', marginTop: 11, marginBottom: 5 },
+  input: { backgroundColor: colors.surface, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, paddingHorizontal: 12, paddingVertical: 11, minHeight: 46, fontSize: 15 },
   halfField: { flex: 1, minWidth: 130 },
-  choice: { backgroundColor: '#f8fafc', borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 11 },
-  choiceSelected: { backgroundColor: '#111827', borderColor: '#111827' },
-  choiceText: { color: '#374151', fontWeight: '600', textTransform: 'capitalize' },
-  choiceTextSelected: { color: '#fff' },
-  secondaryButton: { borderColor: '#cbd5e1', borderWidth: 1, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 12, alignSelf: 'flex-start' },
-  secondaryText: { color: '#111827', fontWeight: '700' },
-  locationText: { color: '#0369a1', fontSize: 12, marginTop: 6 },
-  error: { color: '#b91c1c', fontSize: 13, marginTop: 12, lineHeight: 18 },
-  saveButton: { backgroundColor: '#047857', borderRadius: 10, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
-  saveText: { color: '#fff', fontWeight: '800', fontSize: 14 },
+  choice: { backgroundColor: colors.paper, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 11, minHeight: 44, justifyContent: 'center' },
+  choiceSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
+  choiceText: { color: colors.inkSoft, fontWeight: '600', textTransform: 'capitalize' },
+  choiceTextSelected: { color: colors.surface },
+  secondaryButton: { borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, paddingHorizontal: 14, paddingVertical: 12, alignSelf: 'flex-start' },
+  secondaryText: { color: colors.ink, fontWeight: '700' },
+  locationText: { color: colors.primary, fontSize: 12, marginTop: 6 },
+  error: { color: colors.danger, fontSize: 13, marginTop: 12, lineHeight: 18 },
+  saveButton: { backgroundColor: colors.accentDark, borderRadius: 6, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
+  saveText: { color: colors.surface, fontWeight: '800', fontSize: 14 },
   disabled: { opacity: 0.5 },
-  reportRow: { flexDirection: 'row', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: '#e5e7eb' },
-  thumbnail: { width: 64, height: 80, backgroundColor: '#f3f4f6', borderRadius: 7 },
+  reportRow: { flexDirection: 'row', gap: 10, paddingVertical: 12, borderTopWidth: 1, borderTopColor: colors.line },
+  thumbnail: { width: 64, height: 80, backgroundColor: colors.paper, borderRadius: 7 },
   reportDetails: { flex: 1 },
-  reportName: { color: '#111827', fontSize: 14, fontWeight: '800' },
-  reportMeta: { color: '#6b7280', fontSize: 11, lineHeight: 16, marginTop: 3 },
+  reportName: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  reportMeta: { color: colors.muted, fontSize: 11, lineHeight: 16, marginTop: 3 },
   removeButton: { alignSelf: 'flex-start', paddingVertical: 8, marginTop: 2 },
-  removeText: { color: '#b91c1c', fontSize: 12, fontWeight: '700' },
-  confirmCard: { backgroundColor: '#fef2f2', borderColor: '#fecaca', borderWidth: 1, borderRadius: 14, padding: 15 },
-  deleteButton: { backgroundColor: '#b91c1c', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
+  confirmCard: { backgroundColor: colors.dangerPale, borderColor: colors.accent, borderWidth: 1, borderRadius: 10, padding: 15 },
+  deleteButton: { backgroundColor: colors.danger, borderRadius: 7, paddingHorizontal: 16, paddingVertical: 12 },
+  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.7, marginBottom: 1 },
 });
