@@ -2,6 +2,7 @@ import { colors } from '@/theme';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GasStationCard } from '@/components/GasStationCard';
@@ -15,7 +16,7 @@ import type { FuelType } from '@/types/stations';
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
   const { selectedFuelType, selectedRadius, sortOrder, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
-  const [mode, setMode] = useState<'demo' | 'online'>('demo');
+  const [mode, setMode] = useState<'demo' | 'nearby' | 'online'>('demo');
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
   const [now, setNow] = useState(() => Date.now());
@@ -25,8 +26,8 @@ export default function GasScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  async function startOnlineSearch() {
-    setMode('online');
+  async function startLocationSearch(nextMode: 'nearby' | 'online') {
+    setMode(nextMode);
     if (selectedRadius > 25) setSelectedRadius(25);
     setLocation(null);
     setLocationStatus('loading');
@@ -74,7 +75,7 @@ export default function GasScreen() {
 
         {canShowResults && !isError && cheapest && (
           <View style={styles.highlightCard}>
-            <View style={styles.heroTop}><Text style={styles.heroEyebrow}>01 / FUEL WATCH</Text><Text style={styles.heroBadge}>{mode === 'demo' ? cheapestPrice?.source === 'community' ? 'UNVERIFIED' : 'SAMPLE' : 'REPORTED'}</Text></View>
+            <View style={styles.heroTop}><Text style={styles.heroEyebrow}>01 / FUEL WATCH</Text><Text style={styles.heroBadge}>{cheapestPrice?.source === 'sample' ? 'SAMPLE' : 'UNVERIFIED'}</Text></View>
             <Text style={styles.label}>Lowest {selectedFuelType} price</Text>
             <View style={styles.heroPriceRow}><Text style={styles.priceMain}>{cheapestPrice ? formatFuelPrice(cheapestPrice.price) : '—'}</Text><Text style={styles.perGallon}>/ gallon</Text></View>
             <View style={styles.heroRule} />
@@ -84,23 +85,24 @@ export default function GasScreen() {
         )}
 
         <View style={styles.sourceCard}>
-          <Text style={styles.sourceTitle}>{mode === 'demo' ? 'api-learn station data' : 'Online station search'}</Text>
+          <Text style={styles.sourceTitle}>{mode === 'demo' ? 'api-learn sample data' : mode === 'nearby' ? 'Real stations near you' : 'Google station search'}</Text>
           <Text style={styles.sourceText}>
             {mode === 'demo'
               ? 'These stations start with fictional prices from api-learn. User price reports are unverified and may be inaccurate.'
-              : 'Search uses your current location. Available prices may be missing or old. This online service covers up to 25 miles and returns up to 20 stations.'}
+              : mode === 'nearby'
+                ? 'Locations come from OpenStreetMap. Your device location is sent to the map lookup through your local API. Distances are straight line. Prices appear only when someone has reported one.'
+                : 'Search uses your current location. Available prices may be missing or old. This online service covers up to 25 miles and returns up to 20 stations.'}
           </Text>
+          {mode !== 'demo' && location && <Text style={styles.sourceText}>Your location: {location.latitude.toFixed(3)}, {location.longitude.toFixed(3)} · {data && 'locationsCached' in data && data.locationsCached ? 'cached station locations' : 'current lookup'}</Text>}
+          {mode === 'nearby' && <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}><Text style={styles.sourceText}>© OpenStreetMap contributors · ODbL ↗</Text></Pressable>}
           <View style={styles.pillRow}>
             <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'demo' }} style={[styles.pill, mode === 'demo' && styles.activePill]} onPress={() => setMode('demo')}>
               <Text style={[styles.pillText, mode === 'demo' && styles.activePillText]}>Sample data</Text>
             </Pressable>
-            {stationApiBaseUrl ? (
-              <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'online' }} style={[styles.pill, mode === 'online' && styles.activePill]} onPress={() => void startOnlineSearch()}>
-                <Text style={[styles.pillText, mode === 'online' && styles.activePillText]}>Search near me</Text>
-              </Pressable>
-            ) : (
-              <Text style={styles.sourceText}>Online data is not configured yet.</Text>
-            )}
+            {sampleApiBaseUrl && <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'nearby' }} style={[styles.pill, mode === 'nearby' && styles.activePill]} onPress={() => void startLocationSearch('nearby')}><Text style={[styles.pillText, mode === 'nearby' && styles.activePillText]}>Real stations nearby</Text></Pressable>}
+            {stationApiBaseUrl && <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'online' }} style={[styles.pill, mode === 'online' && styles.activePill]} onPress={() => void startLocationSearch('online')}>
+              <Text style={[styles.pillText, mode === 'online' && styles.activePillText]}>Google prices</Text>
+            </Pressable>}
           </View>
         </View>
 
@@ -146,7 +148,7 @@ export default function GasScreen() {
           <View style={styles.filterPanel}>
             <Text style={styles.sectionTitle}>Radius</Text>
             <View style={styles.pillRow}>
-              {(mode === 'online' ? [5, 10, 25] : [5, 10, 25, 50]).map((radius) => (
+              {(mode === 'demo' ? [5, 10, 25, 50] : [5, 10, 25]).map((radius) => (
                 <Pressable
                   key={radius}
                   style={[styles.pill, selectedRadius === radius && styles.activePill]}
@@ -159,21 +161,21 @@ export default function GasScreen() {
           </View>
         </View>
 
-        {mode === 'online' && locationStatus === 'denied' && (
+        {mode !== 'demo' && locationStatus === 'denied' && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Location access was denied</Text>
             <Text style={styles.emptyText}>Enable location for GasFinder in your device settings, then try again. Sample data is still available.</Text>
-            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startOnlineSearch()}><Text style={styles.retryText}>Try location again</Text></Pressable>
+            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startLocationSearch(mode)}><Text style={styles.retryText}>Try location again</Text></Pressable>
           </View>
         )}
-        {mode === 'online' && locationStatus === 'unavailable' && (
+        {mode !== 'demo' && locationStatus === 'unavailable' && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Location unavailable</Text>
             <Text style={styles.emptyText}>Check your device location service and try again.</Text>
-            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startOnlineSearch()}><Text style={styles.retryText}>Try again</Text></Pressable>
+            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startLocationSearch(mode)}><Text style={styles.retryText}>Try again</Text></Pressable>
           </View>
         )}
-        {(locationStatus === 'loading' && mode === 'online' || canShowResults && (isLoading || isFetching)) && (
+        {(locationStatus === 'loading' && mode !== 'demo' || canShowResults && (isLoading || isFetching)) && (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="small" color={colors.accent} />
             <Text style={styles.loadingText}>{mode === 'demo' ? 'Loading sample stations…' : 'Finding nearby stations…'}</Text>
@@ -192,9 +194,9 @@ export default function GasScreen() {
           <View style={styles.listSection}>
             <Text style={styles.sectionEyebrow}>04 / STATIONS NEARBY</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
-            {mode === 'online' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. Station locations are shown below.</Text>}
+            {mode !== 'demo' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. Station locations are shown below.</Text>}
             {stations.map((station) => (
-              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={mode === 'demo'} now={now} canReport={mode === 'demo' && !!sampleApiBaseUrl} onReported={() => void refetch()} />
+              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={mode === 'demo'} now={now} canReport={mode !== 'online' && !!sampleApiBaseUrl} canOpenMaps={mode !== 'demo'} onReported={() => void refetch()} />
             ))}
           </View>
         )}

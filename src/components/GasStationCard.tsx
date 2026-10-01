@@ -1,12 +1,14 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Link } from 'expo-router';
+import * as Linking from 'expo-linking';
 import { useQueryClient } from '@tanstack/react-query';
 
 import type { FuelType, GasStation } from '@/types/stations';
 import { priceDescription, reportStationPrice } from '@/features/stations/data';
 import { formatFuelPrice } from '@/features/stations/logic';
+import { appleMapsDirections, googleMapsDirections } from '@/features/stations/maps';
 
 export function GasStationCard({
   station,
@@ -15,6 +17,7 @@ export function GasStationCard({
   isDemo,
   now,
   canReport = false,
+  canOpenMaps = false,
   onReported,
 }: {
   station: GasStation;
@@ -23,6 +26,7 @@ export function GasStationCard({
   isDemo: boolean;
   now: number;
   canReport?: boolean;
+  canOpenMaps?: boolean;
   onReported?: () => void;
 }) {
   const price = station.prices.find((item) => item.fuelType === fuelType);
@@ -31,6 +35,16 @@ export function GasStationCard({
   const [priceInput, setPriceInput] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  const [mapsError, setMapsError] = useState('');
+
+  async function openMap(url: string) {
+    setMapsError('');
+    try {
+      await Linking.openURL(url);
+    } catch {
+      setMapsError('Could not open the maps app on this device.');
+    }
+  }
 
   async function submitPrice() {
     const value = Number(priceInput.trim());
@@ -73,6 +87,11 @@ export function GasStationCard({
           <Text style={styles.priceLabel}>/gal</Text>
         </View>
       </View>
+      {canOpenMaps && <View style={styles.mapActions}>
+        {Platform.OS === 'ios' && <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(appleMapsDirections(station))}><Text style={styles.mapButtonText}>Apple Maps ↗</Text></Pressable>}
+        <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(googleMapsDirections(station))}><Text style={styles.mapButtonText}>Google Maps ↗</Text></Pressable>
+        {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
+      </View>}
       {canReport && (
         <View style={styles.reportArea}>
           <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>
@@ -92,6 +111,9 @@ export function GasStationCard({
 }
 
 const styles = StyleSheet.create({
+  mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 15, alignItems: 'center' },
+  mapButton: { borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
+  mapButtonText: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   reportArea: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12 },
   historyLink: { marginBottom: 10 },
   reportNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 9 },
