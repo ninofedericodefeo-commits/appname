@@ -26,6 +26,7 @@ export type GasStation = {
     restrooms?: boolean;
   };
   prices: GasPrice[];
+  attributions?: { provider: string; providerUri?: string }[];
   distanceMiles?: number;
 };
 

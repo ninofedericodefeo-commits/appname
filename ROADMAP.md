@@ -6,14 +6,14 @@ This roadmap turns four product goals into a staged plan:
 
 1. Learn from other gas-finding apps and improve GasFinder.
 2. Test GasFinder on a physical phone and bring gas data online.
-3. Explore useful money-management features, including spending controls for individuals and families.
+3. Explore useful money-management features, including support for reducing impulse online purchases.
 4. Give users a clear, trustworthy view of money saved and contributions made.
 
 The roadmap prioritizes learning and safe testing before connecting accounts or handling real money. It is a product direction, not a promise that every idea is technically available on every platform.
 
 ## Where the app is today
 
-GasFinder is an Expo/React Native mobile app with separate gas and investing screens. The gas finder currently uses bundled sample stations. The investing screen is a local simulation with configurable contribution rules and cash/stock-style demo balances. The local prototype also includes a savings ledger, an optional online-purchase cooling-off planner, a simulated discretionary-spending pause, and local-only family budget/approval examples. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; block spending in other apps; or execute trades.
+GasFinder is an Expo/React Native mobile app with separate gas and savings-goal screens. The gas finder currently uses bundled sample stations. Savings goals use manually logged purchases and the on-device savings pocket; the previous simulated investing ledger remains in a read-only archive. The local prototype also includes an optional online-purchase cooling-off planner. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; or execute trades.
 
 That is a useful foundation for testing the experience, but simulated values must remain clearly identified as demo data until backed by a real, reviewed financial integration.
 
@@ -21,13 +21,14 @@ That is a useful foundation for testing the experience, but simulated values mus
 
 - A savings tracker summarizes simulated contributions, current demo balances, and withdrawals, with itemized contribution and withdrawal history.
 - An optional, on-device purchase-pause planner lets users set a 24-hour, 2-day, or 7-day delay and self-report whether they bought or skipped a planned online purchase.
-- A local spending-pause demo offers timed pauses and a manual purchase checker; automatic payments and bills are labeled exempt. It cannot observe or block actual purchases.
-- A local family-controls demo supports child/teen profile names, weekly demo limits, and simulated parent approval/decline decisions. It has no linked accounts, verified guardians, notifications, or phone/app-store/payment restrictions.
-- On native mobile, a car-profile prototype estimates remaining fuel from a user-logged refuel, configured tank capacity/MPG, and GPS trip distance; it can send a local low-fuel alert when the estimate crosses the user's configured threshold.
-- Car settings, fuel estimates, background location, and low-fuel alerts are mobile-only. Trip suggestions still use local sample destinations/stations rather than address lookup, road routing, or live gas data.
-- Background fuel alerts require native iOS/Android permissions and a development/release build with the configured location and notification capabilities; they are not available in the web version.
 - The purchase-pause feature does not monitor accounts, intercept checkout, or block transactions. Its skipped-purchase total is an unverified user-reported estimate, not confirmed savings.
-- These features are persisted locally for the prototype. This does not make the balances real or suitable for financial decisions.
+- Both features are persisted locally for the prototype. This does not make the balances real or suitable for financial decisions.
+- The gas screen now separates a labeled Philadelphia sample from an opt-in online backend contract. Online search requires location permission, validates server data, and shows errors without silently substituting samples. A provider and backend are still required before live fuel prices are available.
+- Local ledger entries can be filtered by date and removed with balance-safe corrections; purchase-pause records can be deleted. Physical-phone verification is tracked in `docs/PHONE_SMOKE_TEST.md`.
+- A mobile receipt-report flow now stores a photo and user-confirmed fuel price, fuel type, date, and station address or on-site GPS on the device. It does not extract receipt text or publish prices to other users. Shared prices require an authenticated backend, duplicate checks, moderation, retention rules, and a plan for handling false reports.
+- A separate savings pocket now earmarks part of a manually entered account balance on this device. It is an estimate within the user's existing account; it cannot verify, transfer, or restrict bank funds. This matches the requested no-bank-connection scope.
+- One active savings goal can use all or none of an existing pocket amount, accept confirmed set-asides, and show suggestions based on manually logged purchases and an optional deadline. An optional iPhone widget shows goal progress, with amounts hidden by default. Neither goals nor the widget represent a verified balance or an investment.
+- A local subscription tracker now records monthly or yearly renewal dates and user-entered prices. It prompts for each renewal on the preceding calendar day and can schedule optional local 9 AM notifications. A plan-to-cancel decision is a reminder to act with the provider, not a cancellation or blocked charge.
 
 ## Product principles
 
@@ -46,10 +47,10 @@ That is a useful foundation for testing the experience, but simulated values mus
 | 2 | Phone testing and experience quality | A repeatable real-device test process and a stable mobile demo |
 | 3 | Online gas information | Reliable, licensed station and price data for a defined launch area |
 | 4 | Savings tracker | A reconciliable record of contributions, balances, and withdrawals |
-| 5 | Spending guardrails and family controls | Optional tools to pause discretionary spending and help parents set age-appropriate limits |
+| 5 | Online-purchase guardrails | Optional tools that help users pause or budget discretionary spending |
 | 6 | Real financial connections | A carefully selected, consent-based route to transaction data and, separately, money movement or investing |
 
-Workstreams 1 and 2 can begin with the current demo. Online gas data, the savings tracker, and purchase guardrails can be explored independently. System-level spending controls and family management depend on operating-system capabilities, provider support, and additional privacy and legal review. Real financial integrations depend on selecting providers and completing the required product, legal, security, and operational reviews.
+Workstreams 1 and 2 can begin with the current demo. Online gas data, the savings tracker, and purchase guardrails can be explored independently. Real financial integrations depend on selecting providers and completing the required product, legal, security, and operational reviews.
 
 ---
 
@@ -219,19 +220,17 @@ The interface and data model should distinguish:
 
 ---
 
-## 5. Explore spending guardrails and family controls
+## 5. Explore ways to limit unnecessary online purchases
 
 ### Goal
 
-Offer optional, user-directed tools that help people manage discretionary spending, including family controls, without secretly monitoring them or implying the app can block payments it does not control. The product should distinguish reminders and budgeting from actual system or payment restrictions.
+Offer optional, user-directed tools that help people think before discretionary purchases without secretly monitoring them or implying the app can block payments it does not control.
 
 ### Start with discovery
 
 - Ask users what they mean by “unnecessary” and which purchase situations they want help with.
-- Learn whether their preferred intervention is a reminder, a budget, a delay, a spending summary, or a temporary pause on discretionary spending.
+- Learn whether their preferred intervention is a reminder, a budget, a delay, or a spending summary.
 - Identify accessibility needs, false-positive concerns, privacy expectations, and ways the feature could feel judgmental or coercive.
-- For family controls, interview parents and age-appropriate child/teen participants separately. Understand household expectations, child privacy, autonomy, consent, and how limits and exceptions should work.
-- Map what each target OS can actually restrict, and distinguish app-level reminders from operating-system controls, app-store purchase controls, card controls, and bank/payment-provider controls. Confirm platform policies and required entitlements before promising any blocking behavior.
 
 ### Candidate first features
 
@@ -240,17 +239,12 @@ Offer optional, user-directed tools that help people manage discretionary spendi
 - **Discretionary budget:** user sets a voluntary period/category limit and receives a progress indicator or warning.
 - **Purchase reflection:** a configurable prompt or reminder before a user goes shopping, without intercepting an external payment.
 - **Spending summary:** opt-in totals and trends based on data the user has explicitly provided or authorized.
-- **Discretionary-spending pause:** a user-requested pause on supported discretionary spending from the phone, with recurring automatic payments and bills explicitly excluded. First define the exact scope (for example, app-store purchases, in-app purchases, or a linked payment method); the app cannot universally stop spending across unrelated apps, websites, cards, and payment services by itself. Provide an explicit end time, status, and recovery/unpause path so users are not unexpectedly locked out of essential access.
-- **Family spending controls:** a parent/guardian-managed family group with linked child/teen profiles, configurable spending budgets or limits, age-appropriate approvals, and clear notifications. Any ability to block purchases must be limited to supported OS, app-store, or payment-provider integrations and clearly state what remains outside the control.
 
 ### Guardrails
 
 - Every feature is opt-in, plainly explained, and easy to pause or disable.
 - The app does not shame users or use dark patterns to steer them toward a financial product.
-- Do not claim to prevent a purchase unless a specific supported integration actually has that capability and the affected user or authorized guardian explicitly enabled it.
-- A discretionary-spending pause must not silently interrupt recurring automatic payments or bills; define how subscriptions, pending transactions, refunds, emergencies, and mistaken blocks are handled.
-- Family controls must use verified parent/guardian authority where required, provide age-appropriate notice and transparency to children, minimize monitoring, protect family members' data, and define consent, revocation, account separation, and what happens when a child reaches the applicable age threshold.
-- Do not imply that a parent can control every payment on a child's phone unless all relevant purchase and payment channels are covered by supported integrations.
+- Do not claim to prevent a purchase unless a specific supported integration actually has that capability and the user explicitly enabled it.
 - Minimize transaction data collection and explain retention and deletion behavior.
 - Provide a way to adjust rules and correct incorrect categories or imported transactions.
 
@@ -258,8 +252,6 @@ Offer optional, user-directed tools that help people manage discretionary spendi
 
 - User-research summary and selected problem statement.
 - Tested prototype for the most useful low-risk intervention.
-- A platform/provider capability matrix specifying which purchase channels can be warned about, limited, paused, or not controlled, including how automatic payments and bills are treated.
-- For a family-controls direction, a family permissions and consent model, child/guardian account lifecycle, and clear explanation of uncovered spending channels.
 - Privacy/data-minimization plan and user-controlled settings.
 
 ### Acceptance criteria
@@ -268,12 +260,10 @@ Offer optional, user-directed tools that help people manage discretionary spendi
 - A user can pause, disable, and edit it without contacting support.
 - Usability testing shows that the feature supports the user's stated goal and does not unexpectedly interfere with payments.
 - Any spending estimate is clearly identified as an estimate.
-- A spending pause's covered channels, start/end time, automatic-payment exclusions, and override/unpause behavior are understandable before activation.
-- Family tests confirm that guardians can manage only the controls supported by the selected integrations, while children receive clear notice and appropriate privacy protections.
 
 ### Decision gate
 
-Do not build broad account monitoring, system-wide spending pauses, or family purchase blocking before validating user demand, privacy impact, technical feasibility, and platform/provider terms. If an OS or payment channel does not expose a supported control, offer an honest reminder or budgeting alternative rather than suggesting the app can block that spending.
+Do not build broad account monitoring or transaction blocking before validating user demand, privacy impact, technical feasibility, and platform/provider terms.
 
 ---
 
@@ -371,6 +361,4 @@ Do not optimize for the amount of money collected or invested without also measu
 - Which city or region should be used for online gas-data evaluation?
 - Is the first financial goal transaction visibility, a user-approved transfer, cash savings, or brokerage investment?
 - Should online-spending support focus on budgets, cooling-off reminders, or another user-validated behavior?
-- Which discretionary purchase channels should a pause cover, and what should count as an excluded automatic payment or bill?
-- Should family controls begin with spending visibility, approval requests, budgets, or purchase restrictions—and which age groups/platforms are in scope?
 - Which privacy, retention, and account-deletion expectations should be product defaults?

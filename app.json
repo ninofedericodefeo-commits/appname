@@ -11,35 +11,75 @@
       "typedRoutes": true
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.gasfinder",
+      "infoPlist": {
+        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
+        "NSLocalNetworkUsageDescription": "Allow GasFinder to connect to the sample gas price API running on your local network."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#173A35",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "bundler": "metro",
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
+      "./plugins/withIosBuildScriptAccess",
       "expo-router",
+      "expo-notifications",
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow GasFinder to use your location to estimate fuel use during trips and find nearby gas stations.",
-          "locationAlwaysAndWhenInUsePermission": "Allow GasFinder to use your location in the background to estimate fuel use while you travel and send low-fuel alerts.",
-          "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true,
-          "isAndroidForegroundServiceEnabled": true
+          "locationWhenInUsePermission": "Allow GasFinder to use your location to find nearby gas stations."
         }
       ],
-      "expo-notifications",
-      "expo-status-bar"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow GasFinder to select a gas receipt photo you choose to save in the app.",
+          "cameraPermission": "Allow GasFinder to photograph a gas receipt you choose to save in the app.",
+          "microphonePermission": false
+        }
+      ],
+      "expo-status-bar",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          },
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "expo-widgets",
+        {
+          "widgets": [
+            {
+              "name": "GoalProgressWidget",
+              "displayName": "Savings goal",
+              "description": "See your goal progress at a glance.",
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"]
+              }
+            }
+          ]
+        }
+      ]
     ]
   }
 }
