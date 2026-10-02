@@ -1,12 +1,15 @@
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
 import { progressPercent } from '@/features/goals/logic';
 import type { Goal, GoalSettings } from '@/features/goals/logic';
 
 let latestUpdate = 0;
 
+export const goalWidgetAvailable = Platform.OS === 'ios' && Constants.expoConfig?.extra?.goalWidgetAvailable === true;
+
 export async function syncGoalWidget(goal: Goal | null, settings: GoalSettings) {
-  if (Platform.OS !== 'ios') return;
+  if (!goalWidgetAvailable) return;
   const update = ++latestUpdate;
   const { default: GoalProgressWidget } = await import('@/widgets/GoalProgressWidget');
   if (update !== latestUpdate) return;

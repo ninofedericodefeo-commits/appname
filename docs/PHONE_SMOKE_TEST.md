@@ -2,6 +2,15 @@
 
 [Expo SDK 57](https://docs.expo.dev/versions/v57.0.0/) supports Android 7+ and iOS 16.4+. Record the exact device model, OS version, build identifier, tester, and date for each run. The first supported test devices and launch region still need a product decision.
 
+For an iPhone signed by a free Apple Personal Team, regenerate the iOS project after changing native configuration, then install it while the phone is unlocked:
+
+```bash
+npx expo prebuild --clean --platform ios
+npx expo run:ios --device
+```
+
+Keep Metro running with `npx expo start --host lan` while using a development build. This Personal Team configuration keeps local subscription reminders but omits Push Notifications and the iPhone goal widget because its App Group cannot be provisioned. Builds signed by an enrolled Apple Developer Program team can opt back into both capabilities with `EXPO_ENABLE_IOS_CAPABILITIES=1` during prebuild and build.
+
 1. Install a development build on each agreed Android and iOS device using the project’s EAS setup (`npx eas-cli@latest build --profile development --platform android|ios` after EAS configuration and sign-in).
 2. Open, reload, close, and reopen the app. Confirm the Philadelphia sample label and that no location prompt appears until **Search near me** is chosen.
 3. Grant location, deny it, disable device location services, and change permission later in Settings. Confirm each state is explained and sample data is never shown as an online result.
@@ -17,6 +26,6 @@
 13. Log three actual purchases and confirm suggestions adapt, respect the $5 and 10% defaults, and respond to limit changes. Save one suggestion, skip another, and use a custom amount. Edit and delete a purchase; confirmed goal money must remain until explicitly released.
 14. Mark a Spending Pause item as bought. Log the actual amount and confirm the purchase appears only once in Savings goals. Also test Bought without logging. Confirm gas receipts do not create goal purchases.
 15. Add and release goal money, restart, and confirm goal and pocket totals agree. End a goal, inspect Past goals, then create another with Assign all or Assign none. Ordinary pocket release must never use money assigned to the active goal.
-16. On an iPhone development build, enable the Savings goal widget in settings, add it to the Home and Lock Screens, and confirm progress changes after setting money aside or reopening the app. The default widget should show only a generic title and percent; enable Show amounts and title to verify the other display. Disable the widget and confirm it hides goal details. Check the in-app progress on Android.
+16. On an iPhone build signed by an enrolled Apple Developer Program team with `EXPO_ENABLE_IOS_CAPABILITIES=1`, enable the Savings goal widget in settings, add it to the Home and Lock Screens, and confirm progress changes after setting money aside or reopening the app. The default widget should show only a generic title and percent; enable Show amounts and title to verify the other display. Disable the widget and confirm it hides goal details. On a free Personal Team build, confirm the widget is unavailable and goal progress remains visible inside the app. Check the in-app progress on Android.
 
 For each failure, record steps, expected and actual result, severity, and a screenshot or recording if useful. Use sample data only; do not enter real payment credentials or use customer funds.

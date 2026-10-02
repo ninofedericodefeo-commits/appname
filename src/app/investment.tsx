@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { progressPercent, suggestAmounts, validDeadline } from '@/features/goals/logic';
+import { goalWidgetAvailable } from '@/features/goals/widget';
 import type { Goal, GoalKind, LoggedPurchase } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -100,9 +101,11 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
       <TextInput style={styles.input} value={maxPercent} onChangeText={setMaxPercent} keyboardType="decimal-pad" accessibilityLabel="Maximum percent of a purchase" />
       <Action label="Save suggestion limits" onPress={saveCaps} />
       <Text style={styles.label}>iPhone goal widget</Text>
-      <View style={styles.row}><Choice label="Off" selected={!goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: false })} /><Choice label="On" selected={goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: true })} /></View>
-      <Text style={styles.hint}>Add the Savings goal widget from your iPhone widget gallery. It needs an installed development or release build.</Text>
-      {goalSettings.widgetEnabled && <><Text style={styles.label}>Widget privacy</Text><View style={styles.row}><Choice label="Percent only" selected={!goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: false })} /><Choice label="Show amounts and title" selected={goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: true })} /></View></>}
+      {goalWidgetAvailable ? <>
+        <View style={styles.row}><Choice label="Off" selected={!goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: false })} /><Choice label="On" selected={goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: true })} /></View>
+        <Text style={styles.hint}>Add the Savings goal widget from your iPhone widget gallery.</Text>
+        {goalSettings.widgetEnabled && <><Text style={styles.label}>Widget privacy</Text><View style={styles.row}><Choice label="Percent only" selected={!goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: false })} /><Choice label="Show amounts and title" selected={goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: true })} /></View></>}
+      </> : <Text style={styles.hint}>The widget needs App Groups, which this free Apple Personal Team build cannot use. Goal progress is still available in the app.</Text>}
       {message ? <Text style={styles.hint}>{message}</Text> : null}
     </View>
     {editingGoal && goal && <GoalEditor key={goal.id} goal={goal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) setEditingGoal(false); return saved; }} onCancel={() => setEditingGoal(false)} />}
