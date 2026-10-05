@@ -27,7 +27,7 @@ export default function ActivityScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.kicker}>ARCHIVE  /  01</Text>
+        <Text style={styles.kicker}>ARCHIVE</Text>
     <View style={styles.header}>
           <Text style={styles.title}>Previous demo records</Text>
           <Link href="/activity" asChild>

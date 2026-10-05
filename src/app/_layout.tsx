@@ -6,6 +6,7 @@ import { Stack, router } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BottomNavigation } from '@/components/BottomNavigation';
 import { localDateKey, subscriptionsToReviewTomorrow } from '@/features/subscriptions/logic';
 import { syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { syncGoalWidget } from '@/features/goals/widget';
@@ -142,17 +143,17 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
+      <View style={styles.appShell}>
+        <Stack screenOptions={{ headerShown: false }} />
+        <BottomNavigation />
+      </View>
       <SubscriptionReviewPrompt />
     </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  appShell: { flex: 1, backgroundColor: colors.paper },
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 22, paddingTop: 28, paddingBottom: 42, gap: 17 },
   eyebrow: { color: colors.accentDark, fontWeight: '800', fontSize: 11, letterSpacing: 1.6 },

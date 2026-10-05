@@ -35,8 +35,8 @@ export default function PocketScreen() {
   }
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Text style={styles.kicker}>SAVINGS  /  02</Text>
-    <View style={styles.header}><Text style={styles.title}>Savings pocket</Text><Link href="/" asChild><Pressable accessibilityRole="button" style={styles.nav}><Text style={styles.navText}>Gas prices</Text></Pressable></Link></View>
+    <Text style={styles.kicker}>SAVINGS</Text>
+    <Text style={styles.title}>Savings pocket</Text>
     <View style={styles.balanceCard}>
       <Text style={styles.balanceEyebrow}>YOUR MONEY / MANUALLY REPORTED</Text>
       <Text style={styles.balanceLabel}>Estimated available to spend</Text>

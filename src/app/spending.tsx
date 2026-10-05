@@ -1,6 +1,6 @@
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -110,15 +110,8 @@ export default function SpendingScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.kicker}>MONEY  /  02</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Spending pause</Text>
-          <Link href="/investment" asChild>
-            <Pressable style={styles.navButton} accessibilityRole="button">
-              <Text style={styles.navButtonText}>Savings goals</Text>
-            </Pressable>
-          </Link>
-        </View>
+        <Text style={styles.kicker}>MONEY</Text>
+        <Text style={styles.title}>Spending pause</Text>
 
         <View style={styles.card}>
           <Text style={styles.eyebrow}>OPTIONAL · ON THIS DEVICE</Text>

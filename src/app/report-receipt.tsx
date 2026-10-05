@@ -1,7 +1,6 @@
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { Link } from 'expo-router';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -140,11 +139,8 @@ export default function ReportReceiptScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>FUEL  /  02</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Receipt report</Text>
-          <Link href="/" asChild><Pressable accessibilityRole="button" style={styles.navButton}><Text style={styles.navText}>Gas prices</Text></Pressable></Link>
-        </View>
+        <Text style={styles.kicker}>GAS PRICES</Text>
+        <Text style={styles.title}>Receipt report</Text>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Saved only on this device</Text>
           <Text style={styles.noticeText}>Your receipt photo and report stay on this device. The app does not read the receipt or publish prices yet. Check each detail and cover payment information in the photo.</Text>

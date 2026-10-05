@@ -1,6 +1,5 @@
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { Link } from 'expo-router';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -130,11 +129,8 @@ export default function SubscriptionsScreen() {
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>MONEY  /  03</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Subscriptions</Text>
-          <Link href="/" asChild><Pressable style={styles.homeButton} accessibilityRole="button"><Text style={styles.homeButtonText}>Gas prices</Text></Pressable></Link>
-        </View>
+        <Text style={styles.kicker}>MONEY</Text>
+        <Text style={styles.title}>Subscriptions</Text>
         <Text style={styles.intro}>See what renews tomorrow, what it costs, and what you decided.</Text>
 
         {due.length > 0 && (

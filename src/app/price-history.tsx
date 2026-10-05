@@ -39,7 +39,7 @@ export default function PriceHistoryScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.header}>
-          <Text style={styles.kicker}>FUEL  /  PRICE HISTORY</Text>
+          <Text style={styles.kicker}>PRICE HISTORY</Text>
           <Link href="/" asChild><Pressable accessibilityRole="button" style={styles.back}><Text style={styles.backText}>Gas prices</Text></Pressable></Link>
         </View>
         <Text style={styles.title}>{stationName}</Text>

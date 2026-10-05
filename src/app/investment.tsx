@@ -1,6 +1,5 @@
 import { colors } from '@/theme';
 import { useRef, useState } from 'react';
-import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -179,10 +178,9 @@ export default function GoalsScreen() {
   }
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Text style={styles.kicker}>SAVINGS  /  01</Text>
-    <View style={styles.header}><Text style={styles.title}>Savings goals</Text><Link href="/" asChild><Pressable accessibilityRole="button" style={styles.nav}><Text style={styles.navText}>Gas prices</Text></Pressable></Link></View>
+    <Text style={styles.kicker}>SAVINGS</Text>
+    <View style={styles.header}><Text style={styles.title}>Savings goals</Text><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /></View>
     <Text style={styles.intro}>Set a goal and record each amount you set aside. Purchases and balances are entered by you.</Text>
-    <View style={styles.row}><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /><Link href="/pocket" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Savings pocket</Text></Pressable></Link><Link href="/activity" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Activity</Text></Pressable></Link><Link href="/spending" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Spending pause</Text></Pressable></Link></View>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={createGoal} /> : <>
       <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.kind === 'money' ? 'MONEY GOAL' : 'ITEM GOAL'} · {activeGoal.deadline ? `BY ${activeGoal.deadline}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>{remaining === 0 ? 'Target reached. End this goal in Settings when you are ready.' : 'Small set-asides count.'}</Text></View>

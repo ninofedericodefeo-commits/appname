@@ -1,7 +1,6 @@
 import { colors } from '@/theme';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Link } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -17,6 +16,7 @@ const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
   const { selectedFuelType, selectedRadius, sortOrder, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'demo' | 'nearby' | 'online'>('demo');
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
   const [now, setNow] = useState(() => Date.now());
@@ -47,7 +47,7 @@ export default function GasScreen() {
     }
   }
 
-  const { data, isLoading, isFetching, isError, error, refetch } = useNearbyStations({
+  const { data, isLoading, isFetching, isError, refetch } = useNearbyStations({
     mode,
     latitude: location?.latitude,
     longitude: location?.longitude,
@@ -68,30 +68,19 @@ export default function GasScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.brand}>GASFINDER  /  FIELD GUIDE</Text>
-          <Text style={styles.title}>Fuel, spending,{'\n'}and savings.</Text>
-          <Text style={styles.headerNote}>Compare stations, report receipts, and track savings.</Text>
+          <Text style={styles.brand}>GASFINDER</Text>
+          <Text style={styles.title}>Gas prices</Text>
+          <Text style={styles.headerNote}>Find a station and compare reported prices.</Text>
         </View>
 
-        {canShowResults && !isError && cheapest && (
-          <View style={styles.highlightCard}>
-            <View style={styles.heroTop}><Text style={styles.heroEyebrow}>01 / FUEL WATCH</Text><Text style={styles.heroBadge}>{cheapestPrice?.source === 'sample' ? 'SAMPLE' : 'UNVERIFIED'}</Text></View>
-            <Text style={styles.label}>Lowest {selectedFuelType} price</Text>
-            <View style={styles.heroPriceRow}><Text style={styles.priceMain}>{cheapestPrice ? formatFuelPrice(cheapestPrice.price) : '—'}</Text><Text style={styles.perGallon}>/ gallon</Text></View>
-            <View style={styles.heroRule} />
-            <Text style={styles.heroStation}>{cheapest.name}</Text>
-            <Text style={styles.subText}>{cheapest.distanceMiles?.toFixed(1)} mi away · {priceDescription(cheapestPrice, mode === 'demo', now)}</Text>
-          </View>
-        )}
-
         <View style={styles.sourceCard}>
-          <Text style={styles.sourceTitle}>{mode === 'demo' ? 'api-learn sample data' : mode === 'nearby' ? 'Real stations near you' : 'Google station search'}</Text>
+          <Text style={styles.sourceTitle}>Search source</Text>
           <Text style={styles.sourceText}>
             {mode === 'demo'
-              ? 'These stations start with fictional prices from api-learn. User price reports are unverified and may be inaccurate.'
+              ? 'Sample stations have fictional starting prices. User reports are unverified.'
               : mode === 'nearby'
-                ? 'Locations come from OpenStreetMap. Your device location is sent to the map lookup through your local API. Distances are straight line. Prices appear only when someone has reported one.'
-                : 'Search uses your current location. Available prices may be missing or old. This online service covers up to 25 miles and returns up to 20 stations.'}
+                ? 'Real locations from OpenStreetMap. Prices appear only when reported.'
+                : 'Search uses your location. Prices may be missing or old.'}
           </Text>
           {mode !== 'demo' && location && <Text style={styles.sourceText}>Your location: {location.latitude.toFixed(3)}, {location.longitude.toFixed(3)} · {data && 'locationsCached' in data && data.locationsCached ? 'cached station locations' : 'current lookup'}</Text>}
           {mode === 'nearby' && <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}><Text style={styles.sourceText}>© OpenStreetMap contributors · ODbL ↗</Text></Pressable>}
@@ -106,19 +95,12 @@ export default function GasScreen() {
           </View>
         </View>
 
-        <View style={styles.quickSection}>
-          <Text style={styles.sectionEyebrow}>02 / YOUR TOOLS</Text>
-          <View style={styles.headerActions}>
-            <Link href="/report-receipt" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navNumber}>01  /  REPORT</Text><Text style={styles.navButtonText}>Receipt report  ↗</Text></Pressable></Link>
-            <Link href="/investment" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navNumber}>02  /  SAVE</Text><Text style={styles.navButtonText}>Savings goals  ↗</Text></Pressable></Link>
-            <Link href="/pocket" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navNumber}>03  /  TRACK</Text><Text style={styles.navButtonText}>Savings pocket  ↗</Text></Pressable></Link>
-            <Link href="/subscriptions" asChild><Pressable style={styles.navButton} accessibilityRole="button"><Text style={styles.navNumber}>04  /  REVIEW</Text><Text style={styles.navButtonText}>Subscriptions  ↗</Text></Pressable></Link>
-          </View>
-          <Link href="/spending" asChild><Pressable style={styles.pauseLink} accessibilityRole="button"><Text style={styles.pauseLinkText}>05  /  SPENDING PAUSE</Text><Text style={styles.pauseArrow}>↗</Text></Pressable></Link>
-        </View>
-
         <View style={styles.filters}>
-          <Text style={styles.sectionEyebrow}>03 / SEARCH SETTINGS</Text>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
+            <View><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {selectedRadius} mi · {sortOrder}</Text></View>
+            <Text style={styles.filterChevron}>{filtersOpen ? '−' : '+'}</Text>
+          </Pressable>
+          {filtersOpen && <>
           <View style={styles.filterPanel}>
             <Text style={styles.sectionTitle}>Fuel</Text>
             <View style={styles.pillRow}>
@@ -159,7 +141,19 @@ export default function GasScreen() {
               ))}
             </View>
           </View>
+          </>}
         </View>
+
+        {canShowResults && !isError && cheapest && (
+          <View style={styles.highlightCard}>
+            <View style={styles.heroTop}><Text style={styles.heroEyebrow}>LOWEST PRICE</Text><Text style={styles.heroBadge}>{cheapestPrice?.source === 'sample' ? 'SAMPLE' : 'UNVERIFIED'}</Text></View>
+            <Text style={styles.label}>{selectedFuelType} near you</Text>
+            <View style={styles.heroPriceRow}><Text style={styles.priceMain}>{cheapestPrice ? formatFuelPrice(cheapestPrice.price) : '—'}</Text><Text style={styles.perGallon}>/ gallon</Text></View>
+            <View style={styles.heroRule} />
+            <Text style={styles.heroStation}>{cheapest.name}</Text>
+            <Text style={styles.subText}>{cheapest.distanceMiles?.toFixed(1)} mi away · {priceDescription(cheapestPrice, mode === 'demo', now)}</Text>
+          </View>
+        )}
 
         {mode !== 'demo' && locationStatus === 'denied' && (
           <View style={styles.emptyCard}>
@@ -185,14 +179,14 @@ export default function GasScreen() {
         {canShowResults && isError && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Station search failed</Text>
-            <Text style={styles.emptyText}>{error instanceof Error ? error.message : 'Please try again.'} No sample prices were substituted.</Text>
+            <Text style={styles.emptyText}>{mode === 'demo' ? 'The local sample station server is unavailable. Start it and try again.' : 'Could not load stations. Check your connection and try again. Sample prices were not substituted.'}</Text>
             <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry search</Text></Pressable>
           </View>
         )}
 
         {canShowResults && !isLoading && !isError && stations.length > 0 && (
           <View style={styles.listSection}>
-            <Text style={styles.sectionEyebrow}>04 / STATIONS NEARBY</Text>
+            <Text style={styles.sectionEyebrow}>Stations</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
             {mode !== 'demo' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. Station locations are shown below.</Text>}
             {stations.map((station) => (
@@ -216,10 +210,10 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56 },
-  headerRow: { marginBottom: 22 },
-  brand: { fontSize: 11, fontWeight: '800', letterSpacing: 2.1, color: colors.accentDark, marginBottom: 17 },
-  title: { fontSize: 43, lineHeight: 45, letterSpacing: -2, fontWeight: '800', color: colors.ink },
-  headerNote: { fontSize: 15, color: colors.muted, marginTop: 13 },
+  headerRow: { marginBottom: 20 },
+  brand: { fontSize: 11, fontWeight: '800', letterSpacing: 2.1, color: colors.accentDark, marginBottom: 12 },
+  title: { fontSize: 39, lineHeight: 44, letterSpacing: -1.7, fontWeight: '800', color: colors.ink },
+  headerNote: { fontSize: 15, color: colors.muted, marginTop: 7 },
   highlightCard: { backgroundColor: colors.ink, borderRadius: 14, padding: 22, marginBottom: 14 },
   heroTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 29 },
   heroEyebrow: { color: colors.lime, fontWeight: '800', letterSpacing: 1.5, fontSize: 11 },
@@ -231,19 +225,15 @@ const styles = StyleSheet.create({
   heroRule: { borderTopWidth: 1, borderColor: colors.inkSoft, marginTop: 17, marginBottom: 14 },
   heroStation: { color: colors.surface, fontSize: 17, fontWeight: '800' },
   subText: { marginTop: 4, fontSize: 12, lineHeight: 18, color: colors.lime },
-  sourceCard: { backgroundColor: colors.paleGreen, borderLeftWidth: 3, borderLeftColor: colors.primary, padding: 14, marginBottom: 26, gap: 7 },
+  sourceCard: { backgroundColor: colors.paleGreen, borderLeftWidth: 3, borderLeftColor: colors.primary, padding: 14, marginBottom: 20, gap: 7 },
   sourceTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   sourceText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
-  quickSection: { marginBottom: 26 },
-  sectionEyebrow: { fontSize: 11, fontWeight: '800', color: colors.accentDark, letterSpacing: 1.5, marginBottom: 12 },
-  headerActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
-  navButton: { width: '48%', flexGrow: 1, minHeight: 85, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 8, padding: 13, justifyContent: 'space-between' },
-  navNumber: { color: colors.accentDark, fontSize: 10, letterSpacing: 1.2, fontWeight: '800' },
-  navButtonText: { color: colors.ink, fontSize: 14, lineHeight: 18, fontWeight: '800' },
-  pauseLink: { marginTop: 9, borderRadius: 7, backgroundColor: colors.paleOrange, paddingHorizontal: 14, minHeight: 46, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  pauseLinkText: { color: colors.accentDark, fontSize: 12, fontWeight: '800', letterSpacing: 1 },
-  pauseArrow: { color: colors.accentDark, fontSize: 20, fontWeight: '700' },
+  sectionEyebrow: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 14 },
   filters: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 16, marginBottom: 21 },
+  filterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 },
+  filterToggleTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  filterSummary: { color: colors.muted, fontSize: 12, textTransform: 'capitalize', marginTop: 3 },
+  filterChevron: { color: colors.accentDark, fontSize: 23, fontWeight: '500', paddingHorizontal: 7 },
   filterPanel: { paddingTop: 12, paddingBottom: 13, borderTopWidth: 1, borderColor: colors.line },
   sectionTitle: { fontSize: 12, color: colors.muted, marginBottom: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
