@@ -127,7 +127,7 @@ export default function SubscriptionsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.kicker}>MONEY</Text>
         <Text style={styles.title}>Subscriptions</Text>

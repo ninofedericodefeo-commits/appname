@@ -1,20 +1,18 @@
-import { Link, usePathname } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme';
 
-type Tab = 'gas' | 'goals' | 'more';
+export type Tab = 'index' | 'investment' | 'menu';
 
 const tabs = [
-  { id: 'gas', label: 'Gas', href: '/' },
-  { id: 'goals', label: 'Goals', href: '/investment' },
-  { id: 'more', label: 'More', href: '/menu' },
+  { id: 'index', label: 'Gas' },
+  { id: 'investment', label: 'Goals' },
+  { id: 'menu', label: 'More' },
 ] as const;
 
-export function BottomNavigation() {
-  const pathname = usePathname();
+export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSelect: (tab: Tab) => void }) {
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
@@ -25,21 +23,13 @@ export function BottomNavigation() {
 
   if (keyboardOpen) return null;
 
-  const activeTab: Tab = pathname === '/' || pathname === '/price-history' || pathname === '/report-receipt'
-    ? 'gas'
-    : pathname === '/investment'
-        ? 'goals'
-        : 'more';
-
   return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
     <View style={styles.row} accessibilityRole="tablist">
       {tabs.map((tab) => {
         const active = activeTab === tab.id;
-        return <Link key={tab.id} href={tab.href} replace asChild>
-          <Pressable accessibilityRole="tab" accessibilityState={{ selected: active }} style={StyleSheet.flatten([styles.tab, active && styles.activeTab])}>
-            <Text style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>
-          </Pressable>
-        </Link>;
+        return <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} style={StyleSheet.flatten([styles.tab, active && styles.activeTab])} onPress={() => { if (!active) onSelect(tab.id); }}>
+          <Text style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>
+        </Pressable>;
       })}
     </View>
   </SafeAreaView>;

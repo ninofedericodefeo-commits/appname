@@ -6,7 +6,6 @@ import { Stack, router } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { BottomNavigation } from '@/components/BottomNavigation';
 import { localDateKey, subscriptionsToReviewTomorrow } from '@/features/subscriptions/logic';
 import { syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { syncGoalWidget } from '@/features/goals/widget';
@@ -66,7 +65,7 @@ function SubscriptionReviewPrompt() {
     if (Platform.OS === 'web') return;
     function openSubscriptionReview(response: Notifications.NotificationResponse) {
       if (response.notification.request.content.data?.kind === 'subscription-review') {
-        router.push('/subscriptions');
+        router.navigate('/subscriptions');
         Notifications.clearLastNotificationResponse();
       }
     }
@@ -144,8 +143,15 @@ export default function RootLayout() {
   return (
     <QueryClientProvider client={queryClient}>
       <View style={styles.appShell}>
-        <Stack screenOptions={{ headerShown: false }} />
-        <BottomNavigation />
+        <Stack screenOptions={{
+          headerTitle: '',
+          headerTintColor: colors.ink,
+          headerStyle: { backgroundColor: colors.paper },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.paper },
+        }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
+        </Stack>
       </View>
       <SubscriptionReviewPrompt />
     </QueryClientProvider>

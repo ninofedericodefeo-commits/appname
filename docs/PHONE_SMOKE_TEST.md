@@ -15,7 +15,7 @@ Keep Metro running with `npx expo start --host lan` while using a development bu
 2. Open, reload, close, and reopen the app. Confirm real nearby search is offered first and that no location prompt appears until **Find stations near me** is chosen.
 3. Grant location, deny it, disable device location services, and change permission later in Settings. Confirm each state is explained and sample data is never shown as an online result.
 4. Test fuel, radius, and sort selections; a station with no chosen-fuel price; a stale price; an empty response; and a backend timeout. Confirm displayed distance and lowest-price highlight change correctly.
-5. Move among Gas, its receipt reports, Savings goals, and More tools. Rotate or use a tablet if in scope; test small screens, large text, keyboard, and touch targets.
+5. Switch among Gas, Goals, and More. These section changes should have no push animation or growing back stack. Open a receipt from Gas and a tool from More; each detail should slide in and its back button should return to the section that opened it. From Savings pocket, open Savings goals and confirm this selects the existing Goals tab. Rotate or use a tablet if in scope; test small screens, large text, keyboard, and touch targets.
 6. Confirm the previous investing demo appears only in the read-only archive under Activity and never counts toward a new goal.
 7. Add, skip, and remove a spending-pause entry. Confirm the reported avoided-spending estimate updates and no notification or payment-blocking claim appears.
 8. Test with slow and no connectivity. Confirm online failure is clear and the sample path remains available by explicit selection.

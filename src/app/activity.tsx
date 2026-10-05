@@ -24,7 +24,7 @@ export default function ActivityScreen() {
     setEditingId(null);
     setError('');
   }
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
+  return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}><ScrollView contentContainerStyle={styles.content}>
     <Text style={styles.kicker}>SAVINGS</Text>
     <Text style={styles.title}>Savings activity</Text>
     <View style={styles.notice}><Text style={styles.noticeTitle}>On-device estimate</Text><Text style={styles.hint}>Purchases and set-asides are recorded by you. The app does not verify your account balance or move money.</Text><Text style={styles.total}>{money(reservedCents)} earmarked in pocket</Text>{activeGoal && <Text style={styles.hint}>{money(activeGoal.savedCents)} assigned to {activeGoal.title}</Text>}</View>

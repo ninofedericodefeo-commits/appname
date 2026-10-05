@@ -1,6 +1,5 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
-import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -25,17 +24,10 @@ export default function ActivityScreen() {
   const visibleWithdrawals = period === 'all' ? withdrawals : withdrawals.filter((withdrawal) => withdrawal.createdAt && Date.parse(withdrawal.createdAt) >= cutoff);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.kicker}>ARCHIVE</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Previous demo records</Text>
-          <Link href="/activity" asChild>
-            <Pressable style={styles.navButton} accessibilityRole="button">
-              <Text style={styles.navButtonText}>Activity</Text>
-            </Pressable>
-          </Link>
-        </View>
+        <Text style={styles.title}>Previous demo records</Text>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Read-only demo archive</Text>
           <Text style={styles.noticeText}>
@@ -127,10 +119,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
-  navButton: { backgroundColor: colors.ink, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
-  navButtonText: { color: colors.surface, fontWeight: '700' },
   notice: { backgroundColor: colors.paleOrange, borderLeftColor: colors.accent, borderLeftWidth: 4, padding: 16 },
   noticeTitle: { color: colors.accentDark, fontWeight: '800', fontSize: 14 },
   noticeText: { color: colors.accentDark, fontSize: 12, lineHeight: 17, marginTop: 4 },

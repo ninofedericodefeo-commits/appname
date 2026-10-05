@@ -1,7 +1,7 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -36,12 +36,9 @@ export default function PriceHistoryScreen() {
   const difference = latest && first ? latest.price - first.price : 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>PRICE HISTORY</Text>
-          <Link href="/" asChild><Pressable accessibilityRole="button" style={styles.back}><Text style={styles.backText}>Gas prices</Text></Pressable></Link>
-        </View>
+        <Text style={styles.kicker}>PRICE HISTORY</Text>
         <Text style={styles.title}>{stationName}</Text>
         <Text style={styles.subtitle}>{fuelType} · USD per gallon</Text>
         <View style={styles.ranges}>
@@ -73,10 +70,7 @@ export default function PriceHistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  back: { backgroundColor: colors.ink, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 11 },
-  backText: { color: colors.surface, fontWeight: '700' },
   title: { color: colors.ink, fontSize: 34, fontWeight: '800', marginTop: 20 },
   subtitle: { color: colors.muted, fontSize: 14, marginTop: 4, textTransform: 'capitalize' },
   ranges: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 24, marginBottom: 19 },

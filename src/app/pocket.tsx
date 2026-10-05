@@ -1,6 +1,6 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
-import { Link } from 'expo-router';
+import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -34,7 +34,7 @@ export default function PocketScreen() {
     setError('');
   }
 
-  return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
     <Text style={styles.kicker}>SAVINGS</Text>
     <Text style={styles.title}>Savings pocket</Text>
     <View style={styles.balanceCard}>
@@ -52,7 +52,7 @@ export default function PocketScreen() {
     <View style={styles.card}><Text style={styles.section}>Update your account balance</Text><Text style={styles.hint}>Copy the current balance from your bank app. This value is stored on this device.</Text><TextInput value={balanceInput} onChangeText={setBalanceInput} style={styles.input} keyboardType="decimal-pad" placeholder="250.00" accessibilityLabel="Account balance" /><Pressable accessibilityRole="button" style={styles.button} onPress={updateBalance}><Text style={styles.buttonText}>Save balance</Text></Pressable></View>
     <View style={styles.card}><Text style={styles.section}>Change unassigned pocket money</Text><Text style={styles.hint}>To change money assigned to a goal, use Savings goals.</Text><TextInput value={amountInput} onChangeText={setAmountInput} style={styles.input} keyboardType="decimal-pad" placeholder="25.00" accessibilityLabel="Pocket amount" /><View style={styles.row}><Pressable accessibilityRole="button" style={styles.button} onPress={() => changePocket('reserve')}><Text style={styles.buttonText}>Set aside</Text></Pressable><Pressable accessibilityRole="button" style={styles.secondary} onPress={() => changePocket('release')}><Text style={styles.secondaryText}>Release unassigned</Text></Pressable></View>{error ? <Text style={styles.error}>{error}</Text> : null}</View>
     <View style={styles.card}><Text style={styles.section}>Pocket history</Text>{entries.length === 0 ? <Text style={styles.hint}>Your changes will appear here.</Text> : entries.map((item) => <View style={styles.entry} key={item.id}><Text style={styles.entryText}>{item.kind === 'assign' ? 'Assigned to goal' : item.kind === 'reserve' ? 'Set aside' : 'Released'} {money(item.amountCents)}{item.goalId ? ' · goal' : ''}</Text><Text style={styles.hint}>{new Date(item.createdAt).toLocaleDateString()}</Text></View>)}</View>
-    <Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.legacy}><Text style={styles.hint}>Open Savings goals</Text></Pressable></Link>
+    <Pressable accessibilityRole="button" style={styles.legacy} onPress={() => { router.dismissAll(); router.navigate('/investment'); }}><Text style={styles.hint}>Open Savings goals</Text></Pressable>
   </ScrollView></SafeAreaView>;
 }
 

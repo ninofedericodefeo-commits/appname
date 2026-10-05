@@ -104,11 +104,12 @@ export default function SpendingScreen() {
     }
     if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
     setPendingBought(null);
-    router.push('/investment');
+    router.dismissAll();
+    router.navigate('/investment');
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.kicker}>MONEY</Text>
         <Text style={styles.title}>Spending pause</Text>
