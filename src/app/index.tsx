@@ -2,20 +2,25 @@ import { colors } from '@/theme';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
+import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GasStationCard } from '@/components/GasStationCard';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { priceDescription, sampleApiBaseUrl, stationApiBaseUrl } from '@/features/stations/data';
 import { useNearbyStations } from '@/features/stations/hooks';
-import { formatFuelPrice } from '@/features/stations/logic';
+import { formatFuelPrice, prepareStations } from '@/features/stations/logic';
+import { withReceiptPrices } from '@/features/stations/receiptPrices';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { useReceiptStore } from '@/stores/receiptStore';
 import type { FuelType } from '@/types/stations';
 
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
   const { selectedFuelType, selectedRadius, sortOrder, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
-  const [mode, setMode] = useState<'demo' | 'nearby' | 'online'>('demo');
+  const [mode, setMode] = useState<'demo' | 'nearby' | 'online'>('nearby');
+  const receiptReports = useReceiptStore((state) => state.reports);
+  const receiptCount = receiptReports.length;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
@@ -47,7 +52,7 @@ export default function GasScreen() {
     }
   }
 
-  const { data, isLoading, isFetching, isError, refetch } = useNearbyStations({
+  const { data, isLoading, isFetching, isError, error: searchError, refetch } = useNearbyStations({
     mode,
     latitude: location?.latitude,
     longitude: location?.longitude,
@@ -55,7 +60,11 @@ export default function GasScreen() {
     fuelType: selectedFuelType,
     sortOrder,
   });
-  const stations = useMemo(() => data?.stations ?? [], [data?.stations]);
+  const stations = useMemo(() => {
+    const found = data?.stations ?? [];
+    if (mode === 'demo' || !location) return found;
+    return prepareStations(withReceiptPrices(found, receiptReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder });
+  }, [data?.stations, mode, location, receiptReports, selectedRadius, selectedFuelType, sortOrder]);
   const cheapest = stations.reduce<(typeof stations)[number] | undefined>((best, station) => {
     const price = station.prices.find((item) => item.fuelType === selectedFuelType)?.price;
     const bestPrice = best?.prices.find((item) => item.fuelType === selectedFuelType)?.price;
@@ -69,8 +78,8 @@ export default function GasScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
           <Text style={styles.brand}>GASFINDER</Text>
-          <Text style={styles.title}>Gas prices</Text>
-          <Text style={styles.headerNote}>Find a station and compare reported prices.</Text>
+          <Text style={styles.title}>Gas stations</Text>
+          <Text style={styles.headerNote}>Find nearby stations and see prices you’ve saved.</Text>
         </View>
 
         <View style={styles.sourceCard}>
@@ -79,21 +88,29 @@ export default function GasScreen() {
             {mode === 'demo'
               ? 'Sample stations have fictional starting prices. User reports are unverified.'
               : mode === 'nearby'
-                ? 'Real locations from OpenStreetMap. Prices appear only when reported.'
+                ? 'Find real stations around your current location. Search coordinates go to OpenStreetMap’s public lookup; it has locations, not live pump prices.'
                 : 'Search uses your location. Prices may be missing or old.'}
           </Text>
-          {mode !== 'demo' && location && <Text style={styles.sourceText}>Your location: {location.latitude.toFixed(3)}, {location.longitude.toFixed(3)} · {data && 'locationsCached' in data && data.locationsCached ? 'cached station locations' : 'current lookup'}</Text>}
+          {mode !== 'demo' && location && <Text style={styles.sourceText}>Searching near {location.latitude.toFixed(3)}, {location.longitude.toFixed(3)}</Text>}
           {mode === 'nearby' && <Pressable accessibilityRole="link" onPress={() => void Linking.openURL('https://www.openstreetmap.org/copyright')}><Text style={styles.sourceText}>© OpenStreetMap contributors · ODbL ↗</Text></Pressable>}
           <View style={styles.pillRow}>
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'demo' }} style={[styles.pill, mode === 'demo' && styles.activePill]} onPress={() => setMode('demo')}>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'nearby' }} style={[styles.pill, mode === 'nearby' && styles.activePill]} onPress={() => void startLocationSearch('nearby')}><Text style={[styles.pillText, mode === 'nearby' && styles.activePillText]}>Real stations nearby</Text></Pressable>
+            {sampleApiBaseUrl && <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'demo' }} style={[styles.pill, mode === 'demo' && styles.activePill]} onPress={() => setMode('demo')}>
               <Text style={[styles.pillText, mode === 'demo' && styles.activePillText]}>Sample data</Text>
-            </Pressable>
-            {sampleApiBaseUrl && <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'nearby' }} style={[styles.pill, mode === 'nearby' && styles.activePill]} onPress={() => void startLocationSearch('nearby')}><Text style={[styles.pillText, mode === 'nearby' && styles.activePillText]}>Real stations nearby</Text></Pressable>}
+            </Pressable>}
             {stationApiBaseUrl && <Pressable accessibilityRole="button" accessibilityState={{ selected: mode === 'online' }} style={[styles.pill, mode === 'online' && styles.activePill]} onPress={() => void startLocationSearch('online')}>
               <Text style={[styles.pillText, mode === 'online' && styles.activePillText]}>Google prices</Text>
             </Pressable>}
           </View>
+          {mode === 'nearby' && !location && locationStatus === 'idle' && <Pressable accessibilityRole="button" style={styles.findButton} onPress={() => void startLocationSearch('nearby')}><Text style={styles.findButtonText}>Find stations near me ↗</Text></Pressable>}
         </View>
+
+        <Link href="/report-receipt" asChild>
+          <Pressable accessibilityRole="button" style={styles.receiptCard}>
+            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Gas receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Save a receipt and its price on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
+            <Text style={styles.receiptArrow}>›</Text>
+          </Pressable>
+        </Link>
 
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
@@ -179,7 +196,7 @@ export default function GasScreen() {
         {canShowResults && isError && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>Station search failed</Text>
-            <Text style={styles.emptyText}>{mode === 'demo' ? 'The local sample station server is unavailable. Start it and try again.' : 'Could not load stations. Check your connection and try again. Sample prices were not substituted.'}</Text>
+            <Text style={styles.emptyText}>{mode === 'demo' ? 'The local sample station server is unavailable. Start it and try again.' : searchError instanceof Error ? `${searchError.message} Check your connection and try again.` : 'Could not load stations. Check your connection and try again.'}</Text>
             <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry search</Text></Pressable>
           </View>
         )}
@@ -190,7 +207,7 @@ export default function GasScreen() {
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
             {mode !== 'demo' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. Station locations are shown below.</Text>}
             {stations.map((station) => (
-              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={mode === 'demo'} now={now} canReport={mode !== 'online' && !!sampleApiBaseUrl} canOpenMaps={mode !== 'demo'} onReported={() => void refetch()} />
+              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={mode === 'demo'} now={now} canReport={mode === 'demo' && !!sampleApiBaseUrl} canOpenMaps={mode !== 'demo'} canAddReceipt={mode !== 'demo'} onReported={() => void refetch()} />
             ))}
           </View>
         )}
@@ -226,6 +243,13 @@ const styles = StyleSheet.create({
   heroStation: { color: colors.surface, fontSize: 17, fontWeight: '800' },
   subText: { marginTop: 4, fontSize: 12, lineHeight: 18, color: colors.lime },
   sourceCard: { backgroundColor: colors.paleGreen, borderLeftWidth: 3, borderLeftColor: colors.primary, padding: 14, marginBottom: 20, gap: 7 },
+  findButton: { backgroundColor: colors.ink, borderRadius: 6, minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
+  findButtonText: { color: colors.surface, fontWeight: '800', fontSize: 14 },
+  receiptCard: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 16, marginBottom: 15, minHeight: 72, flexDirection: 'row', alignItems: 'center' },
+  receiptCopy: { flex: 1 },
+  receiptTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  receiptText: { color: colors.muted, fontSize: 12, marginTop: 4 },
+  receiptArrow: { color: colors.accentDark, fontSize: 28, marginLeft: 12 },
   sourceTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   sourceText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
   sectionEyebrow: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 14 },

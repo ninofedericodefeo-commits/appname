@@ -36,32 +36,6 @@ export async function reportStationPrice(stationId: string, fuelType: string, pr
   if (!response.ok) throw new Error(`Could not save price (${response.status}).`);
 }
 
-export async function fetchLocalNearbyStations(search: StationSearch, signal: AbortSignal) {
-  const params = new URLSearchParams({
-    latitude: String(search.latitude),
-    longitude: String(search.longitude),
-    radiusMiles: String(search.radius),
-  });
-  const controller = new AbortController();
-  const abort = () => controller.abort();
-  signal.addEventListener('abort', abort);
-  const timeout = setTimeout(abort, 30_000);
-  try {
-    const response = await fetch(`${validatedSampleApiUrl()}/v1/stations/nearby?${params}`, { signal: controller.signal });
-    const payload: unknown = await response.json();
-    if (!response.ok) {
-      const detail = typeof payload === 'object' && payload !== null && 'detail' in payload && typeof payload.detail === 'string'
-        ? payload.detail : `Could not find real stations (${response.status}).`;
-      throw new Error(detail);
-    }
-    const stations = prepareStations(parseStationsResponse(payload), search);
-    const locationsCached = typeof payload === 'object' && payload !== null && 'locations_cached' in payload && payload.locations_cached === true;
-    return { stations, provider: 'OpenStreetMap', locationsCached };
-  } finally {
-    clearTimeout(timeout);
-    signal.removeEventListener('abort', abort);
-  }
-}
 export async function fetchOnlineStations(search: StationSearch, signal: AbortSignal) {
   if (!stationApiBaseUrl) throw new Error('Online station search is not configured.');
   const serviceUrl = new URL(stationApiBaseUrl);

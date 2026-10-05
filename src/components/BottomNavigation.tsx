@@ -5,11 +5,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors } from '@/theme';
 
-type Tab = 'gas' | 'receipt' | 'goals' | 'more';
+type Tab = 'gas' | 'goals' | 'more';
 
 const tabs = [
   { id: 'gas', label: 'Gas', href: '/' },
-  { id: 'receipt', label: 'Receipt', href: '/report-receipt' },
   { id: 'goals', label: 'Goals', href: '/investment' },
   { id: 'more', label: 'More', href: '/menu' },
 ] as const;
@@ -26,11 +25,9 @@ export function BottomNavigation() {
 
   if (keyboardOpen) return null;
 
-  const activeTab: Tab = pathname === '/' || pathname === '/price-history'
+  const activeTab: Tab = pathname === '/' || pathname === '/price-history' || pathname === '/report-receipt'
     ? 'gas'
-    : pathname === '/report-receipt'
-      ? 'receipt'
-      : pathname === '/investment'
+    : pathname === '/investment'
         ? 'goals'
         : 'more';
 

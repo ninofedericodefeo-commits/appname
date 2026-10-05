@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { deleteReceiptPhoto, saveReceiptPhoto } from '@/features/receipts/photoStorage';
@@ -19,19 +20,35 @@ function todayString() {
 }
 
 export default function ReportReceiptScreen() {
+  const params = useLocalSearchParams<{ stationId?: string; stationName?: string; stationAddress?: string; latitude?: string; longitude?: string; fuelType?: FuelType }>();
+  const mappedLatitude = Number(params.latitude);
+  const mappedLongitude = Number(params.longitude);
+  const mappedCoordinates = Number.isFinite(mappedLatitude) && Math.abs(mappedLatitude) <= 90 &&
+    Number.isFinite(mappedLongitude) && Math.abs(mappedLongitude) <= 180
+    ? { latitude: mappedLatitude, longitude: mappedLongitude } : null;
   const { reports, addReport, removeReport } = useReceiptStore();
   const [photo, setPhoto] = useState<SelectedPhoto | null>(null);
-  const [stationName, setStationName] = useState('');
-  const [stationAddress, setStationAddress] = useState('');
-  const [fuelType, setFuelType] = useState<FuelType>('regular');
+  const [stationName, setStationName] = useState(params.stationName ?? '');
+  const [stationAddress, setStationAddress] = useState(params.stationAddress ?? '');
+  const [linkedStationId, setLinkedStationId] = useState(params.stationId ?? '');
+  const [fuelType, setFuelType] = useState<FuelType>(params.fuelType && fuelTypes.includes(params.fuelType) ? params.fuelType : 'regular');
   const [priceInput, setPriceInput] = useState('');
   const [gallonsInput, setGallonsInput] = useState('');
   const [totalInput, setTotalInput] = useState('');
   const [purchasedOn, setPurchasedOn] = useState(todayString);
-  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [coordinates, setCoordinates] = useState<{ latitude: number; longitude: number } | null>(mappedCoordinates);
+  const [locationSource, setLocationSource] = useState<'device' | 'map' | 'entered'>(mappedCoordinates ? 'map' : 'entered');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+
+  function unlinkStation() {
+    setLinkedStationId('');
+    if (locationSource === 'map') {
+      setCoordinates(null);
+      setLocationSource('entered');
+    }
+  }
 
   useEffect(() => {
     void ImagePicker.getPendingResultAsync().then((result) => {
@@ -72,6 +89,7 @@ export default function ReportReceiptScreen() {
         return;
       }
       setCoordinates(await getCurrentLocation());
+      setLocationSource('device');
     } catch {
       setError('Could not get your location. Enter the station address instead.');
     } finally {
@@ -100,21 +118,24 @@ export default function ReportReceiptScreen() {
       const photoUri = await saveReceiptPhoto(photo.uri, id, photo.mimeType);
       addReport({
         id,
+        stationId: linkedStationId || undefined,
         photoUri,
         ...parsed.value,
         fuelType,
-        locationSource: coordinates ? 'device' : 'entered',
+        locationSource: coordinates ? locationSource : 'entered',
         coordinates: coordinates ?? undefined,
         savedAt: new Date().toISOString(),
       });
       setPhoto(null);
       setStationName('');
       setStationAddress('');
+      setLinkedStationId('');
       setPriceInput('');
       setGallonsInput('');
       setTotalInput('');
       setPurchasedOn(todayString());
       setCoordinates(null);
+      setLocationSource('entered');
     } catch {
       setError('Could not save the receipt photo on this device. Please try again.');
     } finally {
@@ -143,7 +164,7 @@ export default function ReportReceiptScreen() {
         <Text style={styles.title}>Receipt report</Text>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Saved only on this device</Text>
-          <Text style={styles.noticeText}>Your receipt photo and report stay on this device. The app does not read the receipt or publish prices yet. Check each detail and cover payment information in the photo.</Text>
+          <Text style={styles.noticeText}>Your receipt photo and report stay on this device. The app does not read the photo, so enter and check each detail. Cover payment information in the photo. A receipt linked to a mapped station will show its price in your Gas view.</Text>
         </View>
 
         {Platform.OS === 'web' ? (
@@ -162,6 +183,7 @@ export default function ReportReceiptScreen() {
 
             <Text style={styles.sectionTitle}>02 / Confirm the details</Text>
             <Text style={styles.label}>Station name</Text>
+            {linkedStationId && <View style={styles.linkedStation}><Text style={styles.linkedStationText}>Linked to the station you selected in Gas</Text><Pressable accessibilityRole="button" onPress={unlinkStation}><Text style={styles.unlinkText}>Unlink</Text></Pressable></View>}
             <TextInput style={styles.input} value={stationName} onChangeText={setStationName} placeholder="Name on receipt" accessibilityLabel="Station name" maxLength={100} />
             <Text style={styles.label}>Station address</Text>
             <TextInput style={styles.input} value={stationAddress} onChangeText={setStationAddress} placeholder="Street, city, state" accessibilityLabel="Station address" maxLength={180} />
@@ -186,7 +208,7 @@ export default function ReportReceiptScreen() {
             <Text style={styles.sectionTitle}>03 / Confirm the station location</Text>
             <Text style={styles.hint}>Use your current GPS location only if you are at the gas station now. A receipt photo does not prove where it was taken.</Text>
             <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => void attachStationLocation()} disabled={busy}><Text style={styles.secondaryText}>{coordinates ? 'Update station GPS location' : 'Use my location at the station'}</Text></Pressable>
-            {coordinates && <View><Text style={styles.locationText}>Attached GPS: {coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</Text><Pressable accessibilityRole="button" onPress={() => setCoordinates(null)}><Text style={styles.removeText}>Remove GPS location</Text></Pressable></View>}
+            {coordinates && <View><Text style={styles.locationText}>{locationSource === 'map' ? 'Mapped station' : 'Attached GPS'}: {coordinates.latitude.toFixed(5)}, {coordinates.longitude.toFixed(5)}</Text><Pressable accessibilityRole="button" onPress={() => { setCoordinates(null); setLocationSource('entered'); }}><Text style={styles.removeText}>Remove location</Text></Pressable></View>}
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <Pressable accessibilityRole="button" style={[styles.saveButton, busy && styles.disabled]} onPress={() => void saveReport()} disabled={busy}>
               {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveText}>Save receipt report</Text>}
@@ -202,7 +224,7 @@ export default function ReportReceiptScreen() {
               <View style={styles.reportDetails}>
                 <Text style={styles.reportName}>{report.stationName}</Text>
                 <Text style={styles.reportMeta}>${report.pricePerGallon.toFixed(3)}/gal · {report.fuelType} · {report.purchasedOn}</Text>
-                <Text style={styles.reportMeta}>{report.stationAddress || 'GPS location attached'} · {report.locationSource === 'device' ? 'GPS at submission' : 'Address entered'}</Text>
+                <Text style={styles.reportMeta}>{report.stationAddress || 'Location attached'} · {report.locationSource === 'device' ? 'GPS at submission' : report.locationSource === 'map' ? 'Mapped station' : 'Address entered'}</Text>
                 {report.coordinates && <Text style={styles.reportMeta}>{report.coordinates.latitude.toFixed(5)}, {report.coordinates.longitude.toFixed(5)}</Text>}
                 <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingDelete(report.id)}><Text style={styles.removeText}>Delete report and photo</Text></Pressable>
               </View>
@@ -222,6 +244,9 @@ export default function ReportReceiptScreen() {
 }
 
 const styles = StyleSheet.create({
+  linkedStation: { backgroundColor: colors.paleGreen, padding: 10, borderRadius: 7, flexDirection: 'row', gap: 10, alignItems: 'center' },
+  linkedStationText: { color: colors.inkSoft, fontSize: 12, flex: 1 },
+  unlinkText: { color: colors.accentDark, fontSize: 12, fontWeight: '800' },
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },

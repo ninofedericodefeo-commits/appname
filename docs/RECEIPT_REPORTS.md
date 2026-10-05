@@ -1,6 +1,6 @@
 # Receipt price reports
 
-The mobile app lets a user photograph or choose a gas receipt, then confirm the station name, address or current GPS position, fuel type, price per gallon, optional gallons and total, and purchase date. It stores the photo in the app's document directory and the details in local device storage. Deleting a report removes its app-managed photo. The user should cover payment details before photographing.
+Receipts are under Gas. The mobile app lets a user photograph or choose a gas receipt, then confirm the station name, address or current GPS position, fuel type, price per gallon, optional gallons and total, and purchase date. Starting from a real station card links the report to that mapped station; its latest saved price per fuel type appears on that station in the user's Gas list. Reports entered directly remain in the receipt list without being matched by name or address. The app stores the photo in its document directory and the details in local device storage. Deleting a report removes its app-managed photo and any price it supplied. The user should cover payment details before photographing.
 
 The app does not run OCR or publish the report. Manual confirmation avoids claiming that text or location was extracted from a receipt when it was not. Current GPS should be attached only at the station; otherwise the user enters the address. If the app is uninstalled or device data is cleared, reports may be lost.
 
