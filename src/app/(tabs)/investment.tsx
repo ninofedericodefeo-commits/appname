@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
 import { progressPercent, suggestAmounts, validDeadline } from '@/features/goals/logic';
 import { goalWidgetAvailable } from '@/features/goals/widget';
 import type { Goal, GoalKind, LoggedPurchase } from '@/features/goals/logic';
@@ -11,6 +12,7 @@ import { usePocketStore } from '@/stores/pocketStore';
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const tomorrowKey = () => { const date = new Date(); date.setDate(date.getDate() + 1); return localDateKey(date); };
 
 function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
@@ -31,7 +33,7 @@ function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
   onCancel?: () => void;
 }) {
   const [title, setTitle] = useState(goal?.title ?? '');
-  const [kind, setKind] = useState<GoalKind>(goal?.kind ?? 'item');
+  const kind: GoalKind = goal?.kind ?? 'money';
   const [target, setTarget] = useState(goal ? (goal.targetCents / 100).toFixed(2) : '');
   const [timed, setTimed] = useState(!!goal?.deadline);
   const [deadline, setDeadline] = useState(goal?.deadline ?? '');
@@ -42,7 +44,7 @@ function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
     const targetCents = parseDollars(target);
     if (!title.trim() || title.trim().length > 80) { setError('Enter a title up to 80 characters.'); return; }
     if (targetCents === null || targetCents <= 0) { setError('Enter a target greater than $0.'); return; }
-    if (timed && !validDeadline(deadline)) { setError('Enter a future date as YYYY-MM-DD.'); return; }
+    if (timed && !validDeadline(deadline)) { setError('Choose a future date from the calendar.'); return; }
     if (!onSave({ title, kind, targetCents, deadline: timed ? deadline : null }, assignAll)) {
       setError('Could not save this goal. Please try again.');
       return;
@@ -54,13 +56,11 @@ function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
     <Text style={styles.section}>{goal ? 'Edit goal' : 'Set your goal'}</Text>
     <Text style={styles.label}>Title</Text>
     <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="What are you saving for?" maxLength={80} accessibilityLabel="Goal title" />
-    <Text style={styles.label}>Goal type</Text>
-    <View style={styles.row}><Choice label="An item" selected={kind === 'item'} onPress={() => setKind('item')} /><Choice label="Money" selected={kind === 'money'} onPress={() => setKind('money')} /></View>
     <Text style={styles.label}>Target amount</Text>
     <TextInput style={styles.input} value={target} onChangeText={setTarget} placeholder="500.00" keyboardType="decimal-pad" accessibilityLabel="Goal target amount" />
     <Text style={styles.label}>Timing</Text>
     <View style={styles.row}><Choice label="Untimed" selected={!timed} onPress={() => setTimed(false)} /><Choice label="Timed" selected={timed} onPress={() => setTimed(true)} /></View>
-    {timed && <><Text style={styles.label}>Target date</Text><TextInput style={styles.input} value={deadline} onChangeText={setDeadline} placeholder="YYYY-MM-DD" maxLength={10} accessibilityLabel="Goal target date, year month day" /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
+    {timed && <><Text style={styles.label}>Target date</Text><CalendarDateField label="Goal target date" value={deadline} onChange={setDeadline} minimumDate={tomorrowKey()} /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
     {!goal && reservedCents > 0 && <><Text style={styles.label}>Existing pocket money</Text><Text style={styles.hint}>Your pocket already has {money(reservedCents)} earmarked. Assigning it changes goal progress, not the pocket total.</Text><View style={styles.row}><Choice label="Assign none" selected={!assignAll} onPress={() => setAssignAll(false)} /><Choice label="Assign all" selected={assignAll} onPress={() => setAssignAll(true)} /></View></>}
     <Text style={styles.hint}>Money stays in your existing account. This app cannot verify your balance, transfer funds, or buy stocks.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -183,7 +183,7 @@ export default function GoalsScreen() {
     <Text style={styles.intro}>Set a goal and record each amount you set aside. Purchases and balances are entered by you.</Text>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={createGoal} /> : <>
-      <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.kind === 'money' ? 'MONEY GOAL' : 'ITEM GOAL'} · {activeGoal.deadline ? `BY ${activeGoal.deadline}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>{remaining === 0 ? 'Target reached. End this goal in Settings when you are ready.' : 'Small set-asides count.'}</Text></View>
+      <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.deadline ? `BY ${new Date(`${activeGoal.deadline}T12:00:00`).toLocaleDateString()}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>{remaining === 0 ? 'Target reached. End this goal in Settings when you are ready.' : 'Small set-asides count.'}</Text></View>
       <View style={styles.card}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={() => changeGoalMoney('reserve')} disabled={remaining === 0} /></View><Text style={styles.label}>Release from this goal</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={releaseAmount} onChangeText={setReleaseAmount} placeholder="5.00" keyboardType="decimal-pad" accessibilityLabel="Release from goal" /><Action label="Release" secondary onPress={() => changeGoalMoney('release')} disabled={activeGoal.savedCents === 0} /></View></View>
       <View style={styles.card}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Log an actual purchase to get a savings suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>
       {pending && <Text style={styles.subheading}>Your next savings decision</Text>}

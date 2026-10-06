@@ -1,5 +1,5 @@
 import { colors } from '@/theme';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Link } from 'expo-router';
@@ -28,7 +28,8 @@ export default function GasScreen() {
   const [reportsOpen, setReportsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('loading');
+  const initialSearchStarted = useRef(false);
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
@@ -36,10 +37,9 @@ export default function GasScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  async function startLocationSearch(nextMode: 'nearby' | 'online') {
+  const startLocationSearch = useCallback(async (nextMode: 'nearby' | 'online') => {
     setMode(nextMode);
     if (selectedRadius > 25) setSelectedRadius(25);
-    setLocation(null);
     setLocationStatus('loading');
     try {
       const granted = await requestLocationPermission();
@@ -55,7 +55,13 @@ export default function GasScreen() {
       setLocation(null);
       setLocationStatus('unavailable');
     }
-  }
+  }, [selectedRadius, setSelectedRadius]);
+
+  useEffect(() => {
+    if (initialSearchStarted.current) return;
+    initialSearchStarted.current = true;
+    void startLocationSearch('nearby');
+  }, [startLocationSearch]);
 
   const { data, isLoading, isFetching, isError, isPartial, expansionFailed, error: searchError, refetch } = useNearbyStations({
     mode,
@@ -76,7 +82,7 @@ export default function GasScreen() {
     return price !== undefined && (bestPrice === undefined || price < bestPrice) ? station : best;
   }, undefined);
   const cheapestPrice = cheapest?.prices.find((price) => price.fuelType === selectedFuelType);
-  const canShowResults = mode === 'demo' || (location !== null && locationStatus === 'idle');
+  const canShowResults = mode === 'demo' || (location !== null && locationStatus !== 'denied' && locationStatus !== 'unavailable');
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -107,34 +113,20 @@ export default function GasScreen() {
               <Text style={[styles.pillText, mode === 'online' && styles.activePillText]}>Google prices</Text>
             </Pressable>}
           </View>
-          {mode === 'nearby' && !location && locationStatus === 'idle' && <Pressable accessibilityRole="button" style={styles.findButton} onPress={() => void startLocationSearch('nearby')}><Text style={styles.findButtonText}>Find stations near me ↗</Text></Pressable>}
+          {mode === 'nearby' && !location && locationStatus !== 'loading' && <Pressable accessibilityRole="button" style={styles.findButton} onPress={() => void startLocationSearch('nearby')}><Text style={styles.findButtonText}>Find stations near me ↗</Text></Pressable>}
         </View>
 
-        <Link href="/report-price" asChild>
-          <Pressable accessibilityRole="button" style={styles.receiptCard}>
-            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Report a gas price</Text><Text style={styles.receiptText}>Use your location or enter coordinates. No receipt needed.</Text></View>
-            <Text style={styles.receiptArrow}>›</Text>
-          </Pressable>
-        </Link>
+        {(locationStatus === 'loading' && mode !== 'demo' || canShowResults && (isLoading || isFetching)) && (
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="small" color={colors.accent} />
+            <Text style={styles.loadingText}>{mode === 'demo' ? 'Loading sample stations…' : isPartial ? `Showing stations within 2 mi · searching out to ${selectedRadius} mi…` : 'Finding nearby stations…'}</Text>
+          </View>
+        )}
 
-        <Link href="/report-receipt" asChild>
-          <Pressable accessibilityRole="button" style={styles.receiptCard}>
-            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Gas receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Save a receipt and its price on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
-            <Text style={styles.receiptArrow}>›</Text>
-          </Pressable>
-        </Link>
-
-        {priceReports.length > 0 && <View style={styles.reportList}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: reportsOpen }} onPress={() => setReportsOpen(!reportsOpen)} style={styles.reportListToggle}><Text style={styles.reportListTitle}>My price reports ({priceReports.length})</Text><Text style={styles.reportListChevron}>{reportsOpen ? '−' : '+'}</Text></Pressable>
-          {reportsOpen && priceReports.map((report) => <View key={report.id} style={styles.savedReport}>
-            <View style={styles.savedReportTop}><Text style={styles.savedReportName}>{report.stationName}</Text><Text style={styles.savedReportPrice}>{formatFuelPrice(report.price)}</Text></View>
-            <Text style={styles.savedReportMeta}>{report.fuelType} · {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)} · {new Date(report.reportedAt).toLocaleDateString()}</Text>
-            <View style={styles.savedReportActions}>
-              <Link href={{ pathname: '/report-price', params: { reportId: report.id } }} asChild><Pressable accessibilityRole="button"><Text style={styles.savedReportAction}>Edit</Text></Pressable></Link>
-              {pendingDelete === report.id ? <><Pressable accessibilityRole="button" onPress={() => { removePriceReport(report.id); setPendingDelete(null); }}><Text style={styles.savedReportDelete}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setPendingDelete(null)}><Text style={styles.savedReportAction}>Cancel</Text></Pressable></> : <Pressable accessibilityRole="button" onPress={() => setPendingDelete(report.id)}><Text style={styles.savedReportAction}>Delete</Text></Pressable>}
-            </View>
-          </View>)}
-        </View>}
+        <View style={styles.quickActions}>
+          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report a price</Text></Pressable></Link>
+          <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
+        </View>
 
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
@@ -210,13 +202,6 @@ export default function GasScreen() {
             <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startLocationSearch(mode)}><Text style={styles.retryText}>Try again</Text></Pressable>
           </View>
         )}
-        {(locationStatus === 'loading' && mode !== 'demo' || canShowResults && (isLoading || isFetching)) && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="small" color={colors.accent} />
-            <Text style={styles.loadingText}>{mode === 'demo' ? 'Loading sample stations…' : isPartial ? `Showing stations within 2 mi · searching out to ${selectedRadius} mi…` : 'Finding nearby stations…'}</Text>
-          </View>
-        )}
-
         {canShowResults && expansionFailed && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Wider search unavailable</Text><Text style={styles.emptyText}>Showing stations found within 2 mi. You can try the wider search again.</Text><Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry wider search</Text></Pressable></View>}
 
         {canShowResults && isError && (
@@ -244,6 +229,25 @@ export default function GasScreen() {
             <Text style={styles.emptyText}>Try expanding your search radius.</Text>
           </View>
         )}
+
+        <Text style={styles.sectionEyebrow}>Your gas reports</Text>
+        <Link href="/report-receipt" asChild>
+          <Pressable accessibilityRole="button" style={styles.receiptCard}>
+            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Gas receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Save a receipt and its price on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
+            <Text style={styles.receiptArrow}>›</Text>
+          </Pressable>
+        </Link>
+        {priceReports.length > 0 && <View style={styles.reportList}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: reportsOpen }} onPress={() => setReportsOpen(!reportsOpen)} style={styles.reportListToggle}><Text style={styles.reportListTitle}>My price reports ({priceReports.length})</Text><Text style={styles.reportListChevron}>{reportsOpen ? '−' : '+'}</Text></Pressable>
+          {reportsOpen && priceReports.map((report) => <View key={report.id} style={styles.savedReport}>
+            <View style={styles.savedReportTop}><Text style={styles.savedReportName}>{report.stationName}</Text><Text style={styles.savedReportPrice}>{formatFuelPrice(report.price)}</Text></View>
+            <Text style={styles.savedReportMeta}>{report.fuelType} · {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)} · {new Date(report.reportedAt).toLocaleDateString()}</Text>
+            <View style={styles.savedReportActions}>
+              <Link href={{ pathname: '/report-price', params: { reportId: report.id } }} asChild><Pressable accessibilityRole="button"><Text style={styles.savedReportAction}>Edit</Text></Pressable></Link>
+              {pendingDelete === report.id ? <><Pressable accessibilityRole="button" onPress={() => { removePriceReport(report.id); setPendingDelete(null); }}><Text style={styles.savedReportDelete}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setPendingDelete(null)}><Text style={styles.savedReportAction}>Cancel</Text></Pressable></> : <Pressable accessibilityRole="button" onPress={() => setPendingDelete(report.id)}><Text style={styles.savedReportAction}>Delete</Text></Pressable>}
+            </View>
+          </View>)}
+        </View>}
       </ScrollView>
     </SafeAreaView>
   );
@@ -271,6 +275,11 @@ const styles = StyleSheet.create({
   sourceCard: { backgroundColor: colors.paleGreen, borderLeftWidth: 3, borderLeftColor: colors.primary, padding: 14, marginBottom: 20, gap: 7 },
   findButton: { backgroundColor: colors.ink, borderRadius: 6, minHeight: 46, alignItems: 'center', justifyContent: 'center', marginTop: 5 },
   findButtonText: { color: colors.surface, fontWeight: '800', fontSize: 14 },
+  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 },
+  quickReport: { borderRadius: 6, backgroundColor: colors.accentDark, minHeight: 44, justifyContent: 'center', paddingHorizontal: 15 },
+  quickReportText: { color: colors.surface, fontSize: 13, fontWeight: '800' },
+  quickRoute: { borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
+  quickRouteText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   receiptCard: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 16, marginBottom: 15, minHeight: 72, flexDirection: 'row', alignItems: 'center' },
   receiptCopy: { flex: 1 },
   receiptTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
@@ -303,7 +312,7 @@ const styles = StyleSheet.create({
   activePill: { backgroundColor: colors.ink, borderColor: colors.ink },
   pillText: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize', color: colors.inkSoft },
   activePillText: { color: colors.surface },
-  loadingBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 18, alignItems: 'center', flexDirection: 'row', gap: 10 },
+  loadingBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 18, alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
   loadingText: { color: colors.muted, fontSize: 14 },
   listSection: { marginTop: 4 },
   googleLogo: { width: 98, height: 18, marginVertical: 9 },

@@ -3,7 +3,7 @@ import type { FuelType, GasPrice, GasStation, SortOption } from '@/types/station
 export type StationSearch = { latitude: number; longitude: number; radius: number; fuelType: FuelType; sortOrder: SortOption };
 type Coordinates = Pick<StationSearch, 'latitude' | 'longitude'>;
 
-function milesBetween(a: Coordinates, b: Coordinates) {
+export function milesBetween(a: Coordinates, b: Coordinates) {
   const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
   const latitudeDelta = toRadians(b.latitude - a.latitude);
   const longitudeDelta = toRadians(b.longitude - a.longitude);

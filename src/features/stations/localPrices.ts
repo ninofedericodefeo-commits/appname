@@ -3,6 +3,32 @@ import type { ReceiptReport } from '@/types/receipts';
 import type { GasPrice, GasStation } from '@/types/stations';
 import type { HistoryRange, PriceReportPoint } from '@/features/stations/historyLogic';
 
+export function stationsFromSavedLocations(receipts: ReceiptReport[], reports: LocalPriceReport[]): GasStation[] {
+  const stations = new Map<string, GasStation>();
+  for (const report of reports) {
+    const id = report.stationId ?? `saved-price-${report.id}`;
+    if (stations.has(id)) continue;
+    stations.set(id, {
+      id, name: report.stationName, latitude: report.latitude, longitude: report.longitude,
+      address: report.stationAddress || 'Address not listed', city: '', state: '',
+      prices: [{ fuelType: report.fuelType, price: report.price, currency: 'USD', reportedAt: report.reportedAt, source: 'my price report' }],
+      attributions: [{ provider: 'Saved on this device' }],
+    });
+  }
+  for (const receipt of receipts) {
+    if (!receipt.coordinates) continue;
+    const id = receipt.stationId ?? `saved-receipt-${receipt.id}`;
+    if (stations.has(id)) continue;
+    stations.set(id, {
+      id, name: receipt.stationName, latitude: receipt.coordinates.latitude, longitude: receipt.coordinates.longitude,
+      address: receipt.stationAddress || 'Address not listed', city: '', state: '',
+      prices: [{ fuelType: receipt.fuelType, price: receipt.pricePerGallon, currency: 'USD', reportedAt: `${receipt.purchasedOn}T12:00:00`, source: 'my receipt' }],
+      attributions: [{ provider: 'Saved on this device' }],
+    });
+  }
+  return [...stations.values()];
+}
+
 export function withLocalPrices(stations: GasStation[], receipts: ReceiptReport[], reports: LocalPriceReport[]): GasStation[] {
   const latest = new Map<string, Map<GasPrice['fuelType'], GasPrice>>();
   function add(stationId: string | undefined, price: GasPrice) {

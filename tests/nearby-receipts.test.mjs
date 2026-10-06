@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { parseOverpassStations, stationFromOsm } from '../src/features/stations/overpassParse.ts';
-import { localPriceHistory, withLocalPrices } from '../src/features/stations/localPrices.ts';
+import { localPriceHistory, stationsFromSavedLocations, withLocalPrices } from '../src/features/stations/localPrices.ts';
 
 const element = {
   type: 'node', id: 123, lat: 39.95, lon: -75.16,
@@ -67,4 +67,12 @@ test('the local graph includes linked receipts and direct reports, excluding unl
   const points = localPriceHistory(stationId, 'regular', 7, [receipt], [report, { ...report, id: 'other', stationId: undefined, price: 9.99 }], Date.parse('2026-10-06T12:00:00Z'));
   assert.deepEqual(points.map((point) => point.price), [3.4, 3.2]);
   assert.equal(localPriceHistory(stationId, 'regular', 7, [receipt], [report], Date.parse('2026-11-06T12:00:00Z')).length, 0);
+});
+
+test('saved location reports can appear on a route if a map lookup is unavailable', () => {
+  const report = { id: 'p1', stationName: 'My station', stationAddress: 'Main Street', latitude: 40, longitude: -75, fuelType: 'regular', price: 3.2, reportedAt: '2026-10-05T12:00:00Z' };
+  const stations = stationsFromSavedLocations([], [report]);
+  assert.equal(stations[0].id, 'saved-price-p1');
+  assert.equal(stations[0].prices[0].price, 3.2);
+  assert.equal(stations[0].attributions[0].provider, 'Saved on this device');
 });

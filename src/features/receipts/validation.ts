@@ -34,7 +34,7 @@ export function parseReceiptDetails({
   if (!match || !purchaseDate || purchaseDate.getFullYear() !== Number(match[1]) ||
     purchaseDate.getMonth() !== Number(match[2]) - 1 || purchaseDate.getDate() !== Number(match[3]) ||
     purchaseDate.getTime() > Date.now()) {
-    return { error: 'Enter a valid purchase date in YYYY-MM-DD format.' };
+    return { error: 'Choose a valid purchase date from the calendar.' };
   }
   if (gallons !== undefined && total !== undefined && Math.abs(price * gallons - total) > Math.max(0.1, total * 0.03)) {
     return { error: 'The price, gallons, and total differ. Check the receipt values.' };

@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 
+import { CalendarDateField } from '@/components/CalendarDateField';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { deleteReceiptPhoto, saveReceiptPhoto } from '@/features/receipts/photoStorage';
 import { parseReceiptDetails } from '@/features/receipts/validation';
@@ -202,8 +203,8 @@ export default function ReportReceiptScreen() {
               <View style={styles.halfField}><Text style={styles.label}>Gallons (optional)</Text><TextInput style={styles.input} value={gallonsInput} onChangeText={setGallonsInput} placeholder="10.000" keyboardType="decimal-pad" accessibilityLabel="Gallons purchased" maxLength={8} /></View>
               <View style={styles.halfField}><Text style={styles.label}>Total (optional)</Text><TextInput style={styles.input} value={totalInput} onChangeText={setTotalInput} placeholder="31.99" keyboardType="decimal-pad" accessibilityLabel="Receipt total" maxLength={9} /></View>
             </View>
-            <Text style={styles.label}>Purchase date (YYYY-MM-DD)</Text>
-            <TextInput style={styles.input} value={purchasedOn} onChangeText={setPurchasedOn} placeholder="2026-09-28" accessibilityLabel="Purchase date" maxLength={10} />
+            <Text style={styles.label}>Purchase date</Text>
+            <CalendarDateField label="Purchase date" value={purchasedOn} onChange={setPurchasedOn} maximumDate={todayString()} />
 
             <Text style={styles.sectionTitle}>03 / Confirm the station location</Text>
             <Text style={styles.hint}>Use your current GPS location only if you are at the gas station now. A receipt photo does not prove where it was taken.</Text>
@@ -223,7 +224,7 @@ export default function ReportReceiptScreen() {
               {Platform.OS !== 'web' && <Image source={{ uri: report.photoUri }} style={styles.thumbnail} accessibilityLabel={`Receipt for ${report.stationName}`} />}
               <View style={styles.reportDetails}>
                 <Text style={styles.reportName}>{report.stationName}</Text>
-                <Text style={styles.reportMeta}>${report.pricePerGallon.toFixed(3)}/gal · {report.fuelType} · {report.purchasedOn}</Text>
+                <Text style={styles.reportMeta}>${report.pricePerGallon.toFixed(3)}/gal · {report.fuelType} · {new Date(`${report.purchasedOn}T12:00:00`).toLocaleDateString()}</Text>
                 <Text style={styles.reportMeta}>{report.stationAddress || 'Location attached'} · {report.locationSource === 'device' ? 'GPS at submission' : report.locationSource === 'map' ? 'Mapped station' : 'Address entered'}</Text>
                 {report.coordinates && <Text style={styles.reportMeta}>{report.coordinates.latitude.toFixed(5)}, {report.coordinates.longitude.toFixed(5)}</Text>}
                 <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingDelete(report.id)}><Text style={styles.removeText}>Delete report and photo</Text></Pressable>
