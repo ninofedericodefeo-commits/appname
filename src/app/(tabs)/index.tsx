@@ -10,9 +10,10 @@ import { getCurrentLocation, requestLocationPermission } from '@/features/locati
 import { priceDescription, sampleApiBaseUrl, stationApiBaseUrl } from '@/features/stations/data';
 import { useNearbyStations } from '@/features/stations/hooks';
 import { formatFuelPrice, prepareStations } from '@/features/stations/logic';
-import { withReceiptPrices } from '@/features/stations/receiptPrices';
+import { withLocalPrices } from '@/features/stations/localPrices';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useReceiptStore } from '@/stores/receiptStore';
+import { usePriceReportStore } from '@/stores/priceReportStore';
 import type { FuelType } from '@/types/stations';
 
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
@@ -20,7 +21,11 @@ export default function GasScreen() {
   const { selectedFuelType, selectedRadius, sortOrder, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'demo' | 'nearby' | 'online'>('nearby');
   const receiptReports = useReceiptStore((state) => state.reports);
+  const priceReports = usePriceReportStore((state) => state.reports);
+  const removePriceReport = usePriceReportStore((state) => state.removeReport);
   const receiptCount = receiptReports.length;
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
@@ -52,7 +57,7 @@ export default function GasScreen() {
     }
   }
 
-  const { data, isLoading, isFetching, isError, error: searchError, refetch } = useNearbyStations({
+  const { data, isLoading, isFetching, isError, isPartial, expansionFailed, error: searchError, refetch } = useNearbyStations({
     mode,
     latitude: location?.latitude,
     longitude: location?.longitude,
@@ -63,8 +68,8 @@ export default function GasScreen() {
   const stations = useMemo(() => {
     const found = data?.stations ?? [];
     if (mode === 'demo' || !location) return found;
-    return prepareStations(withReceiptPrices(found, receiptReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder });
-  }, [data?.stations, mode, location, receiptReports, selectedRadius, selectedFuelType, sortOrder]);
+    return prepareStations(withLocalPrices(found, receiptReports, priceReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder });
+  }, [data?.stations, mode, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder]);
   const cheapest = stations.reduce<(typeof stations)[number] | undefined>((best, station) => {
     const price = station.prices.find((item) => item.fuelType === selectedFuelType)?.price;
     const bestPrice = best?.prices.find((item) => item.fuelType === selectedFuelType)?.price;
@@ -79,7 +84,7 @@ export default function GasScreen() {
         <View style={styles.headerRow}>
           <Text style={styles.brand}>GASFINDER</Text>
           <Text style={styles.title}>Gas stations</Text>
-          <Text style={styles.headerNote}>Find nearby stations and see prices you’ve saved.</Text>
+          <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
         </View>
 
         <View style={styles.sourceCard}>
@@ -105,12 +110,31 @@ export default function GasScreen() {
           {mode === 'nearby' && !location && locationStatus === 'idle' && <Pressable accessibilityRole="button" style={styles.findButton} onPress={() => void startLocationSearch('nearby')}><Text style={styles.findButtonText}>Find stations near me ↗</Text></Pressable>}
         </View>
 
+        <Link href="/report-price" asChild>
+          <Pressable accessibilityRole="button" style={styles.receiptCard}>
+            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Report a gas price</Text><Text style={styles.receiptText}>Use your location or enter coordinates. No receipt needed.</Text></View>
+            <Text style={styles.receiptArrow}>›</Text>
+          </Pressable>
+        </Link>
+
         <Link href="/report-receipt" asChild>
           <Pressable accessibilityRole="button" style={styles.receiptCard}>
             <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Gas receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Save a receipt and its price on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
             <Text style={styles.receiptArrow}>›</Text>
           </Pressable>
         </Link>
+
+        {priceReports.length > 0 && <View style={styles.reportList}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: reportsOpen }} onPress={() => setReportsOpen(!reportsOpen)} style={styles.reportListToggle}><Text style={styles.reportListTitle}>My price reports ({priceReports.length})</Text><Text style={styles.reportListChevron}>{reportsOpen ? '−' : '+'}</Text></Pressable>
+          {reportsOpen && priceReports.map((report) => <View key={report.id} style={styles.savedReport}>
+            <View style={styles.savedReportTop}><Text style={styles.savedReportName}>{report.stationName}</Text><Text style={styles.savedReportPrice}>{formatFuelPrice(report.price)}</Text></View>
+            <Text style={styles.savedReportMeta}>{report.fuelType} · {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)} · {new Date(report.reportedAt).toLocaleDateString()}</Text>
+            <View style={styles.savedReportActions}>
+              <Link href={{ pathname: '/report-price', params: { reportId: report.id } }} asChild><Pressable accessibilityRole="button"><Text style={styles.savedReportAction}>Edit</Text></Pressable></Link>
+              {pendingDelete === report.id ? <><Pressable accessibilityRole="button" onPress={() => { removePriceReport(report.id); setPendingDelete(null); }}><Text style={styles.savedReportDelete}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setPendingDelete(null)}><Text style={styles.savedReportAction}>Cancel</Text></Pressable></> : <Pressable accessibilityRole="button" onPress={() => setPendingDelete(report.id)}><Text style={styles.savedReportAction}>Delete</Text></Pressable>}
+            </View>
+          </View>)}
+        </View>}
 
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
@@ -189,9 +213,11 @@ export default function GasScreen() {
         {(locationStatus === 'loading' && mode !== 'demo' || canShowResults && (isLoading || isFetching)) && (
           <View style={styles.loadingBox}>
             <ActivityIndicator size="small" color={colors.accent} />
-            <Text style={styles.loadingText}>{mode === 'demo' ? 'Loading sample stations…' : 'Finding nearby stations…'}</Text>
+            <Text style={styles.loadingText}>{mode === 'demo' ? 'Loading sample stations…' : isPartial ? `Showing stations within 2 mi · searching out to ${selectedRadius} mi…` : 'Finding nearby stations…'}</Text>
           </View>
         )}
+
+        {canShowResults && expansionFailed && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Wider search unavailable</Text><Text style={styles.emptyText}>Showing stations found within 2 mi. You can try the wider search again.</Text><Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry wider search</Text></Pressable></View>}
 
         {canShowResults && isError && (
           <View style={styles.emptyCard}>
@@ -205,14 +231,14 @@ export default function GasScreen() {
           <View style={styles.listSection}>
             <Text style={styles.sectionEyebrow}>Stations</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
-            {mode !== 'demo' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. Station locations are shown below.</Text>}
+            {mode !== 'demo' && !cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. The $9.99 figures below are fictional examples, not pump prices.</Text>}
             {stations.map((station) => (
               <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={mode === 'demo'} now={now} canReport={mode === 'demo' && !!sampleApiBaseUrl} canOpenMaps={mode !== 'demo'} canAddReceipt={mode !== 'demo'} onReported={() => void refetch()} />
             ))}
           </View>
         )}
 
-        {canShowResults && !isLoading && !isError && stations.length === 0 && (
+        {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No stations found in this radius</Text>
             <Text style={styles.emptyText}>Try expanding your search radius.</Text>
@@ -250,6 +276,18 @@ const styles = StyleSheet.create({
   receiptTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   receiptText: { color: colors.muted, fontSize: 12, marginTop: 4 },
   receiptArrow: { color: colors.accentDark, fontSize: 28, marginLeft: 12 },
+  reportList: { marginBottom: 16 },
+  reportListToggle: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 8, minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  reportListTitle: { color: colors.ink, fontWeight: '800', fontSize: 14 },
+  reportListChevron: { color: colors.accentDark, fontSize: 24 },
+  savedReport: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 7, padding: 13, marginBottom: 7 },
+  savedReportTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
+  savedReportName: { color: colors.ink, fontWeight: '800', fontSize: 14, flex: 1 },
+  savedReportPrice: { color: colors.accentDark, fontWeight: '800', fontSize: 16 },
+  savedReportMeta: { color: colors.muted, fontSize: 12, marginTop: 5, textTransform: 'capitalize' },
+  savedReportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginTop: 11 },
+  savedReportAction: { color: colors.accentDark, fontSize: 12, fontWeight: '700' },
+  savedReportDelete: { color: colors.danger, fontSize: 12, fontWeight: '800' },
   sourceTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   sourceText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
   sectionEyebrow: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 14 },

@@ -30,7 +30,7 @@ export function stationFromOsm(value: unknown): GasStation | null {
   const street = [mappedText(tags, 'addr:housenumber'), mappedText(tags, 'addr:street')].filter(Boolean).join(' ');
   return {
     id: `osm-${element.type}-${element.id}`,
-    name: (mappedText(tags, 'name') || mappedText(tags, 'brand') || mappedText(tags, 'operator') || 'Gas station').slice(0, 120),
+    name: (mappedText(tags, 'name') || mappedText(tags, 'brand') || mappedText(tags, 'operator') || 'Name not listed').slice(0, 120),
     brand: mappedText(tags, 'brand').slice(0, 120),
     latitude,
     longitude,
@@ -53,4 +53,3 @@ export function parseOverpassStations(value: unknown): GasStation[] {
   const stations = value.elements.map((item: unknown) => stationFromOsm(item)).filter((item: GasStation | null): item is GasStation => item !== null);
   return [...new Map(stations.map((station: GasStation) => [station.id, station])).values()];
 }
-
