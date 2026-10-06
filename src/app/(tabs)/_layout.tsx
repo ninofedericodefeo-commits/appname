@@ -14,6 +14,9 @@ export default function MainTabsLayout() {
   >
     <Tabs.Screen name="index" options={{ title: 'Gas' }} />
     <Tabs.Screen name="investment" options={{ title: 'Goals' }} />
-    <Tabs.Screen name="menu" options={{ title: 'More' }} />
+    <Tabs.Screen name="pocket" options={{ title: 'Pocket' }} />
+    <Tabs.Screen name="spending" options={{ title: 'Pause' }} />
+    <Tabs.Screen name="subscriptions" options={{ title: 'Renewals' }} />
+    <Tabs.Screen name="activity" options={{ title: 'Activity' }} />
   </Tabs>;
 }

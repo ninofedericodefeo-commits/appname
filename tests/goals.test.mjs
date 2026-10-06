@@ -3,14 +3,19 @@ import test from 'node:test';
 
 import {
   DEFAULT_GOAL_SETTINGS,
+  DEFAULT_SET_ASIDE_RULE,
+  automaticSetAsideCents,
   canLogPurchase,
   canReleaseFromGoal,
   canReleaseUnassigned,
   canSetAsideForGoal,
   progressPercent,
+  ruleAmountCents,
+  ruleDescription,
   startingGoalCents,
   suggestAmounts,
   validDeadline,
+  validSetAsideRule,
 } from '../src/features/goals/logic.ts';
 
 const now = new Date('2026-09-29T12:00:00Z');
@@ -59,4 +64,21 @@ test('history and a deadline affect suggestions without exceeding either cap', (
   assert.equal(timed.paceLimited, true);
   assert.deepEqual(timed.amounts, [400]);
   assert.deepEqual(suggestAmounts({ purchase, history, goal, settings: { ...DEFAULT_GOAL_SETTINGS, suggestionsEnabled: false }, now }).amounts, []);
+});
+
+test('fixed, percent and round-up rules use cents and reject invalid values', () => {
+  assert.equal(ruleAmountCents(1250, { mode: 'fixed', cents: 200 }), 200);
+  assert.equal(ruleAmountCents(1250, DEFAULT_SET_ASIDE_RULE), 63);
+  assert.equal(ruleAmountCents(1250, { mode: 'round', incrementCents: 500 }), 250);
+  assert.equal(ruleAmountCents(1500, { mode: 'round', incrementCents: 500 }), 0);
+  assert.equal(validSetAsideRule({ mode: 'percent', percent: 101 }), false);
+  assert.equal(ruleDescription({ mode: 'round', incrementCents: 100 }), 'Round each purchase up to the next $1');
+});
+
+test('automatic pocket set-asides respect the goal remainder and entered balance', () => {
+  const usingRule = { ...goal, setAsideRule: { mode: 'fixed', cents: 500 } };
+  assert.equal(automaticSetAsideCents(2500, usingRule, null, 2000), 500);
+  assert.equal(automaticSetAsideCents(2500, { ...usingRule, savedCents: 9900 }, null, 9900), 100);
+  assert.equal(automaticSetAsideCents(2500, usingRule, 2200, 2000), 200);
+  assert.equal(automaticSetAsideCents(2500, usingRule, 2000, 2000), 0);
 });

@@ -3,6 +3,37 @@ import type { GasStation } from '@/types/stations';
 export type RoutePoint = { latitude: number; longitude: number };
 export type DriveRoute = { points: RoutePoint[]; miles: number; minutes: number };
 export type RouteStation = GasStation & { milesAhead: number; milesOffRoute: number };
+export type FuelStopPlan = { rangeMiles: number; targetMiles: number; lastSafeMiles: number; searchStartMiles: number; searchEndMiles: number; needsFuel: boolean };
+
+export function planFuelStop(routeMiles: number, rangeMiles: number): FuelStopPlan {
+  if (!Number.isFinite(routeMiles) || routeMiles <= 0 || !Number.isFinite(rangeMiles) || rangeMiles <= 0) throw new Error('Enter a valid fuel range and destination.');
+  const reserveMiles = Math.min(20, Math.max(5, rangeMiles * 0.1));
+  const needsFuel = routeMiles > rangeMiles - reserveMiles;
+  const manualSearchEnd = Math.min(routeMiles, 120);
+  const targetMiles = needsFuel ? Math.max(0, rangeMiles - reserveMiles) : manualSearchEnd / 2;
+  const lastSafeMiles = needsFuel ? Math.min(routeMiles, Math.max(0, rangeMiles - Math.min(5, rangeMiles * 0.2))) : manualSearchEnd;
+  return {
+    rangeMiles, targetMiles, lastSafeMiles,
+    searchStartMiles: needsFuel ? Math.max(0, targetMiles - 60) : 0,
+    searchEndMiles: lastSafeMiles,
+    needsFuel,
+  };
+}
+
+export function rankFuelStops(stations: RouteStation[], plan: FuelStopPlan, fuelType: string) {
+  const eligible = stations.filter((station) => station.milesAhead <= plan.lastSafeMiles);
+  const nearby = eligible.filter((station) => station.milesAhead >= Math.max(0, plan.targetMiles - 25));
+  const candidates = nearby.length ? nearby : eligible;
+  return [...candidates].sort((a, b) => {
+    const priceA = a.prices.find((price) => price.fuelType === fuelType)?.price;
+    const priceB = b.prices.find((price) => price.fuelType === fuelType)?.price;
+    if (priceA === undefined && priceB !== undefined) return 1;
+    if (priceA !== undefined && priceB === undefined) return -1;
+    const score = (station: RouteStation, price: number | undefined) =>
+      (price ?? 0) * 100 + Math.abs(station.milesAhead - plan.targetMiles) + station.milesOffRoute * 10;
+    return score(a, priceA) - score(b, priceB);
+  });
+}
 
 export function parseDriveRoute(payload: unknown): DriveRoute {
   if (!payload || typeof payload !== 'object' || !('routes' in payload) || !Array.isArray(payload.routes)) throw new Error('The route service returned invalid data.');
@@ -73,6 +104,28 @@ export function routePrefix(points: RoutePoint[], maxMiles: number) {
     traveled += segment;
   }
   return result;
+}
+
+export function routeWindow(points: RoutePoint[], fromMiles: number, toMiles: number) {
+  const prefix = routePrefix(points, toMiles);
+  if (fromMiles <= 0 || prefix.length < 2) return prefix;
+  const result: RoutePoint[] = [];
+  let traveled = 0;
+  for (let index = 1; index < prefix.length; index++) {
+    const start = prefix[index - 1];
+    const end = prefix[index];
+    const length = segmentDistance(end, start, end).segmentMiles;
+    if (traveled + length >= fromMiles) {
+      if (result.length === 0) {
+        const fraction = length > 0 ? Math.max(0, (fromMiles - traveled) / length) : 0;
+        result.push({ latitude: start.latitude + (end.latitude - start.latitude) * fraction,
+          longitude: start.longitude + (end.longitude - start.longitude) * fraction });
+      }
+      result.push(end);
+    }
+    traveled += length;
+  }
+  return result.length >= 2 ? result : prefix.slice(-2);
 }
 
 export function routeQueryPoints(points: RoutePoint[], maxPoints = 100) {
