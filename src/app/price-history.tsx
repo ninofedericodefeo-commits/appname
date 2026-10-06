@@ -1,13 +1,16 @@
 import { colors } from '@/theme';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Link, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PriceHistoryChart } from '@/components/PriceHistoryChart';
 import { fetchPriceHistory, type HistoryRange } from '@/features/stations/history';
+import { localPriceHistory } from '@/features/stations/localPrices';
 import { formatFuelPrice } from '@/features/stations/logic';
+import { usePriceReportStore } from '@/stores/priceReportStore';
+import { useReceiptStore } from '@/stores/receiptStore';
 import type { FuelType } from '@/types/stations';
 
 const ranges: { value: HistoryRange; label: string }[] = [
@@ -19,38 +22,40 @@ const ranges: { value: HistoryRange; label: string }[] = [
 const validFuels: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 
 export default function PriceHistoryScreen() {
-  const params = useLocalSearchParams<{ stationId?: string; stationName?: string; fuelType?: string }>();
+  const params = useLocalSearchParams<{ stationId?: string; stationName?: string; fuelType?: string; source?: string }>();
   const stationId = typeof params.stationId === 'string' ? params.stationId : '';
   const stationName = typeof params.stationName === 'string' ? params.stationName : 'Station';
   const fuelType: FuelType = validFuels.includes(params.fuelType as FuelType) ? params.fuelType as FuelType : 'regular';
   const [range, setRange] = useState<HistoryRange>(30);
   const [now] = useState(() => Date.now());
-  const { data: reports = [], isPending, isError, error, refetch } = useQuery({
+  const isLocal = params.source === 'local';
+  const priceReports = usePriceReportStore((state) => state.reports);
+  const receipts = useReceiptStore((state) => state.reports);
+  const { data: remoteReports = [], isPending, isError, error, refetch } = useQuery({
     queryKey: ['price-history', stationId, fuelType, range],
-    enabled: !!stationId,
+    enabled: !!stationId && !isLocal,
     queryFn: ({ signal }) => fetchPriceHistory(stationId, fuelType, range, signal),
     staleTime: 15_000,
   });
+  const reports = isLocal ? localPriceHistory(stationId, fuelType, range, receipts, priceReports, now) : remoteReports;
   const latest = reports.at(-1);
   const first = reports[0];
   const difference = latest && first ? latest.price - first.price : 0;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.kicker}>FUEL  /  PRICE HISTORY</Text>
-          <Link href="/" asChild><Pressable accessibilityRole="button" style={styles.back}><Text style={styles.backText}>Gas prices</Text></Pressable></Link>
-        </View>
+        <Text style={styles.kicker}>PRICE HISTORY</Text>
         <Text style={styles.title}>{stationName}</Text>
         <Text style={styles.subtitle}>{fuelType} · USD per gallon</Text>
+        {isLocal && <Text style={styles.localNote}>Only reports saved on this device appear here.</Text>}
         <View style={styles.ranges}>
           {ranges.map((option) => <Pressable key={option.label} accessibilityRole="button" accessibilityState={{ selected: range === option.value }} onPress={() => setRange(option.value)} style={[styles.range, range === option.value && styles.rangeActive]}><Text style={[styles.rangeText, range === option.value && styles.rangeTextActive]}>{option.label}</Text></Pressable>)}
         </View>
-        {isPending ? <View style={styles.status}><ActivityIndicator color={colors.accentDark} /><Text style={styles.statusText}>Loading reports…</Text></View> : isError ? (
+        {!isLocal && isPending ? <View style={styles.status}><ActivityIndicator color={colors.accentDark} /><Text style={styles.statusText}>Loading reports…</Text></View> : !isLocal && isError ? (
           <View style={styles.status}><Text style={styles.statusText}>{error instanceof Error ? error.message : 'Could not load history.'}</Text><Pressable accessibilityRole="button" onPress={() => void refetch()}><Text style={styles.retry}>Try again</Text></Pressable></View>
         ) : reports.length === 0 ? (
-          <View style={styles.status}><Text style={styles.emptyTitle}>No reports in this range</Text><Text style={styles.statusText}>The graph starts when someone saves a price for this station and fuel. Fictional sample prices are excluded.</Text></View>
+          <View style={styles.status}><Text style={styles.emptyTitle}>No reports in this range</Text><Text style={styles.statusText}>{isLocal ? 'Save a price or receipt for this mapped station to start its graph. Fictional example prices are excluded.' : 'The graph starts when someone saves a price for this station and fuel. Fictional sample prices are excluded.'}</Text></View>
         ) : (
           <>
             <View style={styles.summary}>
@@ -73,12 +78,10 @@ export default function PriceHistoryScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  back: { backgroundColor: colors.ink, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 11 },
-  backText: { color: colors.surface, fontWeight: '700' },
   title: { color: colors.ink, fontSize: 34, fontWeight: '800', marginTop: 20 },
   subtitle: { color: colors.muted, fontSize: 14, marginTop: 4, textTransform: 'capitalize' },
+  localNote: { color: colors.muted, fontSize: 12, marginTop: 8 },
   ranges: { flexDirection: 'row', flexWrap: 'wrap', gap: 7, marginTop: 24, marginBottom: 19 },
   range: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, paddingHorizontal: 13, paddingVertical: 11 },
   rangeActive: { backgroundColor: colors.ink, borderColor: colors.ink },

@@ -2,6 +2,7 @@ import type { FuelType } from '@/types/stations';
 
 export type ReceiptReport = {
   id: string;
+  stationId?: string;
   photoUri: string;
   stationName: string;
   stationAddress: string;
@@ -11,6 +12,6 @@ export type ReceiptReport = {
   total?: number;
   purchasedOn: string;
   savedAt: string;
-  locationSource: 'device' | 'entered';
+  locationSource: 'device' | 'entered' | 'map';
   coordinates?: { latitude: number; longitude: number };
 };

@@ -65,7 +65,7 @@ function SubscriptionReviewPrompt() {
     if (Platform.OS === 'web') return;
     function openSubscriptionReview(response: Notifications.NotificationResponse) {
       if (response.notification.request.content.data?.kind === 'subscription-review') {
-        router.push('/subscriptions');
+        router.navigate('/subscriptions');
         Notifications.clearLastNotificationResponse();
       }
     }
@@ -142,17 +142,24 @@ export default function RootLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
+      <View style={styles.appShell}>
+        <Stack screenOptions={{
+          headerTitle: '',
+          headerTintColor: colors.ink,
+          headerStyle: { backgroundColor: colors.paper },
+          headerShadowVisible: false,
+          contentStyle: { backgroundColor: colors.paper },
+        }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
+        </Stack>
+      </View>
       <SubscriptionReviewPrompt />
     </QueryClientProvider>
   );
 }
 
 const styles = StyleSheet.create({
+  appShell: { flex: 1, backgroundColor: colors.paper },
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 22, paddingTop: 28, paddingBottom: 42, gap: 17 },
   eyebrow: { color: colors.accentDark, fontWeight: '800', fontSize: 11, letterSpacing: 1.6 },

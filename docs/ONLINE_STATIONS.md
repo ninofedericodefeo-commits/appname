@@ -1,6 +1,6 @@
 # Online station search
 
-GasFinder now has an opt-in nearby search backed by [Google Places (New) Nearby Search](https://developers.google.com/maps/documentation/places/web-service/nearby-search). The app still opens with clearly labeled Philadelphia sample data. Online results can include provider fuel reports, but many stations have no fuel price. The app shows their locations with “Price unavailable” instead of inventing a value. Prices include the provider's update time; reports older than 24 hours are marked stale.
+GasFinder opens with a free OpenStreetMap nearby search. The separate, optional Google Places mode is backed by [Google Places (New) Nearby Search](https://developers.google.com/maps/documentation/places/web-service/nearby-search). Google results can include provider fuel reports, but many stations have no fuel price. The app shows their locations with “Price unavailable” instead of inventing a value. Prices include the provider's update time; reports older than 24 hours are marked stale.
 
 ## Try it in an iOS simulator
 
@@ -15,9 +15,9 @@ The server searches up to 25 miles and returns at most 20 stations per request. 
 
 `localhost` on an iPhone is the phone itself. Host `server/index.mjs` behind HTTPS and set `EXPO_PUBLIC_STATIONS_API_URL` to that public URL when building the app. Keep `GOOGLE_PLACES_API_KEY` only in the server environment. Add authentication or another abuse control and persistent usage limits before exposing the endpoint publicly, and restrict the Google key according to [Google's API key security guidance](https://developers.google.com/maps/api-security-best-practices). Verify actual fuel-price coverage, units, timestamps, and billing with the intended launch area and a real provider response. No Google key or hosted endpoint is included in this repository, so live results cannot be verified from source alone.
 
-For ongoing use, Google says the demo key cannot be used in production. A standard Places key needs billing enabled. Requests for `fuelOptions` use the [Nearby Search Enterprise + Atmosphere SKU](https://developers.google.com/maps/documentation/places/web-service/nearby-search); Google currently lists a monthly free usage cap, but usage beyond that cap is billable. If you want a strict no-billing app, keep the locally saved receipt reports and sample station mode instead of enabling the Google online provider for everyday use.
+For ongoing use, Google says the demo key cannot be used in production. A standard Places key needs billing enabled. Requests for `fuelOptions` use the [Nearby Search Enterprise + Atmosphere SKU](https://developers.google.com/maps/documentation/places/web-service/nearby-search); Google currently lists a monthly free usage cap, but usage beyond that cap is billable. For a no-billing app, use OpenStreetMap station lookup and locally saved receipts instead of enabling Google Places.
 
-Google Maps attribution and any place-specific provider attributions are shown with results. Before release, include the required Google Maps [terms and privacy disclosures](https://developers.google.com/maps/documentation/places/web-service/policies) in the app's public legal pages. Receipt photo reports remain separate and stored locally; they do not change Google results or upload reports.
+Google Maps attribution and any place-specific provider attributions are shown with results. Before release, include the required Google Maps [terms and privacy disclosures](https://developers.google.com/maps/documentation/places/web-service/policies) in the app's public legal pages. Receipt photos remain on the device; a receipt linked to a station can provide a local price in the app's list, without changing the provider response or uploading the report.
 
 ## App service contract
 

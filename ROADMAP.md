@@ -2,33 +2,34 @@
 
 ## Purpose
 
-This roadmap turns four product goals into a staged plan:
+This roadmap describes the current app and the remaining work in staged order:
 
-1. Learn from other gas-finding apps and improve GasFinder.
-2. Test GasFinder on a physical phone and bring gas data online.
-3. Explore useful money-management features, including support for reducing impulse online purchases.
-4. Give users a clear, trustworthy view of money saved and contributions made.
+1. Bring the restored Gas, Savings, Money, and Activity experience to a reliable, testable baseline.
+2. Keep personal data private and local-first, with explicit import, review, persistence, and deletion behavior.
+3. Validate physical-device behavior and decide whether any online gas-data source is suitable.
+4. Defer account linking, money movement, and investing integrations unless separately approved.
 
-The roadmap prioritizes learning and safe testing before connecting accounts or handling real money. It is a product direction, not a promise that every idea is technically available on every platform.
+The app is private and single-user. This roadmap does not authorize bank linking, FinanceKit, a shared backend for personal data, or any movement of funds. It is a product direction, not a promise that every idea is technically available on every platform.
 
 ## Where the app is today
 
-GasFinder is an Expo/React Native mobile app with separate gas and savings-goal screens. The gas finder currently uses bundled sample stations. Savings goals use manually logged purchases and the on-device savings pocket; the previous simulated investing ledger remains in a read-only archive. The local prototype also includes an optional online-purchase cooling-off planner. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; or execute trades.
+GasFinder is an Expo/React Native mobile app with grouped **Gas**, **Savings**, **Money**, and **Activity** navigation. Savings includes goals and Pocket; Money includes Spending Pause, subscriptions, and on-device bank-history CSV import. The previous simulated investing ledger remains in a read-only archive.
 
-That is a useful foundation for testing the experience, but simulated values must remain clearly identified as demo data until backed by a real, reviewed financial integration.
+Gas opens in clearly labeled Philadelphia sample mode and does not request location on launch. Location is requested only when the user chooses a nearby search. Station sources include retained local fixtures and service integrations, but no production source has passed the coverage, freshness, terms, and operating-readiness gates. The app does not connect to a bank, card, or brokerage, detect transactions automatically, transfer funds, or execute trades.
 
 ### Implemented locally so far
 
-- A savings tracker summarizes simulated contributions, current demo balances, and withdrawals, with itemized contribution and withdrawal history.
+- Savings goals, the on-device pocket, spending pause, and subscriptions are local user-managed workflows. Any balance or avoided-spending amount is an estimate and must not imply money has moved or a payment has been blocked.
 - An optional, on-device purchase-pause planner lets users set a 24-hour, 2-day, or 7-day delay and self-report whether they bought or skipped a planned online purchase.
 - The purchase-pause feature does not monitor accounts, intercept checkout, or block transactions. Its skipped-purchase total is an unverified user-reported estimate, not confirmed savings.
-- Both features are persisted locally for the prototype. This does not make the balances real or suitable for financial decisions.
-- The gas screen now separates a labeled Philadelphia sample from an opt-in online backend contract. Online search requires location permission, validates server data, and shows errors without silently substituting samples. A provider and backend are still required before live fuel prices are available.
+- Personal finance data is persisted locally. This does not make estimates verified balances or suitable for financial decisions.
+- The gas screen separates the labeled Philadelphia sample from opt-in nearby/service search. Location permission is requested on demand; online search validates service data and surfaces errors rather than substituting sample results.
 - Local ledger entries can be filtered by date and removed with balance-safe corrections; purchase-pause records can be deleted. Physical-phone verification is tracked in `docs/PHONE_SMOKE_TEST.md`.
 - A mobile receipt-report flow now stores a photo and user-confirmed fuel price, fuel type, date, and station address or on-site GPS on the device. It does not extract receipt text or publish prices to other users. Shared prices require an authenticated backend, duplicate checks, moderation, retention rules, and a plan for handling false reports.
 - A separate savings pocket now earmarks part of a manually entered account balance on this device. It is an estimate within the user's existing account; it cannot verify, transfer, or restrict bank funds. This matches the requested no-bank-connection scope.
 - One active savings goal can use all or none of an existing pocket amount, accept confirmed set-asides, and show suggestions based on manually logged purchases and an optional deadline. An optional iPhone widget shows goal progress, with amounts hidden by default. Neither goals nor the widget represent a verified balance or an investment.
 - A local subscription tracker now records monthly or yearly renewal dates and user-entered prices. It prompts for each renewal on the preceding calendar day and can schedule optional local 9 AM notifications. A plan-to-cancel decision is a reminder to act with the provider, not a cancellation or blocked charge.
+- Bank-history CSV files are selected and processed on-device. A parsed import now has an explicit preview and confirmation step before persistence. Possible recurring-charge suggestions show match evidence and can be dismissed/restored; they remain inferences, not confirmed subscriptions or live account data.
 
 ## Product principles
 
@@ -43,14 +44,14 @@ That is a useful foundation for testing the experience, but simulated values mus
 
 | Priority | Workstream | Outcome |
 |---|---|---|
-| 1 | Competitor research and product discovery | Evidence-backed list of gas-finder problems and opportunities |
-| 2 | Phone testing and experience quality | A repeatable real-device test process and a stable mobile demo |
-| 3 | Online gas information | Reliable, licensed station and price data for a defined launch area |
-| 4 | Savings tracker | A reconciliable record of contributions, balances, and withdrawals |
-| 5 | Online-purchase guardrails | Optional tools that help users pause or budget discretionary spending |
-| 6 | Real financial connections | A carefully selected, consent-based route to transaction data and, separately, money movement or investing |
+| 1 | Documentation and implementation baseline | Roadmap, routes, source map, and smoke checklist describe the same current app |
+| 2 | CSV import and recurring suggestions | Basic preview-before-save and dismissible evidence-based suggestions are implemented; broaden format/row review and lifecycle tests |
+| 3 | Local-data lifecycle | Define and test persistence, migration, export, deletion, and recovery for local user data |
+| 4 | Physical-device validation | Verify permissions, navigation, storage, reminders, import, accessibility, and failure states on agreed devices |
+| 5 | Gas data readiness | Select a source only after coverage, freshness, terms, cost, and operating requirements are verified |
+| Deferred | Account linking or real-money integrations | Requires a separate explicit product decision and appropriate provider, privacy, security, and legal review |
 
-Workstreams 1 and 2 can begin with the current demo. Online gas data, the savings tracker, and purchase guardrails can be explored independently. Real financial integrations depend on selecting providers and completing the required product, legal, security, and operational reviews.
+The current local workflows remain available while these gates are completed. Keep the sample records until each replacement is mapped, validated, and covered by tests. Do not infer approval for bank linking or FinanceKit from the presence of CSV import.
 
 ---
 
@@ -107,14 +108,15 @@ Make the current prototype dependable to install and use on a real phone before 
 
 ### Activities
 
-1. Confirm the target platforms and devices (initially Android, iOS, or both) and define the minimum supported OS versions.
+1. Confirm the target platforms/devices and minimum supported OS versions; record the model, OS, build, tester, and date for each run.
 2. Create and install the appropriate Expo development build on the target phone. Use a development build when Expo Go does not include a required native module.
 3. Test the current local-data experience:
    - First launch, reload, and app restart.
    - Location permission granted, denied, unavailable, and later changed in Settings.
-   - Gas-to-investing navigation and return navigation.
-   - Small and large screens, text scaling, keyboard appearance, and touch target sizes.
-   - Investment settings, persisted demo state, and transaction consent flow.
+   - Gas, Savings, Money, and Activity tabs, plus access to secondary screens and return navigation.
+   - Small screens, text scaling, keyboard appearance, and touch target sizes.
+   - Goals, Pocket, Spending Pause, subscriptions, local reminders, and persisted user data.
+   - CSV selection, preview, cancellation, confirmation, duplicate handling, and local deletion.
    - Slow/no connectivity and readable loading, empty, and error states.
 4. Record OS/device, steps, expected and actual result, severity, and a screen recording or screenshot when useful.
 5. Keep a smoke-test checklist for each build and retest fixes on affected platforms.
@@ -129,8 +131,10 @@ Make the current prototype dependable to install and use on a real phone before 
 ### Acceptance criteria
 
 - The app installs and opens on every agreed target test device.
-- Core gas and investing navigation works after reload and restart.
-- Permission denial does not strand the user or misrepresent the default test location.
+- Grouped navigation and core local workflows work after reload and restart.
+- Launch does not request location; choosing nearby search explains and handles granted, denied, unavailable, and later-changed permission states.
+- Sample results remain explicitly labeled and are never presented as online/provider results.
+- CSV data is not persisted until the user confirms the preview; cancellation leaves existing history unchanged.
 - Text, buttons, inputs, and confirmation steps remain usable on small screens and with accessibility settings.
 - Critical issues found during smoke testing are resolved or explicitly documented before the next release step.
 
@@ -178,11 +182,11 @@ Do not switch the app to production online data until the data source's terms pe
 
 ---
 
-## 4. Build a savings and contribution tracker
+## 4. Maintain trustworthy Savings estimates
 
 ### Goal
 
-Help users understand what they have contributed, what remains available, and what they have withdrawn—without claiming that simulated contributions or market changes are guaranteed savings.
+Continue validating the implemented Goals and Pocket workflows. Help users understand user-entered and derived amounts without implying that money moved, was verified by a bank, or is guaranteed savings.
 
 ### Define the numbers first
 
@@ -198,12 +202,12 @@ The interface and data model should distinguish:
 
 ### Activities
 
-1. Start with an itemized, local/demo ledger and label every demo value.
-2. Show contribution date, purchase or trigger reference, selected rule, calculated amount, destination, and status.
+1. Keep local records itemized and clearly distinguish user-entered, calculated, and fictional sample values.
+2. Show contribution date, purchase or trigger reference, selected rule, calculated amount, and local status.
 3. Add clear totals for contributions, withdrawals, and current balance; keep them separate.
 4. Plan for duplicate transaction events, pending-to-posted changes, refunds, reversals, corrections, and provider reconciliation.
 5. Provide a transaction detail view, date filtering, export, and a way to correct or remove user-entered demo data.
-6. When a provider is selected, specify which figures come from the provider and how recently they were refreshed.
+6. Do not add a financial provider unless the user explicitly changes the current no-bank-connection scope and all provider/privacy/legal gates are met.
 
 ### Deliverables
 
@@ -220,25 +224,24 @@ The interface and data model should distinguish:
 
 ---
 
-## 5. Explore ways to limit unnecessary online purchases
+## 5. Validate local Money tools and imported transaction suggestions
 
 ### Goal
 
-Offer optional, user-directed tools that help people think before discretionary purchases without secretly monitoring them or implying the app can block payments it does not control.
+Continue validating Spending Pause, subscriptions, and possible recurring-charge suggestions. These are user-managed/local tools; imported CSV history is not a live feed, and suggestions are not confirmed subscriptions.
 
-### Start with discovery
+### Remaining work
 
-- Ask users what they mean by “unnecessary” and which purchase situations they want help with.
-- Learn whether their preferred intervention is a reminder, a budget, a delay, or a spending summary.
-- Identify accessibility needs, false-positive concerns, privacy expectations, and ways the feature could feel judgmental or coercive.
+- Add review-before-persist for CSV imports, with clear valid/skipped-row counts and a cancel path.
+- Improve recurring-candidate evidence and confidence; allow explicit dismissal and correction, and never add a subscription without user action.
+- Validate reminder timing, edits, duplicate imports, false positives, variable amounts, sparse transaction history, and data deletion.
+- Keep discovery open for improvements, but do not expand transaction monitoring or payment controls in the current scope.
 
-### Candidate first features
+### Existing boundaries
 
-- **Cooling-off reminder:** user chooses a delay before acting on a planned nonessential purchase.
-- **Intent prompt:** user records what they intend to buy and why, then reviews that note after the chosen delay.
-- **Discretionary budget:** user sets a voluntary period/category limit and receives a progress indicator or warning.
-- **Purchase reflection:** a configurable prompt or reminder before a user goes shopping, without intercepting an external payment.
-- **Spending summary:** opt-in totals and trends based on data the user has explicitly provided or authorized.
+- Spending Pause is an optional self-reporting planner. It does not detect, intercept, or block purchases.
+- Subscriptions are user-entered reminders; a plan-to-cancel reminder does not cancel with a provider.
+- CSV import accepts user-selected files and processes them on-device. It does not sign in to, sync with, or connect to a bank.
 
 ### Guardrails
 
@@ -267,11 +270,11 @@ Do not build broad account monitoring or transaction blocking before validating 
 
 ---
 
-## 6. Explore real account, payment, cash, and investment integrations
+## 6. Deferred: assess account, payment, cash, or investment integrations
 
 ### Goal
 
-Determine which real-money product is feasible, then implement only a user-authorized flow supported by qualified providers and reviewed operational controls.
+This workstream is not approved or part of the current private, local-first scope. Do not begin provider selection or implementation unless the user explicitly changes scope. If that decision is made later, determine feasibility before implementing any user-authorized flow, and require qualified providers and reviewed operational controls.
 
 ### Keep the product choices distinct
 
@@ -324,7 +327,8 @@ No real customer funds, live withdrawals, custody, or trades in a prototype. San
 - Inventory the data collected (location, transaction metadata, account identifiers, and app preferences).
 - Collect only data required for the chosen feature and define retention/deletion behavior.
 - Keep secrets server-side; use secure transport, appropriate storage, and restricted staff access.
-- Explain account permissions and provide revocation and account-disconnection paths.
+- Keep personal finance records on-device by default; do not send selected CSV contents or financial records to a shared backend.
+- Explain permissions and provide revocation/disconnection paths only if a future, explicitly approved integration is added.
 
 ### Quality and release process
 
@@ -348,17 +352,18 @@ Do not optimize for the amount of money collected or invested without also measu
 
 ## Suggested next actions
 
-1. Start the competitor opportunity log and choose the first gas apps/tasks to review.
-2. Confirm phone platforms/devices and complete a local-demo install and smoke test.
-3. Pick an initial online-data geography, then compare station and fuel-price sources and their terms.
-4. Define the savings metrics and ledger statuses before expanding the finance dashboard.
-5. Interview users about impulse-purchase situations and test a reversible reminder/budget concept.
-6. Only after product direction is clear, shortlist financial partners and begin counsel-led feasibility review; keep all financial testing in sandboxes until production gates are met.
+1. Reconcile roadmap, migration map, and phone checklist against the current grouped app and sample-first launch behavior.
+2. Implement and test CSV preview/confirmation, then improve recurring-candidate review without changing local-only processing.
+3. Define local persistence, migration, export, deletion, and recovery behavior feature by feature.
+4. Confirm physical test devices, install development builds, and complete the updated smoke checklist.
+5. Evaluate live gas-data providers only against documented coverage, freshness, terms, cost, attribution, and operational gates; preserve sample fixtures in the meantime.
+6. Keep bank linking, FinanceKit, money movement, and investing integrations deferred unless explicitly authorized as a separate scope.
 
 ## Open decisions
 
 - Which mobile platform and phone models are the first supported test targets?
 - Which city or region should be used for online gas-data evaluation?
-- Is the first financial goal transaction visibility, a user-approved transfer, cash savings, or brokerage investment?
-- Should online-spending support focus on budgets, cooling-off reminders, or another user-validated behavior?
-- Which privacy, retention, and account-deletion expectations should be product defaults?
+- Which iOS and Android physical devices are the initial test targets?
+- Which region should be used to evaluate live gas data?
+- What export, retention, and deletion behavior is expected for locally stored personal data?
+- Should a later product decision expand beyond local CSV import into any account connection? Until explicitly decided, it remains out of scope.

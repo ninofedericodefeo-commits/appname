@@ -4,14 +4,17 @@ import { Link } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { progressPercent, suggestAmounts, validDeadline } from '@/features/goals/logic';
+import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
+import { SectionSwitcher } from '@/components/SectionSwitcher';
+import { DEFAULT_SET_ASIDE_RULE, progressPercent, ruleDescription, suggestAmounts, validDeadline } from '@/features/goals/logic';
 import { goalWidgetAvailable } from '@/features/goals/widget';
-import type { Goal, GoalKind, LoggedPurchase } from '@/features/goals/logic';
+import type { Goal, GoalKind, LoggedPurchase, SetAsideRule } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
 
 const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const tomorrowKey = () => { const date = new Date(); date.setDate(date.getDate() + 1); return localDateKey(date); };
 
 function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
@@ -25,29 +28,48 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
   </Pressable>;
 }
 
-function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
+function GoalEditor({ goal, reservedCents, onSave, onCancel, onLowerPocket }: {
   goal: Goal | null;
   reservedCents: number;
-  onSave: (input: { title: string; kind: GoalKind; targetCents: number; deadline: string | null }, assignAll: boolean) => boolean;
+  onSave: (input: { title: string; kind: GoalKind; targetCents: number; deadline: string | null; setAsideRule: SetAsideRule }, assignAll: boolean) => boolean;
   onCancel?: () => void;
+  onLowerPocket?: (cents: number) => boolean;
 }) {
   const [title, setTitle] = useState(goal?.title ?? '');
-  const [kind, setKind] = useState<GoalKind>(goal?.kind ?? 'item');
+  const kind: GoalKind = goal?.kind ?? 'money';
   const [target, setTarget] = useState(goal ? (goal.targetCents / 100).toFixed(2) : '');
   const [timed, setTimed] = useState(!!goal?.deadline);
   const [deadline, setDeadline] = useState(goal?.deadline ?? '');
   const [assignAll, setAssignAll] = useState(false);
+  const currentRule = goal?.setAsideRule ?? DEFAULT_SET_ASIDE_RULE;
+  const [ruleMode, setRuleMode] = useState<SetAsideRule['mode']>(currentRule.mode);
+  const [fixedAmount, setFixedAmount] = useState(currentRule.mode === 'fixed' ? (currentRule.cents / 100).toFixed(2) : '1.00');
+  const [percentAmount, setPercentAmount] = useState(currentRule.mode === 'percent' ? String(currentRule.percent) : '5');
+  const [roundIncrement, setRoundIncrement] = useState(currentRule.mode === 'round' ? currentRule.incrementCents : 100);
+  const [lowerAmount, setLowerAmount] = useState('');
   const [error, setError] = useState('');
 
   function save() {
     const targetCents = parseDollars(target);
     if (!title.trim() || title.trim().length > 80) { setError('Enter a title up to 80 characters.'); return; }
     if (targetCents === null || targetCents <= 0) { setError('Enter a target greater than $0.'); return; }
-    if (timed && !validDeadline(deadline)) { setError('Enter a future date as YYYY-MM-DD.'); return; }
-    if (!onSave({ title, kind, targetCents, deadline: timed ? deadline : null }, assignAll)) {
+    if (timed && deadline !== goal?.deadline && !validDeadline(deadline)) { setError('Choose a future date from the calendar.'); return; }
+    const fixedCents = parseDollars(fixedAmount);
+    const percent = Number(percentAmount);
+    if (ruleMode === 'fixed' && (fixedCents === null || fixedCents <= 0)) { setError('Enter a fixed amount greater than $0.'); return; }
+    if (ruleMode === 'percent' && (!percentAmount.trim() || !Number.isFinite(percent) || percent <= 0 || percent > 100)) { setError('Enter a percent above 0 and no greater than 100.'); return; }
+    const setAsideRule: SetAsideRule = ruleMode === 'fixed' ? { mode: 'fixed', cents: fixedCents! } : ruleMode === 'percent' ? { mode: 'percent', percent } : { mode: 'round', incrementCents: roundIncrement };
+    if (!onSave({ title, kind, targetCents, deadline: timed ? deadline : null, setAsideRule }, assignAll)) {
       setError('Could not save this goal. Please try again.');
       return;
     }
+    setError('');
+  }
+
+  function lowerPocket() {
+    const cents = parseDollars(lowerAmount);
+    if (!onLowerPocket || cents === null || cents <= 0 || !onLowerPocket(cents)) { setError('Enter an amount no greater than the money assigned to this goal.'); return; }
+    setLowerAmount('');
     setError('');
   }
 
@@ -55,14 +77,19 @@ function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
     <Text style={styles.section}>{goal ? 'Edit goal' : 'Set your goal'}</Text>
     <Text style={styles.label}>Title</Text>
     <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="What are you saving for?" maxLength={80} accessibilityLabel="Goal title" />
-    <Text style={styles.label}>Goal type</Text>
-    <View style={styles.row}><Choice label="An item" selected={kind === 'item'} onPress={() => setKind('item')} /><Choice label="Money" selected={kind === 'money'} onPress={() => setKind('money')} /></View>
     <Text style={styles.label}>Target amount</Text>
     <TextInput style={styles.input} value={target} onChangeText={setTarget} placeholder="500.00" keyboardType="decimal-pad" accessibilityLabel="Goal target amount" />
+    <Text style={styles.label}>Set aside after each purchase</Text>
+    <View style={styles.row}><Choice label="Fixed amount" selected={ruleMode === 'fixed'} onPress={() => setRuleMode('fixed')} /><Choice label="Percent" selected={ruleMode === 'percent'} onPress={() => setRuleMode('percent')} /><Choice label="Round up" selected={ruleMode === 'round'} onPress={() => setRuleMode('round')} /></View>
+    {ruleMode === 'fixed' && <TextInput style={styles.input} value={fixedAmount} onChangeText={setFixedAmount} placeholder="1.00" keyboardType="decimal-pad" accessibilityLabel="Fixed dollars per purchase" />}
+    {ruleMode === 'percent' && <TextInput style={styles.input} value={percentAmount} onChangeText={setPercentAmount} placeholder="5" keyboardType="decimal-pad" accessibilityLabel="Percent of each purchase" />}
+    {ruleMode === 'round' && <View style={styles.row}>{[100, 500, 1000].map((increment) => <Choice key={increment} label={`Next $${increment / 100}`} selected={roundIncrement === increment} onPress={() => setRoundIncrement(increment)} />)}</View>}
+    <Text style={styles.hint}>This rule updates your pocket estimate when a purchase is logged. You can edit it whenever you want.</Text>
     <Text style={styles.label}>Timing</Text>
     <View style={styles.row}><Choice label="Untimed" selected={!timed} onPress={() => setTimed(false)} /><Choice label="Timed" selected={timed} onPress={() => setTimed(true)} /></View>
-    {timed && <><Text style={styles.label}>Target date</Text><TextInput style={styles.input} value={deadline} onChangeText={setDeadline} placeholder="YYYY-MM-DD" maxLength={10} accessibilityLabel="Goal target date, year month day" /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
+    {timed && <><Text style={styles.label}>Target date</Text><CalendarDateField label="Goal target date" value={deadline} onChange={setDeadline} minimumDate={tomorrowKey()} /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
     {!goal && reservedCents > 0 && <><Text style={styles.label}>Existing pocket money</Text><Text style={styles.hint}>Your pocket already has {money(reservedCents)} earmarked. Assigning it changes goal progress, not the pocket total.</Text><View style={styles.row}><Choice label="Assign none" selected={!assignAll} onPress={() => setAssignAll(false)} /><Choice label="Assign all" selected={assignAll} onPress={() => setAssignAll(true)} /></View></>}
+    {goal && onLowerPocket && <View style={styles.warning}><Text style={styles.section}>Lower pocket for this goal</Text><Text style={styles.hint}>Currently assigned: {money(goal.savedCents)}. Lowering it also lowers goal progress. No money moves in your account.</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={lowerAmount} onChangeText={setLowerAmount} placeholder="Amount to remove" keyboardType="decimal-pad" accessibilityLabel="Lower goal pocket by" /><Action label="Lower pocket" secondary onPress={lowerPocket} disabled={goal.savedCents === 0} /></View></View>}
     <Text style={styles.hint}>Money stays in your existing account. This app cannot verify your balance, transfer funds, or buy stocks.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     <View style={styles.row}><Action label={goal ? 'Save goal' : 'Create goal'} onPress={save} />{onCancel && <Action label="Cancel" secondary onPress={onCancel} />}</View>
@@ -70,10 +97,9 @@ function GoalEditor({ goal, reservedCents, onSave, onCancel }: {
 }
 
 function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => void }) {
-  const { goalSettings, updateGoalSettings, updateGoal, endGoal } = usePocketStore();
+  const { goalSettings, updateGoalSettings, endGoal } = usePocketStore();
   const [maxAmount, setMaxAmount] = useState((goalSettings.maxSuggestionCents / 100).toFixed(2));
   const [maxPercent, setMaxPercent] = useState(String(goalSettings.maxPurchasePercent));
-  const [editingGoal, setEditingGoal] = useState(false);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [message, setMessage] = useState('');
 
@@ -91,7 +117,7 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
   return <View style={styles.settingsGroup}>
     <View style={styles.card}>
       <View style={styles.rowBetween}><Text style={styles.section}>Goal settings</Text><Action label="Close" secondary onPress={onClose} /></View>
-      {goal && <View style={styles.row}><Action label="Edit goal" secondary onPress={() => setEditingGoal(!editingGoal)} /><Action label="End goal" secondary onPress={() => setConfirmEnd(true)} /></View>}
+      {goal && <View style={styles.row}><Action label="Finish and archive goal" secondary onPress={() => setConfirmEnd(true)} /></View>}
       {confirmEnd && <View style={styles.warning}><Text style={styles.section}>End this goal?</Text><Text style={styles.hint}>Its progress will be saved in history. Money remains earmarked in the pocket and becomes available to assign to your next goal.</Text><View style={styles.row}><Action label="End goal" onPress={() => { endGoal(); setConfirmEnd(false); onClose(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmEnd(false)} /></View></View>}
       <Text style={styles.label}>Savings suggestions</Text>
       <View style={styles.row}><Choice label="On" selected={goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: true })} /><Choice label="Off" selected={!goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: false })} /></View>
@@ -108,7 +134,6 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
       </> : <Text style={styles.hint}>The widget needs App Groups, which this free Apple Personal Team build cannot use. Goal progress is still available in the app.</Text>}
       {message ? <Text style={styles.hint}>{message}</Text> : null}
     </View>
-    {editingGoal && goal && <GoalEditor key={goal.id} goal={goal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) setEditingGoal(false); return saved; }} onCancel={() => setEditingGoal(false)} />}
   </View>;
 }
 
@@ -133,7 +158,7 @@ function PurchaseCard({ purchase, history, goal }: { purchase: LoggedPurchase; h
 
   return <View style={styles.card}>
     <View style={styles.rowBetween}><Text style={styles.section}>{purchase.title}</Text><Text style={styles.amount}>{money(purchase.amountCents)}</Text></View>
-    <Text style={styles.hint}>Logged {new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside` : purchase.decision === 'skipped' ? 'No set-aside' : 'Choose a set-aside amount'}</Text>
+    <Text style={styles.hint}>{purchase.source === 'shortcut' ? 'Apple Pay Shortcut' : 'Logged'} · {new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside by your rule` : purchase.decision === 'skipped' ? 'No set-aside' : 'Choose a set-aside amount'}</Text>
     {purchase.decision === 'pending' && <>
       {goalSettings.suggestionsEnabled && suggestion.amounts.length > 0 && <><Text style={styles.label}>Suggested set-aside amounts</Text><View style={styles.row}>{suggestion.amounts.map((amount, index) => <Action key={amount} label={`${['Small', 'Medium', 'Faster'][index] ?? 'Save'} ${money(amount)}`} secondary onPress={() => save(amount)} />)}</View></>}
       {suggestion.sparse && goalSettings.suggestionsEnabled && <Text style={styles.hint}>Starting suggestion: 5% of this purchase. Suggestions will adapt after three logged purchases.</Text>}
@@ -149,13 +174,14 @@ function PurchaseCard({ purchase, history, goal }: { purchase: LoggedPurchase; h
 }
 
 export default function GoalsScreen() {
-  const { activeGoal, archivedGoals, purchases, reservedCents, reportedBalanceCents, goalSettings, createGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
+  const { activeGoal, archivedGoals, purchases, reservedCents, reportedBalanceCents, goalSettings, createGoal, updateGoal, deleteGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [purchaseTitle, setPurchaseTitle] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const purchaseId = useRef(newId());
   const [directAmount, setDirectAmount] = useState('');
-  const [releaseAmount, setReleaseAmount] = useState('');
   const [error, setError] = useState('');
   const pending = purchases.find((item) => item.decision === 'pending');
   const remaining = activeGoal ? Math.max(0, activeGoal.targetCents - activeGoal.savedCents) : 0;
@@ -168,26 +194,28 @@ export default function GoalsScreen() {
     setPurchaseTitle(''); setPurchaseAmount(''); setError('');
   }
 
-  function changeGoalMoney(kind: 'reserve' | 'release') {
-    const value = kind === 'reserve' ? directAmount : releaseAmount;
-    const cents = parseDollars(value);
-    if (cents === null || cents <= 0 || !(kind === 'reserve' ? reserveForGoal(cents) : releaseFromGoal(cents))) {
-      setError(kind === 'reserve' ? 'Enter an amount within the remaining goal and your estimated available balance.' : 'Enter an amount no greater than your goal progress.');
+  function changeGoalMoney() {
+    const cents = parseDollars(directAmount);
+    if (cents === null || cents <= 0 || !reserveForGoal(cents)) {
+      setError('Enter an amount within the remaining goal and your estimated available balance.');
       return;
     }
-    setDirectAmount(''); setReleaseAmount(''); setError('');
+    setDirectAmount(''); setError('');
   }
 
   return <SafeAreaView style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <Text style={styles.kicker}>SAVINGS  /  01</Text>
-    <View style={styles.header}><Text style={styles.title}>Savings goals</Text><Link href="/" asChild><Pressable accessibilityRole="button" style={styles.nav}><Text style={styles.navText}>Gas prices</Text></Pressable></Link></View>
-    <Text style={styles.intro}>Set a goal and record each amount you set aside. Purchases and balances are entered by you.</Text>
-    <View style={styles.row}><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /><Link href="/pocket" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Savings pocket</Text></Pressable></Link><Link href="/activity" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Activity</Text></Pressable></Link><Link href="/spending" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Spending pause</Text></Pressable></Link></View>
+    <Text style={styles.kicker}>SAVINGS</Text>
+    <SectionSwitcher group="savings" selected="goals" />
+    <View style={styles.header}><Text style={styles.title}>Savings goals</Text><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /></View>
+    <Text style={styles.intro}>Choose a rule for each purchase. Your pocket is an on-device estimate; money stays in your account.</Text>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={createGoal} /> : <>
-      <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.kind === 'money' ? 'MONEY GOAL' : 'ITEM GOAL'} · {activeGoal.deadline ? `BY ${activeGoal.deadline}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>{remaining === 0 ? 'Target reached. End this goal in Settings when you are ready.' : 'Small set-asides count.'}</Text></View>
-      <View style={styles.card}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={() => changeGoalMoney('reserve')} disabled={remaining === 0} /></View><Text style={styles.label}>Release from this goal</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={releaseAmount} onChangeText={setReleaseAmount} placeholder="5.00" keyboardType="decimal-pad" accessibilityLabel="Release from goal" /><Action label="Release" secondary onPress={() => changeGoalMoney('release')} disabled={activeGoal.savedCents === 0} /></View></View>
-      <View style={styles.card}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Log an actual purchase to get a savings suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>
+      <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.deadline ? `BY ${new Date(`${activeGoal.deadline}T12:00:00`).toLocaleDateString()}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>Rule: {ruleDescription(activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE)}. You can edit it any time.</Text><View style={styles.row}><Action label="Edit goal" secondary onPress={() => setEditingGoal(!editingGoal)} /><Action label="Delete goal" secondary onPress={() => setConfirmDelete(true)} /></View></View>
+      {editingGoal && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) setEditingGoal(false); return saved; }} onCancel={() => setEditingGoal(false)} onLowerPocket={releaseFromGoal} />}
+      {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your pocket as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); setEditingGoal(false); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
+      <View style={styles.card}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>
+      <View style={styles.card}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates this pocket estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>
+      <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Set up Apple Pay purchase logging ↗</Text><Text style={styles.hint}>Optional iPhone Shortcuts automation for in-person card taps.</Text></Pressable></Link>
       {pending && <Text style={styles.subheading}>Your next savings decision</Text>}
       {pending && <PurchaseCard key={pending.id} purchase={pending} history={purchases} goal={activeGoal} />}
       <Text style={styles.subheading}>Recent purchases</Text>

@@ -1,9 +1,10 @@
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { Link, router } from 'expo-router';
+import { router } from 'expo-router';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SectionSwitcher } from '@/components/SectionSwitcher';
 import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
 import { usePocketStore } from '@/stores/pocketStore';
 import type { PurchasePauseDelayHours } from '@/stores/purchasePauseStore';
@@ -104,21 +105,16 @@ export default function SpendingScreen() {
     }
     if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
     setPendingBought(null);
-    router.push('/investment');
+    router.dismissAll();
+    router.navigate('/investment');
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.kicker}>MONEY  /  02</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Spending pause</Text>
-          <Link href="/investment" asChild>
-            <Pressable style={styles.navButton} accessibilityRole="button">
-              <Text style={styles.navButtonText}>Savings goals</Text>
-            </Pressable>
-          </Link>
-        </View>
+        <Text style={styles.kicker}>MONEY</Text>
+        <SectionSwitcher group="money" selected="pause" />
+        <Text style={styles.title}>Spending pause</Text>
 
         <View style={styles.card}>
           <Text style={styles.eyebrow}>OPTIONAL · ON THIS DEVICE</Text>

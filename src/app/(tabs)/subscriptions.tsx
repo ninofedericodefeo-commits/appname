@@ -1,15 +1,18 @@
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { Link } from 'expo-router';
 import { AppState, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { BankHistoryPanel } from '@/components/BankHistoryPanel';
+import { CalendarDateField, localDateKey as calendarDateKey } from '@/components/CalendarDateField';
+import { SectionSwitcher } from '@/components/SectionSwitcher';
 import { localDateKey, nextRenewal, subscriptionsToReviewTomorrow } from '@/features/subscriptions/logic';
 import type { Subscription } from '@/features/subscriptions/logic';
 import { requestSubscriptionReminderPermission, syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function nextLeapYear(start: number) { let year = start; while (new Date(year, 1, 29).getMonth() !== 1) year++; return year; }
 
 export default function SubscriptionsScreen() {
   const { subscriptions, remindersEnabled, setRemindersEnabled, saveSubscription, setActive, review, removeSubscription } = useSubscriptionStore();
@@ -23,6 +26,10 @@ export default function SubscriptionsScreen() {
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [reminderMessage, setReminderMessage] = useState('');
+  const selectedDay = Number(day);
+  const calendarYear = month === 2 && selectedDay === 29 ? nextLeapYear(new Date().getFullYear()) : new Date().getFullYear();
+  const calendarMonth = cadence === 'yearly' ? month : (selectedDay === 31 ? 1 : 3);
+  const recurrenceDate = calendarDateKey(new Date(calendarYear, calendarMonth - 1, Number.isInteger(selectedDay) && selectedDay >= 1 && selectedDay <= 31 ? selectedDay : 1, 12));
   const due = subscriptionsToReviewTomorrow(subscriptions, today);
   const active = subscriptions.filter((subscription) => subscription.active)
     .sort((a, b) => nextRenewal(a, today).getTime() - nextRenewal(b, today).getTime());
@@ -128,13 +135,11 @@ export default function SubscriptionsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>MONEY  /  03</Text>
-    <View style={styles.header}>
-          <Text style={styles.title}>Subscriptions</Text>
-          <Link href="/" asChild><Pressable style={styles.homeButton} accessibilityRole="button"><Text style={styles.homeButtonText}>Gas prices</Text></Pressable></Link>
-        </View>
+        <Text style={styles.kicker}>MONEY</Text>
+        <SectionSwitcher group="money" selected="subscriptions" />
+        <Text style={styles.title}>Subscriptions</Text>
         <Text style={styles.intro}>See what renews tomorrow, what it costs, and what you decided.</Text>
 
         {due.length > 0 && (
@@ -169,6 +174,8 @@ export default function SubscriptionsScreen() {
           {reminderMessage ? <Text style={styles.error}>{reminderMessage}</Text> : null}
         </View>
 
+        <BankHistoryPanel />
+
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{editingId ? 'Edit subscription' : 'Add a subscription'}</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name, such as Music" accessibilityLabel="Subscription name" maxLength={80} />
@@ -181,16 +188,7 @@ export default function SubscriptionsScreen() {
               </Pressable>
             ))}
           </View>
-          {cadence === 'yearly' && (
-            <View style={styles.months}>
-              {monthNames.map((label, index) => (
-                <Pressable key={label} accessibilityRole="button" accessibilityState={{ selected: month === index + 1 }} style={[styles.monthChoice, month === index + 1 && styles.choiceActive]} onPress={() => setMonth(index + 1)}>
-                  <Text style={[styles.choiceLabel, month === index + 1 && styles.choiceActiveLabel]}>{label}</Text>
-                </Pressable>
-              ))}
-            </View>
-          )}
-          <TextInput style={styles.input} value={day} onChangeText={setDay} placeholder="Day of month (1–31)" accessibilityLabel="Renewal day of month" keyboardType="number-pad" maxLength={2} />
+          <CalendarDateField key={`${editingId ?? 'new'}-${cadence}-${recurrenceDate}`} label="Renewal date" value={recurrenceDate} displayValue={cadence === 'monthly' ? `Day ${day} of each month` : `${monthNames[month - 1]} ${day} each year`} onChange={(date) => { const [, selectedMonth, selectedDate] = date.split('-').map(Number); setDay(String(selectedDate)); setMonth(selectedMonth); }} />
           <Text style={styles.smallNote}>For months without that day, the renewal is shown on the last day of the month.</Text>
           {error ? <Text style={styles.error}>{error}</Text> : null}
           <Pressable accessibilityRole="button" style={styles.saveButton} onPress={save}><Text style={styles.saveLabel}>{editingId ? 'Save changes' : 'Add subscription'}</Text></Pressable>

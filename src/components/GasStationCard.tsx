@@ -18,6 +18,7 @@ export function GasStationCard({
   now,
   canReport = false,
   canOpenMaps = false,
+  canAddReceipt = false,
   onReported,
 }: {
   station: GasStation;
@@ -27,6 +28,7 @@ export function GasStationCard({
   now: number;
   canReport?: boolean;
   canOpenMaps?: boolean;
+  canAddReceipt?: boolean;
   onReported?: () => void;
 }) {
   const price = station.prices.find((item) => item.fuelType === fuelType);
@@ -72,7 +74,7 @@ export function GasStationCard({
       <View style={styles.row}>
         <View style={styles.textBlock}>
           {isCheapest && <Text style={styles.bestLabel}>BEST PRICE IN THIS LIST</Text>}
-          <Text style={styles.name}>{station.name}</Text>
+          <Text style={styles.name}>{station.name === 'Gas station' ? 'Name not listed' : station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
           <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi · {priceDescription(price, isDemo, now)}</Text>
           {station.attributions?.map((attribution, index) => attribution.providerUri ? (
@@ -83,8 +85,9 @@ export function GasStationCard({
         </View>
 
         <View style={styles.priceCol}>
-          <Text style={styles.price}>{price ? formatFuelPrice(price.price) : '—'}</Text>
+          <Text style={[styles.price, !price && styles.examplePrice]}>{price ? formatFuelPrice(price.price) : '$9.99'}</Text>
           <Text style={styles.priceLabel}>/gal</Text>
+          {!price && <Text style={styles.exampleTag}>EXAMPLE · NOT REAL</Text>}
         </View>
       </View>
       {canOpenMaps && <View style={styles.mapActions}>
@@ -92,6 +95,9 @@ export function GasStationCard({
         <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(googleMapsDirections(station))}><Text style={styles.mapButtonText}>Google Maps ↗</Text></Pressable>
         {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
       </View>}
+      {canAddReceipt && <Link href={{ pathname: '/report-receipt', params: { stationId: station.id, stationName: station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Add receipt for this station ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/report-price', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Report price without receipt ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, fuelType, source: 'local' } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>View saved price history ↗</Text></Pressable></Link>}
       {canReport && (
         <View style={styles.reportArea}>
           <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>
@@ -111,6 +117,7 @@ export function GasStationCard({
 }
 
 const styles = StyleSheet.create({
+  receiptLink: { marginTop: 13, paddingVertical: 7, alignSelf: 'flex-start' },
   mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 15, alignItems: 'center' },
   mapButton: { borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
   mapButtonText: { color: colors.ink, fontWeight: '700', fontSize: 12 },
@@ -177,4 +184,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
   },
+  examplePrice: { color: colors.muted },
+  exampleTag: { marginTop: 4, color: colors.danger, fontSize: 9, fontWeight: '800', textAlign: 'right', maxWidth: 100 },
 });

@@ -1,4 +1,33 @@
 export type GoalKind = 'item' | 'money';
+export type SetAsideRule = { mode: 'fixed'; cents: number } | { mode: 'percent'; percent: number } | { mode: 'round'; incrementCents: number };
+
+export const DEFAULT_SET_ASIDE_RULE: SetAsideRule = { mode: 'percent', percent: 5 };
+
+export function validSetAsideRule(rule: SetAsideRule) {
+  if (rule.mode === 'fixed') return Number.isSafeInteger(rule.cents) && rule.cents > 0 && rule.cents <= 100_000_000;
+  if (rule.mode === 'percent') return Number.isFinite(rule.percent) && rule.percent > 0 && rule.percent <= 100;
+  return Number.isSafeInteger(rule.incrementCents) && [100, 500, 1000].includes(rule.incrementCents);
+}
+
+export function ruleAmountCents(purchaseCents: number, rule: SetAsideRule) {
+  if (!Number.isSafeInteger(purchaseCents) || purchaseCents <= 0 || !validSetAsideRule(rule)) return 0;
+  if (rule.mode === 'fixed') return rule.cents;
+  if (rule.mode === 'percent') return Math.round(purchaseCents * rule.percent / 100);
+  return (rule.incrementCents - purchaseCents % rule.incrementCents) % rule.incrementCents;
+}
+
+export function ruleDescription(rule: SetAsideRule) {
+  if (rule.mode === 'fixed') return `$${(rule.cents / 100).toFixed(2)} per purchase`;
+  if (rule.mode === 'percent') return `${rule.percent}% of each purchase`;
+  return `Round each purchase up to the next $${rule.incrementCents / 100}`;
+}
+
+export function automaticSetAsideCents(purchaseCents: number, goal: Goal | null, reportedBalanceCents: number | null, reservedCents: number) {
+  if (!goal) return 0;
+  const wanted = ruleAmountCents(purchaseCents, goal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE);
+  const available = reportedBalanceCents === null ? Number.POSITIVE_INFINITY : Math.max(0, reportedBalanceCents - reservedCents);
+  return Math.max(0, Math.min(wanted, goal.targetCents - goal.savedCents, available));
+}
 
 export type Goal = {
   id: string;
@@ -6,6 +35,7 @@ export type Goal = {
   kind: GoalKind;
   targetCents: number;
   deadline: string | null;
+  setAsideRule: SetAsideRule;
   savedCents: number;
   createdAt: string;
 };
@@ -18,6 +48,7 @@ export type LoggedPurchase = {
   amountCents: number;
   purchasedAt: string;
   sourcePauseId?: string;
+  source?: 'manual' | 'shortcut';
   decision: 'pending' | 'skipped' | 'saved';
   savedCents?: number;
 };

@@ -33,3 +33,18 @@ export async function getCurrentLocation() {
     longitude: location.coords.longitude,
   };
 }
+
+export async function describeLocation(coordinates: { latitude: number; longitude: number }) {
+  const [place] = await Location.reverseGeocodeAsync(coordinates);
+  if (!place) return { name: 'Name not listed', address: '' };
+  const street = [place.streetNumber, place.street].filter(Boolean).join(' ');
+  const address = place.formattedAddress || [street, place.city, place.region, place.postalCode].filter(Boolean).join(', ');
+  return { name: place.name?.trim() || 'Name not listed', address };
+}
+
+export async function geocodeDestination(address: string) {
+  if (Platform.OS === 'web') throw new Error('Address lookup is available in the iPhone or Android app. Enter destination coordinates in this preview.');
+  const [result] = await Location.geocodeAsync(address);
+  if (!result) throw new Error('Destination not found. Try a fuller address or coordinates.');
+  return { latitude: result.latitude, longitude: result.longitude };
+}

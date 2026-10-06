@@ -3,8 +3,8 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { canReserve } from '@/features/pocket/logic';
-import { DEFAULT_GOAL_SETTINGS, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, startingGoalCents, validDeadline } from '@/features/goals/logic';
-import type { ArchivedGoal, Goal, GoalKind, GoalSettings, LoggedPurchase } from '@/features/goals/logic';
+import { DEFAULT_GOAL_SETTINGS, DEFAULT_SET_ASIDE_RULE, automaticSetAsideCents, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, startingGoalCents, validDeadline, validSetAsideRule } from '@/features/goals/logic';
+import type { ArchivedGoal, Goal, GoalKind, GoalSettings, LoggedPurchase, SetAsideRule } from '@/features/goals/logic';
 
 export type PocketEntry = {
   id: string;
@@ -15,7 +15,7 @@ export type PocketEntry = {
   purchaseId?: string;
 };
 
-type GoalInput = { title: string; kind: GoalKind; targetCents: number; deadline: string | null };
+type GoalInput = { title: string; kind: GoalKind; targetCents: number; deadline: string | null; setAsideRule: SetAsideRule };
 
 type PocketState = {
   reportedBalanceCents: number | null;
@@ -32,9 +32,10 @@ type PocketState = {
   createGoal: (input: GoalInput, assignAll: boolean) => boolean;
   updateGoal: (input: GoalInput) => boolean;
   endGoal: () => boolean;
+  deleteGoal: () => boolean;
   reserveForGoal: (cents: number, purchaseId?: string) => boolean;
   releaseFromGoal: (cents: number) => boolean;
-  addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string) => boolean;
+  addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string, source?: 'manual' | 'shortcut') => boolean;
   updatePurchase: (id: string, title: string, amountCents: number) => boolean;
   skipPurchase: (id: string) => void;
   removePurchase: (id: string) => void;
@@ -48,6 +49,7 @@ function entry(kind: PocketEntry['kind'], amountCents: number, goalId?: string, 
 function validGoalInput(input: GoalInput, existingDeadline?: string | null) {
   return input.title.trim().length > 0 && input.title.trim().length <= 80 &&
     (input.kind === 'item' || input.kind === 'money') &&
+    validSetAsideRule(input.setAsideRule) &&
     Number.isSafeInteger(input.targetCents) && input.targetCents > 0 &&
     (input.deadline === null || input.deadline === existingDeadline || validDeadline(input.deadline));
 }
@@ -84,7 +86,7 @@ export const usePocketStore = create<PocketState>()(
         const goal: Goal = {
           id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           title: input.title.trim(), kind: input.kind, targetCents: input.targetCents,
-          deadline: input.deadline, savedCents: startingGoalCents(state.reservedCents, assignAll),
+          deadline: input.deadline, setAsideRule: input.setAsideRule, savedCents: startingGoalCents(state.reservedCents, assignAll),
           createdAt: new Date().toISOString(),
         };
         set({ activeGoal: goal, entries: assignAll && state.reservedCents > 0
@@ -95,7 +97,7 @@ export const usePocketStore = create<PocketState>()(
       updateGoal: (input) => {
         const goal = get().activeGoal;
         if (!goal || !validGoalInput(input, goal.deadline)) return false;
-        set({ activeGoal: { ...goal, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents, deadline: input.deadline } });
+        set({ activeGoal: { ...goal, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents, deadline: input.deadline, setAsideRule: input.setAsideRule } });
         return true;
       },
       endGoal: () => {
@@ -103,6 +105,11 @@ export const usePocketStore = create<PocketState>()(
         if (!state.activeGoal) return false;
         const goal = state.activeGoal;
         set({ activeGoal: null, archivedGoals: [{ ...goal, endedAt: new Date().toISOString(), result: goal.savedCents >= goal.targetCents ? 'reached' : 'stopped' }, ...state.archivedGoals] });
+        return true;
+      },
+      deleteGoal: () => {
+        if (!get().activeGoal) return false;
+        set({ activeGoal: null });
         return true;
       },
       reserveForGoal: (cents, purchaseId) => {
@@ -126,10 +133,22 @@ export const usePocketStore = create<PocketState>()(
         set({ reservedCents: state.reservedCents - cents, activeGoal: { ...goal, savedCents: goal.savedCents - cents }, entries: [entry('release', cents, goal.id), ...state.entries] });
         return true;
       },
-      addPurchase: (id, title, amountCents, sourcePauseId) => {
+      addPurchase: (id, title, amountCents, sourcePauseId, source = 'manual') => {
         const state = get();
         if (!canLogPurchase(id, title, amountCents, sourcePauseId, state.purchases)) return false;
-        set({ purchases: [{ id, title: title.trim(), amountCents, purchasedAt: new Date().toISOString(), sourcePauseId, decision: 'pending' }, ...state.purchases] });
+        const goal = state.activeGoal;
+        const savedCents = automaticSetAsideCents(amountCents, goal, state.reportedBalanceCents, state.reservedCents);
+        const purchasedAt = new Date().toISOString();
+        const purchase: LoggedPurchase = { id, title: title.trim(), amountCents, purchasedAt, sourcePauseId, source,
+          decision: savedCents > 0 ? 'saved' : 'pending', ...(savedCents > 0 ? { savedCents } : {}) };
+        set({
+          purchases: [purchase, ...state.purchases],
+          ...(goal && savedCents > 0 ? {
+            reservedCents: state.reservedCents + savedCents,
+            activeGoal: { ...goal, savedCents: goal.savedCents + savedCents },
+            entries: [entry('reserve', savedCents, goal.id, id), ...state.entries],
+          } : {}),
+        });
         return true;
       },
       updatePurchase: (id, title, amountCents) => {
@@ -149,10 +168,17 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }),
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 2,
-      migrate: (persisted) => ({
-        ...(persisted as object), activeGoal: null, archivedGoals: [], purchases: [], goalSettings: DEFAULT_GOAL_SETTINGS,
-      }),
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 3,
+      migrate: (persisted, version) => {
+        const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
+        if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], goalSettings: DEFAULT_GOAL_SETTINGS };
+        return {
+          ...previous,
+          activeGoal: previous.activeGoal ? { ...previous.activeGoal, setAsideRule: previous.activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE } : null,
+          archivedGoals: (previous.archivedGoals ?? []).map((goal) => ({ ...goal, setAsideRule: goal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE })),
+          goalSettings: { ...DEFAULT_GOAL_SETTINGS, ...previous.goalSettings },
+        };
+      },
     },
   ),
 );
