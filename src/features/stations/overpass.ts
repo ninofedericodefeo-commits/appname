@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 import { prepareStations } from '@/features/stations/logic';
 import type { StationSearch } from '@/features/stations/logic';
 import { parseOverpassStations } from '@/features/stations/overpassParse';
@@ -25,7 +27,12 @@ export async function fetchOpenStreetMapStations(search: StationSearch, signal: 
     let timedOut = false;
     const timeout = setTimeout(() => { timedOut = true; abort(); }, endpoint.includes('private.coffee') ? 12_000 : 20_000);
     try {
-      const response = await fetch(`${endpoint}?data=${encodeURIComponent(query)}`, { signal: controller.signal });
+      const response = await fetch(endpoint, {
+        signal: controller.signal,
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...(Platform.OS === 'web' ? {} : { 'User-Agent': 'GasFinder/1.0 (com.anonymous.gasfinder)' }) },
+        body: `data=${encodeURIComponent(query)}`,
+      });
       if (!response.ok) throw new Error(`Map service unavailable (${response.status}).`);
       const payload: unknown = await response.json();
       return { stations: prepareStations(parseOverpassStations(payload), search).slice(0, 200), provider: 'OpenStreetMap' };

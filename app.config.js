@@ -14,10 +14,14 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
-    plugins,
+    plugins: [...plugins, ['expo-sharing', {
+      ios: { enabled: enableIosCapabilities, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1 } },
+      android: { enabled: true, singleShareMimeTypes: ['text/plain'] },
+    }]],
     extra: {
       ...config.extra,
       goalWidgetAvailable: enableIosCapabilities,
+      mapsShareAvailable: enableIosCapabilities,
     },
   };
 };

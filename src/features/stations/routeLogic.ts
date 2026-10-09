@@ -128,6 +128,16 @@ export function routeWindow(points: RoutePoint[], fromMiles: number, toMiles: nu
   return result.length >= 2 ? result : prefix.slice(-2);
 }
 
+// OSRM road distance and simplified geometry length differ. Scale windows to the actual route distance.
+export function driveRouteWindow(route: DriveRoute, fromMiles: number, toMiles: number) {
+  let geometryMiles = 0;
+  for (let index = 1; index < route.points.length; index++) {
+    geometryMiles += segmentDistance(route.points[index], route.points[index - 1], route.points[index]).segmentMiles;
+  }
+  const scale = route.miles > 0 ? geometryMiles / route.miles : 1;
+  return routeWindow(route.points, fromMiles * scale, toMiles * scale);
+}
+
 export function routeQueryPoints(points: RoutePoint[], maxPoints = 100) {
   if (points.length <= maxPoints) return points;
   const lengths: number[] = [];
@@ -165,15 +175,19 @@ export function stationsOnRoute(stations: GasStation[], points: RoutePoint[], lo
 }
 
 export function parseDestinationInput(input: string) {
-  const trimmed = input.trim();
+  const trimmed = input.trim().match(/https?:\/\/[^\s<>]+/i)?.[0] ?? input.trim();
   if (!trimmed) return '';
   try {
     const url = new URL(trimmed);
     if (!['maps.apple.com', 'www.google.com', 'google.com', 'maps.google.com'].includes(url.hostname)) return trimmed;
-    const fromQuery = url.searchParams.get('destination') || url.searchParams.get('daddr') || url.searchParams.get('coordinate') || url.searchParams.get('q') || url.searchParams.get('query');
+    const fromQuery = url.searchParams.get('destination') || url.searchParams.get('daddr') || url.searchParams.get('coordinate') || url.searchParams.get('address') || (url.hostname === 'maps.apple.com' ? url.searchParams.get('ll') : null) || url.searchParams.get('q') || url.searchParams.get('query');
     if (fromQuery) return fromQuery;
-    const embeddedCoordinates = url.pathname.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+    const coordinateMatches = [...url.pathname.matchAll(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/g)];
+    const embeddedCoordinates = coordinateMatches.at(-1);
     if (embeddedCoordinates) return `${embeddedCoordinates[1]},${embeddedCoordinates[2]}`;
+    const directions = url.pathname.split('/dir/')[1]?.split('/').filter((part) => part && !part.startsWith('@') && !part.startsWith('data='));
+    const pathDestination = directions?.at(-1) || url.pathname.match(/\/place\/([^/]+)/)?.[1];
+    if (pathDestination) return decodeURIComponent(pathDestination).replace(/\+/g, ' ');
     return trimmed;
   } catch {
     return trimmed;
