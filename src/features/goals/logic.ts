@@ -50,7 +50,7 @@ export type LoggedPurchase = {
   amountCents: number;
   purchasedAt: string;
   sourcePauseId?: string;
-  source?: 'manual' | 'shortcut';
+  source?: 'manual' | 'shortcut' | 'bank-import';
   decision: 'pending' | 'skipped' | 'saved';
   savedCents?: number;
 };

@@ -9,3 +9,7 @@ export function formatMoney(cents: number) {
   const amount = formatAmount(cents);
   return cents < 0 ? `-$${amount.slice(1)}` : `$${amount}`;
 }
+
+export function formatCompactMoney(cents: number) {
+  return formatMoney(cents).replace(/\.00$/, '');
+}

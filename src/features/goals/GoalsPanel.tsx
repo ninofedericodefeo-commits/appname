@@ -4,7 +4,9 @@ import { Link } from 'expo-router';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
-import { DEFAULT_SET_ASIDE_RULE, progressPercent, ruleDescription, validDeadline } from '@/features/goals/logic';
+import { IconButton } from '@/components/IconButton';
+import GoalProgressCard from '@/features/goals/GoalProgressCard';
+import { DEFAULT_SET_ASIDE_RULE, validDeadline } from '@/features/goals/logic';
 import { goalWidgetAvailable } from '@/features/goals/widget';
 import type { Goal, GoalKind, SetAsideRule } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
@@ -177,14 +179,19 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
   }
 
   return <View style={styles.content}>
-    <View style={styles.header}><Text style={styles.title}>Savings</Text><Action label="Settings" secondary onPress={() => { Keyboard.dismiss(); closeEditor(); setShowSettings(!showSettings); }} /></View>
-    <Text style={styles.intro}>Choose a rule for each purchase. Your pocket is an on-device estimate; money stays in your account.</Text>
-    <Action label="View activity ↓" secondary onPress={onViewActivity} />
+    <View style={styles.header}>
+      <Text style={styles.title}>Savings</Text>
+      <View style={styles.row}>
+        <IconButton icon="activity" label="View activity" onPress={onViewActivity} />
+        <IconButton icon="settings" label="Goal settings" selected={showSettings} onPress={() => { Keyboard.dismiss(); closeEditor(); setShowSettings(!showSettings); }} />
+      </View>
+    </View>
+    <Text style={styles.intro}>Your pocket is an estimate.</Text>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <>
       {showCreateForm ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setShowCreateForm(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setShowCreateForm(false); }} /> : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.hint}>Choose a target and a set-aside rule you can edit any time.</Text><Action label="Set a goal" onPress={() => setShowCreateForm(true)} /></View>}
     </> : <>
-      <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.deadline ? `BY ${new Date(`${activeGoal.deadline}T12:00:00`).toLocaleDateString()}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>Rule: {ruleDescription(activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE)}. You can edit it any time.</Text><View style={styles.row}><Action label="Edit goal" secondary onPress={() => editingGoal ? closeEditor() : setEditingGoal(true)} /><Action label="Delete goal" secondary onPress={() => setConfirmDelete(true)} /></View></View>
+      <GoalProgressCard key={`progress-${activeGoal.id}`} goal={activeGoal} editing={editingGoal} onEdit={() => editingGoal ? closeEditor() : setEditingGoal(true)} onDelete={() => setConfirmDelete(true)} />
       {editingGoal && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) closeEditor(); return saved; }} onCancel={closeEditor} onLowerPocket={releaseFromGoal}>
         <View style={styles.manualForm}><Text style={styles.section}>Manual updates</Text><Text style={styles.hint}>Add a purchase or adjust what you have set aside. These updates are saved immediately.</Text></View>
         <View style={styles.row}>
@@ -214,6 +221,5 @@ const styles = StyleSheet.create({
   action: { backgroundColor: colors.accentDark, borderRadius: 6, minHeight: 46, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' }, actionSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.lineStrong }, actionText: { color: colors.surface, fontWeight: '800', fontSize: 13 }, actionSecondaryText: { color: colors.ink }, disabled: { opacity: 0.45 },
   choice: { borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 13, paddingVertical: 10, minHeight: 44, justifyContent: 'center' }, choiceSelected: { backgroundColor: colors.ink, borderColor: colors.ink }, choiceText: { color: colors.inkSoft, fontWeight: '700' }, choiceTextSelected: { color: colors.surface },
   link: { borderRadius: 6, backgroundColor: colors.paleGreen, minHeight: 44, paddingHorizontal: 13, paddingVertical: 12 }, linkText: { color: colors.ink, fontWeight: '700', fontSize: 13 },
-  hero: { backgroundColor: colors.ink, borderRadius: 13, padding: 22, gap: 10 }, eyebrow: { color: colors.lime, fontSize: 11, fontWeight: '800', letterSpacing: 1.3 }, heroTitle: { color: colors.surface, fontSize: 22, fontWeight: '800' }, heroPercent: { color: colors.surface, fontSize: 54, lineHeight: 61, letterSpacing: -2, fontWeight: '800', fontVariant: ['tabular-nums'] }, heroDetail: { color: colors.lime, fontSize: 14, fontWeight: '700' }, heroNote: { color: colors.surface, fontSize: 12, lineHeight: 18 }, bar: { height: 9, backgroundColor: colors.inkSoft, borderRadius: 5, overflow: 'hidden' }, fill: { height: '100%', backgroundColor: colors.lime },
   amount: { color: colors.ink, fontSize: 16, fontWeight: '800' }, warning: { backgroundColor: colors.paleOrange, borderRadius: 8, padding: 12, gap: 8 }, historyRow: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9 }, historyName: { fontSize: 14, color: colors.ink, fontWeight: '700' },
 });

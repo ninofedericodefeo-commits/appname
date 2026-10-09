@@ -37,7 +37,7 @@ export default function PurchaseCard({ purchase, history, goal }: { purchase: Lo
 
   return <View style={styles.card}>
     <View style={styles.rowBetween}><Text style={styles.section}>{purchase.title}</Text><Text style={styles.amount}>{money(purchase.amountCents)}</Text></View>
-    <Text style={styles.hint}>{purchase.source === 'shortcut' ? 'Apple Pay Shortcut' : 'Logged'} · {new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside` : purchase.decision === 'skipped' ? 'No set-aside' : goal ? 'Choose a set-aside amount' : 'Awaiting a goal'}</Text>
+    <Text style={styles.hint}>{purchase.source === 'shortcut' ? 'Apple Pay Shortcut' : purchase.source === 'bank-import' ? 'Bank CSV' : 'Logged'} · {new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside` : purchase.decision === 'skipped' ? 'No set-aside' : goal ? 'Choose a set-aside amount' : 'Awaiting a goal'}</Text>
     {purchase.decision === 'pending' && goal && <>
       {goalSettings.suggestionsEnabled && suggestion.amounts.length > 0 && <><Text style={styles.label}>Suggested set-aside amounts</Text><View style={styles.row}>{suggestion.amounts.map((amount, index) => <Action key={amount} label={`${['Small', 'Medium', 'Faster'][index] ?? 'Save'} ${money(amount)}`} secondary onPress={() => save(amount)} />)}</View></>}
       {suggestion.sparse && goalSettings.suggestionsEnabled && <Text style={styles.hint}>Starting suggestion: 5% of this purchase. Suggestions will adapt after three logged purchases.</Text>}
