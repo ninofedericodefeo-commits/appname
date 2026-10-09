@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/money';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
@@ -48,7 +49,7 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: count === 1 ? 'Review a subscription tomorrow' : `Review ${count} subscriptions tomorrow`,
-        body: `Estimated renewal total: $${(group.totalCents / 100).toFixed(2)}. Open GasFinder to decide what to keep.`,
+        body: `Estimated renewal total: ${formatMoney(group.totalCents)}. Open GasFinder to decide what to keep.`,
         data: { kind: notificationKind, url: '/subscriptions' },
       },
       trigger: {

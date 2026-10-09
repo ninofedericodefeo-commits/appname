@@ -8,6 +8,7 @@ export type GoalWidgetProps = {
   percent: number;
   savedCents: number;
   targetCents: number;
+  amountSummary?: string;
   showAmounts: boolean;
 };
 
@@ -25,7 +26,7 @@ const GoalProgress = (props: GoalWidgetProps, environment: WidgetEnvironment) =>
   return <VStack>
     <Text modifiers={[font({ weight: 'bold', size: 16 }), foregroundStyle('#173A35')]}>{props.title}</Text>
     <Text modifiers={[font({ weight: 'bold', size: 30 })]}>{props.percent}%</Text>
-    <Text>{props.showAmounts ? `$${(props.savedCents / 100).toFixed(2)} of $${(props.targetCents / 100).toFixed(2)}` : 'Small set-asides count'}</Text>
+    <Text>{props.showAmounts ? props.amountSummary ?? `$${(props.savedCents / 100).toFixed(2)} of $${(props.targetCents / 100).toFixed(2)}` : 'Small set-asides count'}</Text>
   </VStack>;
 };
 

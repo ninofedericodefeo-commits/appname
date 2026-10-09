@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { availableCents, parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
 
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+import { formatMoney as money } from '@/lib/money';
 
 export default function PocketScreen() {
   const { reportedBalanceCents, balanceUpdatedAt, reservedCents, activeGoal, entries, setReportedBalance, reserve, release } = usePocketStore();

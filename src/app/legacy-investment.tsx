@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -63,11 +64,11 @@ export default function ActivityScreen() {
                 <View style={styles.entryMain}>
                   <Text style={styles.entryTitle}>{formatContributionRule(payment.contributionOption, payment.roundingIncrement)}</Text>
                   <Text style={styles.entryMeta}>
-                    {payment.method} payment · ${payment.amount.toFixed(2)} · {new Date(payment.createdAt).toLocaleString()}
+                    {payment.method} payment · {formatMoney(Math.round(payment.amount * 100))} · {new Date(payment.createdAt).toLocaleString()}
                   </Text>
                   <Text style={styles.entryMeta}>Destination: {payment.destination} · simulated</Text>
                 </View>
-                <Text style={styles.contributionAmount}>+${payment.surcharge.toFixed(2)}</Text>
+                <Text style={styles.contributionAmount}>+{formatMoney(Math.round(payment.surcharge * 100))}</Text>
               </View>
             ))
           )}
@@ -96,7 +97,7 @@ export default function ActivityScreen() {
                         }`}
                   </Text>
                 </View>
-                <Text style={styles.withdrawalAmount}>-${withdrawal.amount.toFixed(2)}</Text>
+                <Text style={styles.withdrawalAmount}>−{formatMoney(Math.round(withdrawal.amount * 100))}</Text>
               </View>
             ))
           )}
@@ -110,7 +111,7 @@ function Summary({ label, amount }: { label: string; amount: number }) {
   return (
     <View style={styles.summary}>
       <Text style={styles.summaryLabel}>{label}</Text>
-      <Text style={styles.summaryAmount}>${amount.toFixed(2)}</Text>
+      <Text style={styles.summaryAmount}>{formatMoney(Math.round(amount * 100))}</Text>
     </View>
   );
 }

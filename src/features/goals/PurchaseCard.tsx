@@ -7,7 +7,7 @@ import { parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+import { formatAmount, formatMoney as money } from '@/lib/money';
 
 function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
@@ -20,7 +20,7 @@ export default function PurchaseCard({ purchase, history, goal }: { purchase: Lo
   const [custom, setCustom] = useState('');
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(purchase.title);
-  const [editAmount, setEditAmount] = useState((purchase.amountCents / 100).toFixed(2));
+  const [editAmount, setEditAmount] = useState(formatAmount(purchase.amountCents));
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [error, setError] = useState('');
   const [showActions, setShowActions] = useState(purchase.decision === 'pending');

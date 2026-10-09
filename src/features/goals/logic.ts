@@ -1,3 +1,5 @@
+import { formatMoney } from '../../lib/money.ts';
+
 export type GoalKind = 'item' | 'money';
 export type SetAsideRule = { mode: 'fixed'; cents: number } | { mode: 'percent'; percent: number } | { mode: 'round'; incrementCents: number };
 
@@ -17,7 +19,7 @@ export function ruleAmountCents(purchaseCents: number, rule: SetAsideRule) {
 }
 
 export function ruleDescription(rule: SetAsideRule) {
-  if (rule.mode === 'fixed') return `$${(rule.cents / 100).toFixed(2)} per purchase`;
+  if (rule.mode === 'fixed') return `${formatMoney(rule.cents)} per purchase`;
   if (rule.mode === 'percent') return `${rule.percent}% of each purchase`;
   return `Round each purchase up to the next $${rule.incrementCents / 100}`;
 }

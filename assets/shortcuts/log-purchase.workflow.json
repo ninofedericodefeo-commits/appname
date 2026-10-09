@@ -1,0 +1,171 @@
+{
+  "WFWorkflowName": "GasFinder Log Purchase",
+  "WFWorkflowMinimumClientVersion": 900,
+  "WFWorkflowMinimumClientVersionString": "900",
+  "WFWorkflowClientVersion": "4018.0.4",
+  "WFWorkflowIcon": {
+    "WFWorkflowIconStartColor": 4282601983,
+    "WFWorkflowIconGlyphNumber": 59511
+  },
+  "WFWorkflowHasShortcutInputVariables": true,
+  "WFWorkflowInputContentItemClasses": [
+    "WFWalletTransactionContentItem"
+  ],
+  "WFWorkflowOutputContentItemClasses": [],
+  "WFWorkflowTypes": [],
+  "WFQuickActionSurfaces": [],
+  "WFWorkflowImportQuestions": [],
+  "WFWorkflowActions": [
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.comment",
+      "WFWorkflowActionParameters": {
+        "WFCommentActionText": "GasFinder logs the USD amount and merchant of an Apple Pay tap and updates your local pocket estimate. No money moves. Add a Transaction automation for your card and run this shortcut with the transaction as Shortcut Input. Run with no input will not log a purchase."
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.urlencode",
+      "WFWorkflowActionParameters": {
+        "UUID": "54496DF7-054E-4C37-9C03-A46B193D7E47",
+        "CustomOutputName": "Encoded amount",
+        "WFInput": {
+          "Value": {
+            "string": "\ufffc",
+            "attachmentsByRange": {
+              "{0, 1}": {
+                "Type": "ExtensionInput",
+                "Aggrandizements": [
+                  {
+                    "Type": "WFCoercionVariableAggrandizement",
+                    "CoercionItemClass": "WFWalletTransactionContentItem"
+                  },
+                  {
+                    "Type": "WFPropertyVariableAggrandizement",
+                    "PropertyName": "Amount"
+                  },
+                  {
+                    "Type": "WFCoercionVariableAggrandizement",
+                    "CoercionItemClass": "WFCurrencyAmountContentItem"
+                  },
+                  {
+                    "Type": "WFPropertyVariableAggrandizement",
+                    "PropertyName": "Currency Amount"
+                  }
+                ]
+              }
+            }
+          },
+          "WFSerializationType": "WFTextTokenString"
+        },
+        "WFEncodeMode": "Encode"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.urlencode",
+      "WFWorkflowActionParameters": {
+        "UUID": "CDD49F6A-949F-4878-8B31-81F9DB43BEEC",
+        "CustomOutputName": "Encoded merchant",
+        "WFInput": {
+          "Value": {
+            "string": "\ufffc",
+            "attachmentsByRange": {
+              "{0, 1}": {
+                "Type": "ExtensionInput",
+                "Aggrandizements": [
+                  {
+                    "Type": "WFCoercionVariableAggrandizement",
+                    "CoercionItemClass": "WFWalletTransactionContentItem"
+                  },
+                  {
+                    "Type": "WFPropertyVariableAggrandizement",
+                    "PropertyName": "Merchant"
+                  }
+                ]
+              }
+            }
+          },
+          "WFSerializationType": "WFTextTokenString"
+        },
+        "WFEncodeMode": "Encode"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.urlencode",
+      "WFWorkflowActionParameters": {
+        "UUID": "EBD51FB2-A87B-4BE6-8155-6CE15C958A2D",
+        "CustomOutputName": "Encoded currency",
+        "WFEncodeMode": "Encode",
+        "WFInput": {
+          "WFSerializationType": "WFTextTokenString",
+          "Value": {
+            "string": "\ufffc",
+            "attachmentsByRange": {
+              "{0, 1}": {
+                "Type": "ExtensionInput",
+                "Aggrandizements": [
+                  {
+                    "Type": "WFCoercionVariableAggrandizement",
+                    "CoercionItemClass": "WFWalletTransactionContentItem"
+                  },
+                  {
+                    "Type": "WFPropertyVariableAggrandizement",
+                    "PropertyName": "Amount"
+                  },
+                  {
+                    "Type": "WFCoercionVariableAggrandizement",
+                    "CoercionItemClass": "WFCurrencyAmountContentItem"
+                  },
+                  {
+                    "Type": "WFPropertyVariableAggrandizement",
+                    "PropertyName": "Currency Code"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.url",
+      "WFWorkflowActionParameters": {
+        "WFURLActionURL": {
+          "Value": {
+            "string": "gasfinder://import-purchase?amount=\ufffc&merchant=\ufffc&currency=\ufffc",
+            "attachmentsByRange": {
+              "{35, 1}": {
+                "Type": "ActionOutput",
+                "OutputUUID": "54496DF7-054E-4C37-9C03-A46B193D7E47",
+                "OutputName": "Encoded amount"
+              },
+              "{46, 1}": {
+                "Type": "ActionOutput",
+                "OutputUUID": "CDD49F6A-949F-4878-8B31-81F9DB43BEEC",
+                "OutputName": "Encoded merchant"
+              },
+              "{57, 1}": {
+                "Type": "ActionOutput",
+                "OutputUUID": "EBD51FB2-A87B-4BE6-8155-6CE15C958A2D",
+                "OutputName": "Encoded currency"
+              }
+            }
+          },
+          "WFSerializationType": "WFTextTokenString"
+        },
+        "UUID": "C490F528-7D7C-48FC-B6F6-613028E1493A"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.openurl",
+      "WFWorkflowActionParameters": {
+        "WFInput": {
+          "Value": {
+            "Type": "ActionOutput",
+            "OutputUUID": "C490F528-7D7C-48FC-B6F6-613028E1493A",
+            "OutputName": "URL"
+          },
+          "WFSerializationType": "WFTextTokenAttachment"
+        }
+      }
+    }
+  ]
+}

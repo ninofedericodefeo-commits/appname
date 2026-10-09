@@ -1,3 +1,5 @@
+import { formatAmount, formatMoney } from '@/lib/money';
+import { parseDollars } from '@/features/pocket/logic';
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { AppState, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -58,7 +60,7 @@ export default function SubscriptionsPanel() {
 
   function save() {
     const trimmedName = name.trim();
-    const amountCents = /^\d+(?:\.\d{1,2})?$/.test(amount.trim()) ? Math.round(Number(amount) * 100) : NaN;
+    const amountCents = parseDollars(amount) ?? NaN;
     const billingDay = Number(day);
     if (!trimmedName) return setError('Enter the subscription name.');
     if (!Number.isSafeInteger(amountCents) || amountCents <= 0 || amountCents > 100_000_000) {
@@ -75,7 +77,7 @@ export default function SubscriptionsPanel() {
     setShowForm(true);
     setEditingId(subscription.id);
     setName(subscription.name);
-    setAmount((subscription.amountCents / 100).toFixed(2));
+    setAmount(formatAmount(subscription.amountCents));
     setCadence(subscription.cadence);
     setDay(String(subscription.day));
     setMonth(subscription.month);
@@ -113,7 +115,7 @@ export default function SubscriptionsPanel() {
       <View key={subscription.id} style={styles.subscriptionCard}>
         <View style={styles.rowBetween}>
           <Text style={styles.subscriptionName}>{subscription.name}</Text>
-          <Text style={styles.subscriptionAmount}>${(subscription.amountCents / 100).toFixed(2)}</Text>
+          <Text style={styles.subscriptionAmount}>{formatMoney(subscription.amountCents)}</Text>
         </View>
         <Text style={styles.meta}>
           {subscription.cadence === 'monthly' ? 'Monthly' : 'Yearly'} · next renewal {renewal.toLocaleDateString()}
@@ -144,13 +146,13 @@ export default function SubscriptionsPanel() {
         <View style={styles.reviewCard}>
           <Text style={styles.sectionTitle}>Review before tomorrow</Text>
           <Text style={styles.reviewTotal}>
-            {due.length} renewing · ${(due.reduce((total, { subscription }) => total + subscription.amountCents, 0) / 100).toFixed(2)} total
+            {due.length} renewing · {formatMoney(due.reduce((total, { subscription }) => total + subscription.amountCents, 0))} total
           </Text>
           {due.map(({ subscription, renewal }) => (
             <View key={subscription.id} style={styles.reviewRow}>
               <View style={styles.rowBetween}>
                 <Text style={styles.subscriptionName}>{subscription.name}</Text>
-                <Text style={styles.subscriptionAmount}>${(subscription.amountCents / 100).toFixed(2)}</Text>
+                <Text style={styles.subscriptionAmount}>{formatMoney(subscription.amountCents)}</Text>
               </View>
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
               <View style={styles.actions}>

@@ -6,7 +6,7 @@ import PurchaseCard from '@/features/goals/PurchaseCard';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 
-const money = (cents: number) => `$${(cents / 100).toFixed(2)}`;
+import { formatMoney as money } from '@/lib/money';
 
 function More({ label, onPress }: { label: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" style={styles.more} onPress={onPress}><Text style={styles.moreText}>{label}</Text></Pressable>;

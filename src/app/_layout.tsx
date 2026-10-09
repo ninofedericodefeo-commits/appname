@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -90,13 +91,13 @@ function SubscriptionReviewPrompt() {
           </Text>
           <View style={styles.summary}>
             <Text style={styles.summaryLabel}>{due.length} subscription{due.length === 1 ? '' : 's'} · estimated total</Text>
-            <Text style={styles.summaryAmount}>${(totalCents / 100).toFixed(2)}</Text>
+            <Text style={styles.summaryAmount}>{formatMoney(totalCents)}</Text>
           </View>
           {due.map(({ subscription, renewal }) => (
             <View key={subscription.id} style={styles.card}>
               <View style={styles.cardHeading}>
                 <Text style={styles.name}>{subscription.name}</Text>
-                <Text style={styles.amount}>${(subscription.amountCents / 100).toFixed(2)}</Text>
+                <Text style={styles.amount}>{formatMoney(subscription.amountCents)}</Text>
               </View>
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
               <View style={styles.actions}>

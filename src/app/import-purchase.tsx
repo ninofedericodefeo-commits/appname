@@ -1,3 +1,4 @@
+import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Link, useLocalSearchParams } from 'expo-router';
@@ -8,13 +9,13 @@ import { parseImportedPurchase } from '@/features/goals/importPurchase';
 import { usePocketStore } from '@/stores/pocketStore';
 
 export default function ImportPurchaseScreen() {
-  const params = useLocalSearchParams<{ amount?: string; merchant?: string; id?: string }>();
+  const params = useLocalSearchParams<{ amount?: string; merchant?: string; id?: string; currency?: string }>();
   const [openedAt] = useState(() => new Date());
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const purchases = usePocketStore((state) => state.purchases);
   const activeGoal = usePocketStore((state) => state.activeGoal);
-  const { amount, merchant, id } = params;
-  const parsed = useMemo(() => parseImportedPurchase({ amount, merchant, id }, openedAt), [amount, merchant, id, openedAt]);
+  const { amount, merchant, id, currency } = params;
+  const parsed = useMemo(() => parseImportedPurchase({ amount, merchant, id, currency }, openedAt), [amount, merchant, id, currency, openedAt]);
   const logged = parsed ? purchases.find((item) => item.id === parsed.id) : undefined;
 
   useEffect(() => {
@@ -24,12 +25,12 @@ export default function ImportPurchaseScreen() {
   }, [ready, parsed, logged]);
 
   const result = !ready ? 'waiting' : !parsed ? 'invalid' : !logged ? 'waiting' : logged.decision === 'saved' ? 'saved' : 'pending';
-  const details = parsed ? `${parsed.title} · $${(parsed.amountCents / 100).toFixed(2)}` : '';
+  const details = parsed ? `${parsed.title} · ${formatMoney(parsed.amountCents)}` : '';
 
   return <SafeAreaView style={styles.safe}><View style={styles.content}>
     <Text style={styles.kicker}>PURCHASE IMPORT</Text>
     <Text style={styles.title}>{result === 'saved' ? 'Purchase recorded' : result === 'pending' ? 'Purchase logged' : result === 'invalid' ? 'Could not import' : 'Opening your pocket…'}</Text>
-    <Text style={styles.body}>{result === 'saved' ? `${details} · $${((logged?.savedCents ?? 0) / 100).toFixed(2)} included in your pocket estimate` : result === 'pending' ? `${details}. ${activeGoal ? 'Your rule could not set money aside; review this purchase in Goals.' : 'Create a goal to begin setting money aside. Find this purchase under Activity on the Goals page.'}` : result === 'invalid' ? 'The link needs a merchant and a positive USD amount. Check the Shortcuts automation.' : 'Loading saved goals and purchases.'}</Text>
+    <Text style={styles.body}>{result === 'saved' ? `${details} · ${formatMoney(logged?.savedCents ?? 0)} included in your pocket estimate` : result === 'pending' ? `${details}. ${activeGoal ? 'Your rule could not set money aside; review this purchase in Goals.' : 'Create a goal to begin setting money aside. Find this purchase under Activity on the Goals page.'}` : result === 'invalid' ? 'The link needs a merchant and a positive USD amount. Other currencies are not supported. Check the Shortcuts automation.' : 'Loading saved goals and purchases.'}</Text>
     <Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Open savings goals</Text></Pressable></Link>
   </View></SafeAreaView>;
 }

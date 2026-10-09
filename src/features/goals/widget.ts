@@ -3,6 +3,7 @@ import Constants from 'expo-constants';
 
 import { progressPercent } from '@/features/goals/logic';
 import type { Goal, GoalSettings } from '@/features/goals/logic';
+import { formatMoney } from '@/lib/money';
 
 let latestUpdate = 0;
 
@@ -20,6 +21,7 @@ export async function syncGoalWidget(goal: Goal | null, settings: GoalSettings) 
     percent: enabled ? progressPercent(goal) : 0,
     savedCents: enabled ? goal.savedCents : 0,
     targetCents: enabled ? goal.targetCents : 0,
+    amountSummary: enabled && settings.widgetShowAmounts ? `${formatMoney(goal.savedCents)} of ${formatMoney(goal.targetCents)}` : '',
     showAmounts: enabled && settings.widgetShowAmounts,
   });
 }

@@ -1,3 +1,5 @@
+import { formatAmount, formatMoney } from '@/lib/money';
+import { parseDollars } from '@/features/pocket/logic';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
@@ -73,7 +75,8 @@ export default function SpendingPausePanel() {
   }, []);
 
   function savePurchase() {
-    const amount = Number(purchaseAmount);
+    const cents = parseDollars(purchaseAmount);
+    const amount = cents === null ? NaN : cents / 100;
     const name = purchaseName.trim();
     if (!name) {
       setError('Add a short name for the purchase.');
@@ -93,14 +96,14 @@ export default function SpendingPausePanel() {
 
   function offerToLog(id: string, name: string, amount: number, waiting: boolean) {
     setPendingBought({ id, name, amount, waiting });
-    setActualAmount(amount.toFixed(2));
+    setActualAmount(formatAmount(Math.round(amount * 100)));
     setBuyError('');
   }
 
   function logBoughtPurchase() {
     if (!pendingBought) return;
     const amount = actualAmount.trim();
-    const cents = /^\d+(?:\.\d{1,2})?$/.test(amount) ? Math.round(Number(amount) * 100) : NaN;
+    const cents = parseDollars(amount) ?? NaN;
     if (!Number.isSafeInteger(cents) || cents <= 0) { setBuyError('Enter the actual amount paid, greater than $0.'); return; }
     if (!addGoalPurchase(`${Date.now()}-${Math.random().toString(36).slice(2)}`, pendingBought.name, cents, pendingBought.id)) {
       setBuyError('This purchase has already been logged.'); return;
@@ -175,7 +178,7 @@ export default function SpendingPausePanel() {
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryLabel}>You reported skipping</Text>
-        <Text style={styles.summaryAmount}>${reportedAvoidedTotal.toFixed(2)}</Text>
+        <Text style={styles.summaryAmount}>{formatMoney(Math.round(reportedAvoidedTotal * 100))}</Text>
         <Text style={styles.summaryNote}>
           User-reported estimate from {skippedItems.length} skipped purchase{skippedItems.length === 1 ? '' : 's'}; this is not verified savings.
         </Text>
@@ -192,7 +195,7 @@ export default function SpendingPausePanel() {
                 <View style={styles.purchaseHeading}>
                   <View style={styles.purchaseDetails}>
                     <Text style={styles.purchaseName}>{item.name}</Text>
-                    <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                    <Text style={styles.purchasePrice}>{formatMoney(Math.round(item.amount * 100))}</Text>
                   </View>
                   <View style={[styles.statusBubble, ready && styles.statusReady]}>
                     <Text style={[styles.statusText, ready && styles.statusReadyText]}>
@@ -243,7 +246,7 @@ export default function SpendingPausePanel() {
                   </Text>
                 </View>
                 <View style={styles.historyActions}>
-                  <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                  <Text style={styles.purchasePrice}>{formatMoney(Math.round(item.amount * 100))}</Text>
                   <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingRemovalId(item.id)}>
                     <Text style={styles.removeText}>Remove</Text>
                   </Pressable>

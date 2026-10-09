@@ -9,8 +9,10 @@ function shortHash(value: string) {
   return (hash >>> 0).toString(36);
 }
 
-export function parseImportedPurchase(params: { amount?: QueryValue; merchant?: QueryValue; id?: QueryValue }, now = new Date()) {
-  const rawAmount = first(params.amount)?.trim().replace(/^(?:US\$|\$|USD\s*)/i, '').replace(/\s*USD$/i, '').replace(/,/g, '');
+export function parseImportedPurchase(params: { amount?: QueryValue; merchant?: QueryValue; id?: QueryValue; currency?: QueryValue }, now = new Date()) {
+  // Older hand-built links omit currency. The bundled shortcut always supplies it.
+  if (params.currency !== undefined && first(params.currency)?.trim().toUpperCase() !== 'USD') return null;
+  const rawAmount = first(params.amount)?.trim().replace(/^(?:US\$|\$|USD\s*)/i, '').replace(/\s*USD$/i, '');
   const amountCents = rawAmount ? parseDollars(rawAmount) : null;
   const merchant = first(params.merchant)?.trim() ?? '';
   if (amountCents === null || amountCents <= 0 || !merchant || merchant.length > 80 || /[\x00-\x1f]/.test(merchant)) return null;
