@@ -65,7 +65,7 @@ function SubscriptionReviewPrompt() {
     if (Platform.OS === 'web') return;
     function openSubscriptionReview(response: Notifications.NotificationResponse) {
       if (response.notification.request.content.data?.kind === 'subscription-review') {
-        router.navigate({ pathname: '/subscriptions', params: { section: 'subscriptions' } });
+        router.navigate('/subscriptions');
         Notifications.clearLastNotificationResponse();
       }
     }

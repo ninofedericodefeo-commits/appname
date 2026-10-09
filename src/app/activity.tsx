@@ -1,5 +1,5 @@
 import { Redirect } from 'expo-router';
 
 export default function ActivityRedirect() {
-  return <Redirect href={{ pathname: '/subscriptions', params: { section: 'activity' } }} />;
+  return <Redirect href="/investment" />;
 }

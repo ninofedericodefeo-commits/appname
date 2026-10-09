@@ -31,7 +31,7 @@ export default function SettingsScreen() {
     </View>
     <View style={styles.card}><Text style={styles.heading}>Fuel price preference</Text><View style={styles.row}>{(['regular', 'midgrade', 'premium', 'diesel'] as const).map((fuel) => <Pressable key={fuel} accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} onPress={() => setSelectedFuelType(fuel)} style={[styles.choice, selectedFuelType === fuel && styles.selected]}><Text style={[styles.choiceText, selectedFuelType === fuel && styles.selectedText]}>{fuel.charAt(0).toUpperCase() + fuel.slice(1)}</Text></Pressable>)}</View></View>
     <Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Manage saved cars</Text></Pressable></Link>
-    <Link href={{ pathname: '/investment', params: { section: 'goals' } }} asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Savings goals & settings ›</Text></Pressable></Link>
+    <Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Savings goals & settings ›</Text></Pressable></Link>
     <Text style={styles.note}>Your preferences are saved on this device.</Text>
   </FormScrollView></SafeAreaView>;
 }

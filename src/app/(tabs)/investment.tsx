@@ -1,12 +1,7 @@
-import { CombinedSections } from '@/components/CombinedSections';
+import { MoneyPage } from '@/components/MoneyPage';
 import GoalsPanel from '@/features/goals/GoalsPanel';
-import SpendingPausePanel from '@/features/spending/SpendingPausePanel';
-
-const sections = [
-  { id: 'goals', label: 'Goals', component: GoalsPanel },
-  { id: 'pause', label: 'Spending pause', component: SpendingPausePanel },
-] as const;
+import ActivityPanel from '@/features/pocket/ActivityPanel';
 
 export default function GoalsScreen() {
-  return <CombinedSections sections={sections} />;
+  return <MoneyPage><GoalsPanel /><ActivityPanel /></MoneyPage>;
 }

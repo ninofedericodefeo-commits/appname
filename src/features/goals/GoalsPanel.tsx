@@ -1,13 +1,12 @@
-import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useRef, useState } from 'react';
 import { Link } from 'expo-router';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
-import { DEFAULT_SET_ASIDE_RULE, progressPercent, ruleDescription, suggestAmounts, validDeadline } from '@/features/goals/logic';
+import { DEFAULT_SET_ASIDE_RULE, progressPercent, ruleDescription, validDeadline } from '@/features/goals/logic';
 import { goalWidgetAvailable } from '@/features/goals/widget';
-import type { Goal, GoalKind, LoggedPurchase, SetAsideRule } from '@/features/goals/logic';
+import type { Goal, GoalKind, SetAsideRule } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
 
@@ -136,45 +135,12 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
   </View>;
 }
 
-function PurchaseCard({ purchase, history, goal }: { purchase: LoggedPurchase; history: LoggedPurchase[]; goal: Goal }) {
-  const { goalSettings, reserveForGoal, skipPurchase, updatePurchase, removePurchase, reportedBalanceCents, reservedCents } = usePocketStore();
-  const [custom, setCustom] = useState('');
-  const [editing, setEditing] = useState(false);
-  const [editTitle, setEditTitle] = useState(purchase.title);
-  const [editAmount, setEditAmount] = useState((purchase.amountCents / 100).toFixed(2));
-  const [confirmRemove, setConfirmRemove] = useState(false);
-  const [error, setError] = useState('');
-  const suggestion = suggestAmounts({ purchase, history, goal, settings: goalSettings });
-  const available = reportedBalanceCents === null ? null : reportedBalanceCents - reservedCents;
-
-  function save(cents: number) {
-    if (cents <= 0 || !reserveForGoal(cents, purchase.id)) {
-      setError('Could not set this amount aside. Check your target and estimated available balance.');
-      return;
-    }
-    setError('');
-  }
-
-  return <View style={styles.card}>
-    <View style={styles.rowBetween}><Text style={styles.section}>{purchase.title}</Text><Text style={styles.amount}>{money(purchase.amountCents)}</Text></View>
-    <Text style={styles.hint}>{purchase.source === 'shortcut' ? 'Apple Pay Shortcut' : 'Logged'} · {new Date(purchase.purchasedAt).toLocaleDateString()} · {purchase.decision === 'saved' ? `${money(purchase.savedCents ?? 0)} set aside by your rule` : purchase.decision === 'skipped' ? 'No set-aside' : 'Choose a set-aside amount'}</Text>
-    {purchase.decision === 'pending' && <>
-      {goalSettings.suggestionsEnabled && suggestion.amounts.length > 0 && <><Text style={styles.label}>Suggested set-aside amounts</Text><View style={styles.row}>{suggestion.amounts.map((amount, index) => <Action key={amount} label={`${['Small', 'Medium', 'Faster'][index] ?? 'Save'} ${money(amount)}`} secondary onPress={() => save(amount)} />)}</View></>}
-      {suggestion.sparse && goalSettings.suggestionsEnabled && <Text style={styles.hint}>Starting suggestion: 5% of this purchase. Suggestions will adapt after three logged purchases.</Text>}
-      {suggestion.paceLimited && <Text style={styles.hint}>At this limit, the goal may take longer than the target date.</Text>}
-      {available !== null && available < 1 && <Text style={styles.hint}>Your entered balance leaves no estimated amount available to set aside. Update it in Savings pocket.</Text>}
-      <Text style={styles.label}>Or choose your own amount</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={custom} onChangeText={setCustom} placeholder="2.00" keyboardType="decimal-pad" accessibilityLabel={`Custom set-aside for ${purchase.title}`} /><Action label="Set aside" onPress={() => { const cents = parseDollars(custom); if (cents === null) setError('Enter a valid dollar amount.'); else save(cents); }} /><Action label="Skip" secondary onPress={() => skipPurchase(purchase.id)} /></View>
-    </>}
-    <View style={styles.row}><Action label={editing ? 'Cancel edit' : 'Edit purchase'} secondary onPress={() => setEditing(!editing)} /><Action label="Delete purchase" secondary onPress={() => setConfirmRemove(true)} /></View>
-    {editing && <View><Text style={styles.label}>Purchase title</Text><TextInput style={styles.input} value={editTitle} onChangeText={setEditTitle} maxLength={80} accessibilityLabel="Edit purchase title" /><Text style={styles.label}>Actual amount</Text><TextInput style={styles.input} value={editAmount} onChangeText={setEditAmount} keyboardType="decimal-pad" accessibilityLabel="Edit purchase amount" /><Action label="Save purchase" onPress={() => { const cents = parseDollars(editAmount); if (cents === null || !updatePurchase(purchase.id, editTitle, cents)) setError('Enter a title and an amount greater than $0.'); else { setEditing(false); setError(''); } }} /><Text style={styles.hint}>Editing a purchase never changes money already set aside.</Text></View>}
-    {confirmRemove && <View style={styles.warning}><Text style={styles.hint}>Delete this purchase? Any confirmed set-aside stays in your pocket.</Text><View style={styles.row}><Action label="Delete" onPress={() => removePurchase(purchase.id)} /><Action label="Cancel" secondary onPress={() => setConfirmRemove(false)} /></View></View>}
-    {error ? <Text style={styles.error}>{error}</Text> : null}
-  </View>;
-}
-
 export default function GoalsPanel() {
-  const { activeGoal, archivedGoals, purchases, reservedCents, reportedBalanceCents, goalSettings, createGoal, updateGoal, deleteGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
+  const { activeGoal, reservedCents, reportedBalanceCents, createGoal, updateGoal, deleteGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
   const [showSettings, setShowSettings] = useState(false);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showMoneyForm, setShowMoneyForm] = useState(false);
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [editingGoal, setEditingGoal] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [purchaseTitle, setPurchaseTitle] = useState('');
@@ -182,7 +148,6 @@ export default function GoalsPanel() {
   const purchaseId = useRef(newId());
   const [directAmount, setDirectAmount] = useState('');
   const [error, setError] = useState('');
-  const pending = purchases.find((item) => item.decision === 'pending');
   const remaining = activeGoal ? Math.max(0, activeGoal.targetCents - activeGoal.savedCents) : 0;
 
   function logPurchase() {
@@ -191,6 +156,7 @@ export default function GoalsPanel() {
     if (!addPurchase(purchaseId.current, purchaseTitle, cents)) { setError('This purchase was already logged or the details are invalid.'); return; }
     purchaseId.current = newId();
     setPurchaseTitle(''); setPurchaseAmount(''); setError('');
+    Keyboard.dismiss(); setShowPurchaseForm(false);
   }
 
   function changeGoalMoney() {
@@ -200,32 +166,33 @@ export default function GoalsPanel() {
       return;
     }
     setDirectAmount(''); setError('');
+    Keyboard.dismiss(); setShowMoneyForm(false);
   }
 
-  return <View style={styles.safe}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-    <View style={styles.header}><Text style={styles.title}>Savings goals</Text><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /></View>
+  return <View style={styles.content}>
+    <View style={styles.header}><Text style={styles.title}>Savings</Text><Action label="Settings" secondary onPress={() => setShowSettings(!showSettings)} /></View>
     <Text style={styles.intro}>Choose a rule for each purchase. Your pocket is an on-device estimate; money stays in your account.</Text>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
-    {!activeGoal ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={createGoal} /> : <>
+    {!activeGoal ? <>
+      {showCreateForm ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setShowCreateForm(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setShowCreateForm(false); }} /> : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.hint}>Choose a target and a set-aside rule you can edit any time.</Text><Action label="Set a goal" onPress={() => setShowCreateForm(true)} /></View>}
+    </> : <>
       <View style={styles.hero}><Text style={styles.eyebrow}>{activeGoal.deadline ? `BY ${new Date(`${activeGoal.deadline}T12:00:00`).toLocaleDateString()}` : 'NO DEADLINE'}</Text><Text style={styles.heroTitle}>{activeGoal.title}</Text><Text style={styles.heroPercent}>{progressPercent(activeGoal)}%</Text><View style={styles.bar}><View style={[styles.fill, { width: `${progressPercent(activeGoal)}%` }]} /></View><Text style={styles.heroDetail}>{money(activeGoal.savedCents)} set aside of {money(activeGoal.targetCents)} · {money(remaining)} remaining</Text><Text style={styles.heroNote}>Rule: {ruleDescription(activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE)}. You can edit it any time.</Text><View style={styles.row}><Action label="Edit goal" secondary onPress={() => setEditingGoal(!editingGoal)} /><Action label="Delete goal" secondary onPress={() => setConfirmDelete(true)} /></View></View>
       {editingGoal && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) setEditingGoal(false); return saved; }} onCancel={() => setEditingGoal(false)} onLowerPocket={releaseFromGoal} />}
       {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your pocket as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); setEditingGoal(false); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
-      <View style={styles.card}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>
-      <View style={styles.card}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates this pocket estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>
+      <View style={styles.row}>
+        <Action label={showMoneyForm ? 'Hide set-aside form' : 'Set money aside'} secondary disabled={remaining === 0 && !showMoneyForm} onPress={() => { Keyboard.dismiss(); setShowMoneyForm(!showMoneyForm); }} />
+        <Action label={showPurchaseForm ? 'Hide purchase form' : 'Log a purchase'} onPress={() => { Keyboard.dismiss(); setShowPurchaseForm(!showPurchaseForm); }} />
+      </View>
+      {showMoneyForm && <View style={styles.card}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>}
+      {showPurchaseForm && <View style={styles.card}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates this pocket estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>}
       <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Set up Apple Pay purchase logging ↗</Text><Text style={styles.hint}>Optional iPhone Shortcuts automation for in-person card taps.</Text></Pressable></Link>
-      {pending && <Text style={styles.subheading}>Your next savings decision</Text>}
-      {pending && <PurchaseCard key={pending.id} purchase={pending} history={purchases} goal={activeGoal} />}
-      <Text style={styles.subheading}>Recent purchases</Text>
-      {purchases.length === 0 ? <Text style={styles.hint}>Your logged purchases will appear here.</Text> : purchases.filter((item) => item.id !== pending?.id).slice(0, 8).map((item) => <PurchaseCard key={item.id} purchase={item} history={purchases} goal={activeGoal} />)}
-      {!goalSettings.suggestionsEnabled && <Text style={styles.hint}>Suggestions are off. You can still set aside an amount after logging a purchase.</Text>}
     </>}
-    {archivedGoals.length > 0 && <View style={styles.card}><Text style={styles.section}>Past goals</Text>{archivedGoals.map((goal) => <View key={goal.id} style={styles.historyRow}><Text style={styles.historyName}>{goal.title}</Text><Text style={styles.hint}>{goal.result === 'reached' ? 'Reached' : 'Ended'} · {money(goal.savedCents)} of {money(goal.targetCents)} · {new Date(goal.endedAt).toLocaleDateString()}</Text></View>)}</View>}
     {error ? <Text style={styles.error}>{error}</Text> : null}
-  </ScrollView></View>;
+  </View>;
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: colors.paper }, content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48, gap: 18 },
+  content: { gap: 14 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 }, intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
   nav: { backgroundColor: colors.ink, borderRadius: 6, paddingHorizontal: 13, paddingVertical: 11, minHeight: 44, justifyContent: 'center' }, navText: { color: colors.surface, fontWeight: '700' },
   card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 19, gap: 10 },

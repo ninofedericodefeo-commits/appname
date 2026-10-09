@@ -51,6 +51,7 @@ export default function SpendingPausePanel() {
   const [purchaseName, setPurchaseName] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [error, setError] = useState('');
+  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [pendingBought, setPendingBought] = useState<{ id: string; name: string; amount: number; waiting: boolean } | null>(null);
   const [actualAmount, setActualAmount] = useState('');
@@ -86,6 +87,7 @@ export default function SpendingPausePanel() {
     addPurchase(name, amount);
     setPurchaseName('');
     setPurchaseAmount('');
+    setShowPurchaseForm(false);
     setError('');
   }
 
@@ -106,178 +108,176 @@ export default function SpendingPausePanel() {
     if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
     Keyboard.dismiss();
     setPendingBought(null);
-    router.setParams({ section: 'goals' });
+    router.navigate('/investment');
   }
 
   return (
-    <View style={styles.safeArea}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.title}>Spending pause</Text>
+    <View style={styles.section}>
+      <Text accessibilityRole="header" style={styles.sectionTitle}>Spending pause</Text>
 
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>OPTIONAL · ON THIS DEVICE</Text>
-          <Text style={styles.cardTitle}>Pause before an online purchase</Text>
-          <Text style={styles.description}>
-            Add something you are considering buying, then give yourself time to decide. Review it when you open the app; this planner does not send notifications, monitor accounts, or block checkout.
+      <View style={styles.card}>
+        <Text style={styles.description}>
+          Give a purchase time before deciding. This optional planner uses your own entries; it does not monitor accounts, block checkout, or send notifications.
+        </Text>
+        <Pressable
+          accessibilityRole="switch"
+          accessibilityState={{ checked: enabled }}
+          style={[styles.toggle, enabled && styles.toggleEnabled]}
+          onPress={() => setEnabled(!enabled)}
+        >
+          <Text style={[styles.toggleText, enabled && styles.toggleTextEnabled]}>
+            {enabled ? 'Pause planner on' : 'Turn on pause planner'}
           </Text>
-          <Pressable
-            accessibilityRole="switch"
-            accessibilityState={{ checked: enabled }}
-            style={[styles.toggle, enabled && styles.toggleEnabled]}
-            onPress={() => setEnabled(!enabled)}
-          >
-            <Text style={[styles.toggleText, enabled && styles.toggleTextEnabled]}>
-              {enabled ? 'Pause planner on' : 'Turn on pause planner'}
-            </Text>
-          </Pressable>
-          {enabled && (
-            <>
-              <Text style={styles.label}>Cooling-off period</Text>
-              <View style={styles.row}>
-                {delays.map((delay) => (
-                  <Choice
-                    key={delay.hours}
-                    label={delay.label}
-                    selected={delayHours === delay.hours}
-                    onPress={() => setDelayHours(delay.hours)}
-                  />
-                ))}
-              </View>
-            </>
-          )}
-        </View>
-
+        </Pressable>
         {enabled && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Add a purchase to pause</Text>
-            <TextInput
-              value={purchaseName}
-              onChangeText={setPurchaseName}
-              placeholder="What are you thinking of buying?"
-              accessibilityLabel="Purchase description"
-              maxLength={80}
-              style={styles.input}
-            />
-            <TextInput
-              value={purchaseAmount}
-              onChangeText={setPurchaseAmount}
-              placeholder="Estimated price"
-              accessibilityLabel="Estimated purchase price"
-              keyboardType="decimal-pad"
-              style={styles.input}
-            />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={savePurchase}>
-              <Text style={styles.primaryButtonText}>Start cooling-off period</Text>
-            </Pressable>
-          </View>
+          <>
+            <Text style={styles.label}>Cooling-off period</Text>
+            <View style={styles.row}>
+              {delays.map((delay) => (
+                <Choice
+                  key={delay.hours}
+                  label={delay.label}
+                  selected={delayHours === delay.hours}
+                  onPress={() => setDelayHours(delay.hours)}
+                />
+              ))}
+            </View>
+          </>
         )}
+      </View>
 
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>You reported skipping</Text>
-          <Text style={styles.summaryAmount}>${reportedAvoidedTotal.toFixed(2)}</Text>
-          <Text style={styles.summaryNote}>
-            User-reported estimate from {skippedItems.length} skipped purchase{skippedItems.length === 1 ? '' : 's'}; this is not verified savings.
-          </Text>
+      {enabled && <Pressable accessibilityRole="button" accessibilityState={{ expanded: showPurchaseForm }} style={styles.outlineButton} onPress={() => { if (showPurchaseForm) Keyboard.dismiss(); setShowPurchaseForm(!showPurchaseForm); }}><Text style={styles.outlineButtonText}>{showPurchaseForm ? 'Hide purchase form' : 'Pause a purchase'}</Text></Pressable>}
+      {enabled && showPurchaseForm && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Add a purchase to pause</Text>
+          <TextInput
+            value={purchaseName}
+            onChangeText={setPurchaseName}
+            placeholder="What are you thinking of buying?"
+            accessibilityLabel="Purchase description"
+            maxLength={80}
+            style={styles.input}
+          />
+          <TextInput
+            value={purchaseAmount}
+            onChangeText={setPurchaseAmount}
+            placeholder="Estimated price"
+            accessibilityLabel="Estimated purchase price"
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={savePurchase}>
+            <Text style={styles.primaryButtonText}>Start cooling-off period</Text>
+          </Pressable>
         </View>
+      )}
 
-        {waitingItems.length > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Still considering</Text>
-            {waitingItems.map((item) => {
-              const remaining = item.reviewAt - (now ?? item.createdAt);
-              const ready = remaining <= 0;
-              return (
-                <View key={item.id} style={styles.purchaseItem}>
-                  <View style={styles.purchaseHeading}>
-                    <View style={styles.purchaseDetails}>
-                      <Text style={styles.purchaseName}>{item.name}</Text>
-                      <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
-                    </View>
-                    <View style={[styles.statusBubble, ready && styles.statusReady]}>
-                      <Text style={[styles.statusText, ready && styles.statusReadyText]}>
-                        {ready ? 'Ready to review' : formatTimeRemaining(remaining)}
-                      </Text>
-                    </View>
-                  </View>
-                  <Text style={styles.dateText}>
-                    Review after {new Date(item.reviewAt).toLocaleString()}
-                  </Text>
-                  <View style={styles.row}>
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.outlineButton}
-                      onPress={() => recordOutcome(item.id, 'skipped')}
-                    >
-                      <Text style={styles.outlineButtonText}>I skipped it</Text>
-                    </Pressable>
-                    <Pressable
-                      accessibilityRole="button"
-                      style={styles.outlineButton}
-                      onPress={() => offerToLog(item.id, item.name, item.amount, true)}
-                    >
-                      <Text style={styles.outlineButtonText}>I bought it</Text>
-                    </Pressable>
-                    <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(item.id)}>
-                      <Text style={styles.outlineButtonText}>Remove</Text>
-                    </Pressable>
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryLabel}>You reported skipping</Text>
+        <Text style={styles.summaryAmount}>${reportedAvoidedTotal.toFixed(2)}</Text>
+        <Text style={styles.summaryNote}>
+          User-reported estimate from {skippedItems.length} skipped purchase{skippedItems.length === 1 ? '' : 's'}; this is not verified savings.
+        </Text>
+      </View>
 
-        {items.some((item) => item.status !== 'waiting') && (
-          <View style={styles.card}>
-            <Text style={styles.cardTitle}>Completed decisions</Text>
-            {items
-              .filter((item) => item.status !== 'waiting')
-              .map((item) => (
-                <View key={item.id} style={styles.historyRow}>
+      {waitingItems.length > 0 && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Still considering</Text>
+          {waitingItems.map((item) => {
+            const remaining = item.reviewAt - (now ?? item.createdAt);
+            const ready = remaining <= 0;
+            return (
+              <View key={item.id} style={styles.purchaseItem}>
+                <View style={styles.purchaseHeading}>
                   <View style={styles.purchaseDetails}>
                     <Text style={styles.purchaseName}>{item.name}</Text>
-                    <Text style={styles.dateText}>
-                      {item.status === 'skipped' ? 'You reported skipping' : 'You reported buying'} ·{' '}
-                      {new Date(item.outcomeAt ?? item.createdAt).toLocaleDateString()}
+                    <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                  </View>
+                  <View style={[styles.statusBubble, ready && styles.statusReady]}>
+                    <Text style={[styles.statusText, ready && styles.statusReadyText]}>
+                      {ready ? 'Ready to review' : formatTimeRemaining(remaining)}
                     </Text>
                   </View>
-                  <View style={styles.historyActions}>
-                    <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
-                    <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingRemovalId(item.id)}>
-                      <Text style={styles.removeText}>Remove</Text>
-                    </Pressable>
-                    {item.status === 'bought' && !purchases.some((purchase) => purchase.sourcePauseId === item.id) && <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => offerToLog(item.id, item.name, item.amount, false)}><Text style={styles.removeText}>Log actual purchase</Text></Pressable>}
-                  </View>
                 </View>
-              ))}
+                <Text style={styles.dateText}>
+                  Review after {new Date(item.reviewAt).toLocaleString()}
+                </Text>
+                <View style={styles.row}>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.outlineButton}
+                    onPress={() => recordOutcome(item.id, 'skipped')}
+                  >
+                    <Text style={styles.outlineButtonText}>I skipped it</Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    style={styles.outlineButton}
+                    onPress={() => offerToLog(item.id, item.name, item.amount, true)}
+                  >
+                    <Text style={styles.outlineButtonText}>I bought it</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(item.id)}>
+                    <Text style={styles.outlineButtonText}>Remove</Text>
+                  </Pressable>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {items.some((item) => item.status !== 'waiting') && (
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Completed decisions</Text>
+          {items
+            .filter((item) => item.status !== 'waiting')
+            .map((item) => (
+              <View key={item.id} style={styles.historyRow}>
+                <View style={styles.purchaseDetails}>
+                  <Text style={styles.purchaseName}>{item.name}</Text>
+                  <Text style={styles.dateText}>
+                    {item.status === 'skipped' ? 'You reported skipping' : 'You reported buying'} ·{' '}
+                    {new Date(item.outcomeAt ?? item.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+                <View style={styles.historyActions}>
+                  <Text style={styles.purchasePrice}>${item.amount.toFixed(2)}</Text>
+                  <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => setPendingRemovalId(item.id)}>
+                    <Text style={styles.removeText}>Remove</Text>
+                  </Pressable>
+                  {item.status === 'bought' && !purchases.some((purchase) => purchase.sourcePauseId === item.id) && <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => offerToLog(item.id, item.name, item.amount, false)}><Text style={styles.removeText}>Log actual purchase</Text></Pressable>}
+                </View>
+              </View>
+            ))}
+        </View>
+      )}
+      {pendingRemovalId && (
+        <View style={styles.confirmCard}>
+          <Text style={styles.purchaseName}>Remove this local purchase record?</Text>
+          <Text style={styles.dateText}>The user-reported skipped total will update if needed.</Text>
+          <View style={styles.row}>
+            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removePurchase(pendingRemovalId); setPendingRemovalId(null); }}><Text style={styles.primaryButtonText}>Remove</Text></Pressable>
+            <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable>
           </View>
-        )}
-        {pendingRemovalId && (
-          <View style={styles.confirmCard}>
-            <Text style={styles.purchaseName}>Remove this local purchase record?</Text>
-            <Text style={styles.dateText}>The user-reported skipped total will update if needed.</Text>
-            <View style={styles.row}>
-              <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removePurchase(pendingRemovalId); setPendingRemovalId(null); }}><Text style={styles.primaryButtonText}>Remove</Text></Pressable>
-              <Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingRemovalId(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable>
-            </View>
-          </View>
-        )}
-        <Modal animationType="slide" visible={pendingBought !== null} onRequestClose={() => setPendingBought(null)}>
-          <SafeAreaView style={styles.safeArea}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-            <Text style={styles.title}>Log what you paid?</Text>
-            <Text style={styles.description}>This will add the purchase to your savings goal history and offer a set-aside amount. It will not charge you or move money.</Text>
-            <View style={styles.card}><Text style={styles.cardTitle}>{pendingBought?.name}</Text><Text style={styles.label}>Actual amount paid</Text><TextInput style={styles.input} value={actualAmount} onChangeText={setActualAmount} keyboardType="decimal-pad" accessibilityLabel="Actual amount paid" />{buyError ? <Text style={styles.error}>{buyError}</Text> : null}<View style={styles.row}><Pressable accessibilityRole="button" style={styles.primaryButton} onPress={logBoughtPurchase}><Text style={styles.primaryButtonText}>Log purchase</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => { if (pendingBought?.waiting) recordOutcome(pendingBought.id, 'bought'); setPendingBought(null); }}><Text style={styles.outlineButtonText}>Bought without logging</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingBought(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable></View></View>
-          </ScrollView></SafeAreaView>
-        </Modal>
-      </ScrollView>
+        </View>
+      )}
+      <Modal animationType="slide" visible={pendingBought !== null} onRequestClose={() => setPendingBought(null)}>
+        <SafeAreaView style={styles.safeArea}><ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <Text style={styles.title}>Log what you paid?</Text>
+          <Text style={styles.description}>This will add the purchase to your savings goal history and offer a set-aside amount. It will not charge you or move money.</Text>
+          <View style={styles.card}><Text style={styles.cardTitle}>{pendingBought?.name}</Text><Text style={styles.label}>Actual amount paid</Text><TextInput style={styles.input} value={actualAmount} onChangeText={setActualAmount} keyboardType="decimal-pad" accessibilityLabel="Actual amount paid" />{buyError ? <Text style={styles.error}>{buyError}</Text> : null}<View style={styles.row}><Pressable accessibilityRole="button" style={styles.primaryButton} onPress={logBoughtPurchase}><Text style={styles.primaryButtonText}>Log purchase</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => { if (pendingBought?.waiting) recordOutcome(pendingBought.id, 'bought'); setPendingBought(null); }}><Text style={styles.outlineButtonText}>Bought without logging</Text></Pressable><Pressable accessibilityRole="button" style={styles.outlineButton} onPress={() => setPendingBought(null)}><Text style={styles.outlineButtonText}>Cancel</Text></Pressable></View></View>
+        </ScrollView></SafeAreaView>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
-  container: { flex: 1 },
+  section: { gap: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 18 },
+  sectionTitle: { color: colors.ink, fontSize: 23, fontWeight: '800', letterSpacing: -0.5 },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
@@ -301,10 +301,10 @@ const styles = StyleSheet.create({
   primaryButton: { backgroundColor: colors.accentDark, borderRadius: 6, paddingVertical: 13, paddingHorizontal: 14, alignItems: 'center', marginTop: 12 },
   primaryButtonText: { color: colors.surface, fontSize: 14, fontWeight: '700' },
   error: { color: colors.danger, fontSize: 13, marginTop: 7 },
-  summaryCard: { backgroundColor: colors.ink, borderRadius: 12, padding: 20 },
-  summaryLabel: { color: colors.lime, fontSize: 11, fontWeight: '800', letterSpacing: 1.1, textTransform: 'uppercase' },
-  summaryAmount: { color: colors.surface, fontSize: 42, lineHeight: 48, fontWeight: '800', letterSpacing: -1.5, marginTop: 8, fontVariant: ['tabular-nums'] },
-  summaryNote: { color: colors.surface, fontSize: 12, lineHeight: 18, marginTop: 9 },
+  summaryCard: { backgroundColor: colors.paleGreen, borderRadius: 8, padding: 14 },
+  summaryLabel: { color: colors.inkSoft, fontSize: 11, fontWeight: '800', letterSpacing: 1.1, textTransform: 'uppercase' },
+  summaryAmount: { color: colors.ink, fontSize: 24, lineHeight: 28, fontWeight: '800', letterSpacing: -0.5, marginTop: 5, fontVariant: ['tabular-nums'] },
+  summaryNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 9 },
   purchaseItem: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12, marginTop: 12 },
   purchaseHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   purchaseDetails: { flex: 1 },

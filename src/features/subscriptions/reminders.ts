@@ -49,7 +49,7 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
       content: {
         title: count === 1 ? 'Review a subscription tomorrow' : `Review ${count} subscriptions tomorrow`,
         body: `Estimated renewal total: $${(group.totalCents / 100).toFixed(2)}. Open GasFinder to decide what to keep.`,
-        data: { kind: notificationKind, url: '/subscriptions?section=subscriptions' },
+        data: { kind: notificationKind, url: '/subscriptions' },
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

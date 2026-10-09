@@ -29,8 +29,8 @@ export default function ImportPurchaseScreen() {
   return <SafeAreaView style={styles.safe}><View style={styles.content}>
     <Text style={styles.kicker}>PURCHASE IMPORT</Text>
     <Text style={styles.title}>{result === 'saved' ? 'Purchase recorded' : result === 'pending' ? 'Purchase logged' : result === 'invalid' ? 'Could not import' : 'Opening your pocket…'}</Text>
-    <Text style={styles.body}>{result === 'saved' ? `${details} · $${((logged?.savedCents ?? 0) / 100).toFixed(2)} included in your pocket estimate` : result === 'pending' ? `${details}. ${activeGoal ? 'Your rule could not set money aside; review this purchase in Goals.' : 'Create a goal to begin setting money aside. Find this purchase in Subs → Activity.'}` : result === 'invalid' ? 'The link needs a merchant and a positive USD amount. Check the Shortcuts automation.' : 'Loading saved goals and purchases.'}</Text>
-    <Link href={{ pathname: '/investment', params: { section: 'goals' } }} asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Open savings goals</Text></Pressable></Link>
+    <Text style={styles.body}>{result === 'saved' ? `${details} · $${((logged?.savedCents ?? 0) / 100).toFixed(2)} included in your pocket estimate` : result === 'pending' ? `${details}. ${activeGoal ? 'Your rule could not set money aside; review this purchase in Goals.' : 'Create a goal to begin setting money aside. Find this purchase under Activity on the Goals page.'}` : result === 'invalid' ? 'The link needs a merchant and a positive USD amount. Check the Shortcuts automation.' : 'Loading saved goals and purchases.'}</Text>
+    <Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Open savings goals</Text></Pressable></Link>
   </View></SafeAreaView>;
 }
 

@@ -1,7 +1,6 @@
-import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey as calendarDateKey } from '@/components/CalendarDateField';
 import { localDateKey, nextRenewal, subscriptionsToReviewTomorrow } from '@/features/subscriptions/logic';
@@ -23,6 +22,8 @@ export default function SubscriptionsPanel() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [showReminderSettings, setShowReminderSettings] = useState(false);
   const [reminderMessage, setReminderMessage] = useState('');
   const selectedDay = Number(day);
   const calendarYear = month === 2 && selectedDay === 29 ? nextLeapYear(new Date().getFullYear()) : new Date().getFullYear();
@@ -51,6 +52,7 @@ export default function SubscriptionsPanel() {
     setDay('1');
     setMonth(1);
     setEditingId(null);
+    setShowForm(false);
     setError('');
   }
 
@@ -70,6 +72,7 @@ export default function SubscriptionsPanel() {
   }
 
   function edit(subscription: Subscription) {
+    setShowForm(true);
     setEditingId(subscription.id);
     setName(subscription.name);
     setAmount((subscription.amountCents / 100).toFixed(2));
@@ -133,34 +136,48 @@ export default function SubscriptionsPanel() {
   }
 
   return (
-    <View style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Subscriptions</Text>
-        <Text style={styles.intro}>See what renews tomorrow, what it costs, and what you decided.</Text>
+    <View style={styles.content}>
+      <Text style={styles.title}>Subscriptions & pause</Text>
+      <Text style={styles.intro}>Review renewals and give new purchases time before you buy.</Text>
 
-        {due.length > 0 && (
-          <View style={styles.reviewCard}>
-            <Text style={styles.sectionTitle}>Review before tomorrow</Text>
-            <Text style={styles.reviewTotal}>
-              {due.length} renewing · ${(due.reduce((total, { subscription }) => total + subscription.amountCents, 0) / 100).toFixed(2)} total
-            </Text>
-            {due.map(({ subscription, renewal }) => (
-              <View key={subscription.id} style={styles.reviewRow}>
-                <View style={styles.rowBetween}>
-                  <Text style={styles.subscriptionName}>{subscription.name}</Text>
-                  <Text style={styles.subscriptionAmount}>${(subscription.amountCents / 100).toFixed(2)}</Text>
-                </View>
-                <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
-                <View style={styles.actions}>
-                  <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'keep')}><Text style={styles.primaryLabel}>Keep it</Text></Pressable>
-                  <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'plan-to-cancel')}><Text style={styles.secondaryLabel}>Plan to cancel</Text></Pressable>
-                </View>
+      {due.length > 0 && (
+        <View style={styles.reviewCard}>
+          <Text style={styles.sectionTitle}>Review before tomorrow</Text>
+          <Text style={styles.reviewTotal}>
+            {due.length} renewing · ${(due.reduce((total, { subscription }) => total + subscription.amountCents, 0) / 100).toFixed(2)} total
+          </Text>
+          {due.map(({ subscription, renewal }) => (
+            <View key={subscription.id} style={styles.reviewRow}>
+              <View style={styles.rowBetween}>
+                <Text style={styles.subscriptionName}>{subscription.name}</Text>
+                <Text style={styles.subscriptionAmount}>${(subscription.amountCents / 100).toFixed(2)}</Text>
               </View>
-            ))}
-            <Text style={styles.smallNote}>Planning to cancel here does not cancel the subscription. Contact the provider before its deadline.</Text>
-          </View>
-        )}
+              <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
+              <View style={styles.actions}>
+                <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'keep')}><Text style={styles.primaryLabel}>Keep it</Text></Pressable>
+                <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'plan-to-cancel')}><Text style={styles.secondaryLabel}>Plan to cancel</Text></Pressable>
+              </View>
+            </View>
+          ))}
+          <Text style={styles.smallNote}>Planning to cancel here does not cancel the subscription. Contact the provider before its deadline.</Text>
+        </View>
+      )}
 
+      <View style={styles.listSection}>
+        <Text style={styles.sectionTitle}>Upcoming ({active.length})</Text>
+        {active.length === 0 ? <Text style={styles.bodyText}>Add a subscription to see its next renewal here.</Text> : active.map(subscriptionCard)}
+      </View>
+      {inactive.length > 0 && (
+        <View style={styles.listSection}>
+          <Text style={styles.sectionTitle}>Marked canceled ({inactive.length})</Text>
+          {inactive.map(subscriptionCard)}
+        </View>
+      )}
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: showForm }} style={styles.choice} onPress={() => { if (showForm) Keyboard.dismiss(); setShowForm(!showForm); }}><Text style={styles.choiceLabel}>{showForm ? 'Hide form' : editingId ? 'Edit subscription' : 'Add subscription'}</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityState={{ expanded: showReminderSettings }} style={styles.choice} onPress={() => setShowReminderSettings(!showReminderSettings)}><Text style={styles.choiceLabel}>Reminder settings</Text></Pressable>
+      </View>
+      {showReminderSettings && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Phone reminder</Text>
           <Text style={styles.bodyText}>Get one local notification at 9 AM the day before renewals. You can also review inside the app without notification permission.</Text>
@@ -169,7 +186,9 @@ export default function SubscriptionsPanel() {
           </Pressable>
           {reminderMessage ? <Text style={styles.error}>{reminderMessage}</Text> : null}
         </View>
+      )}
 
+      {showForm && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>{editingId ? 'Edit subscription' : 'Add a subscription'}</Text>
           <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name, such as Music" accessibilityLabel="Subscription name" maxLength={80} />
@@ -188,38 +207,27 @@ export default function SubscriptionsPanel() {
           <Pressable accessibilityRole="button" style={styles.saveButton} onPress={save}><Text style={styles.saveLabel}>{editingId ? 'Save changes' : 'Add subscription'}</Text></Pressable>
           {editingId && <Pressable accessibilityRole="button" style={styles.cancelEdit} onPress={resetForm}><Text style={styles.textButtonLabel}>Stop editing</Text></Pressable>}
         </View>
+      )}
 
-        <View style={styles.listSection}>
-          <Text style={styles.sectionTitle}>Upcoming ({active.length})</Text>
-          {active.length === 0 ? <Text style={styles.bodyText}>Add a subscription to see its next renewal here.</Text> : active.map(subscriptionCard)}
+      <Text style={styles.footer}>Saved only on this device. GasFinder does not connect to subscription accounts or stop charges.</Text>
+      {removeId && (
+        <View style={styles.confirmCard}>
+          <Text style={styles.sectionTitle}>Delete this subscription?</Text>
+          <Text style={styles.bodyText}>Its local reminder and review record will be removed.</Text>
+          <View style={styles.actions}>
+            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removeSubscription(removeId); if (editingId === removeId) resetForm(); setRemoveId(null); }}><Text style={styles.primaryLabel}>Delete</Text></Pressable>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => setRemoveId(null)}><Text style={styles.secondaryLabel}>Keep it</Text></Pressable>
+          </View>
         </View>
-        {inactive.length > 0 && (
-          <View style={styles.listSection}>
-            <Text style={styles.sectionTitle}>Marked canceled ({inactive.length})</Text>
-            {inactive.map(subscriptionCard)}
-          </View>
-        )}
-        <Text style={styles.footer}>Saved only on this device. GasFinder does not connect to subscription accounts or stop charges.</Text>
-        {removeId && (
-          <View style={styles.confirmCard}>
-            <Text style={styles.sectionTitle}>Delete this subscription?</Text>
-            <Text style={styles.bodyText}>Its local reminder and review record will be removed.</Text>
-            <View style={styles.actions}>
-              <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removeSubscription(removeId); if (editingId === removeId) resetForm(); setRemoveId(null); }}><Text style={styles.primaryLabel}>Delete</Text></Pressable>
-              <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => setRemoveId(null)}><Text style={styles.secondaryLabel}>Keep it</Text></Pressable>
-            </View>
-          </View>
-        )}
-      </ScrollView>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.paper },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 45, gap: 18 },
+  content: { gap: 14 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
-  title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 },
+  title: { color: colors.ink, fontSize: 30, fontWeight: '800', lineHeight: 35, letterSpacing: -1, flexShrink: 1 },
   homeButton: { backgroundColor: colors.ink, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, minHeight: 44, justifyContent: 'center' },
   homeButtonText: { color: colors.surface, fontWeight: '700' },
   intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
