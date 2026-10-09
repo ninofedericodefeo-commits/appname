@@ -1,6 +1,7 @@
+import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 

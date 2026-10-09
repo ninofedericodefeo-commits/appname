@@ -5,6 +5,7 @@ import { fuelRange, estimatedTankGallons, validateCar } from '../src/features/ve
 import { chooseStop, nextStopWindow, planDriveStops, safeRange } from '../src/features/stations/multiStopLogic.ts';
 import { appleMapsTrip, googleMapsTripSegments } from '../src/features/stations/maps.ts';
 import { driveRouteWindow, parseDestinationInput } from '../src/features/stations/routeLogic.ts';
+import { preferredMapsApp, validateRefillPercent } from '../src/features/stations/preferences.ts';
 
 const car = { id: 'car-a', name: 'My Subaru', model: 'Subaru Crosstrek', mpg: 28, tankGallons: 14, estimateSource: 'estimate' };
 const station = (id, milesAhead, price, milesOffRoute = 0.1, source = 'report') => ({ id, name: id, latitude: 40, longitude: -75 + milesAhead / 1000, milesAhead, milesOffRoute, prices: price ? [{ fuelType: 'regular', price, source }] : [], address: '', city: '', state: '' });
@@ -28,6 +29,41 @@ test('offline catalog includes gasoline model estimates and EPA provenance', () 
   assert.ok(data.vehicles.every((item) => item.mpg > 0 && item.fromYear <= item.toYear));
 });
 
+test('refill percentage is of the full tank, including a partially full starting tank', () => {
+  assert.equal(safeRange(150, 300, 10), 120);
+  assert.equal(safeRange(150, 300, 25), 75);
+  assert.equal(safeRange(15, 300, 10), 0);
+  assert.equal(nextStopWindow(500, 0, 150, 300, 10).targetMiles, 120);
+  assert.equal(nextStopWindow(500, 100, 300, 300, 25).targetMiles, 325);
+  assert.throws(() => validateRefillPercent(0));
+  assert.throws(() => validateRefillPercent(NaN));
+  assert.throws(() => validateRefillPercent(51));
+});
+
+test('a changed refill level applies to every later leg of a long drive', async () => {
+  const available = [station('one', 70, 3), station('two', 290, 3), station('three', 510, 3)];
+  const windows = [];
+  const result = await planDriveStops({ routeMiles: 700, initialRange: 150, fullRange: 300, refillPercent: 25, fuelType: 'regular', lookup: async (window) => { windows.push({ ...window }); return inWindow(available, window); } });
+  assert.equal(result.complete, true);
+  assert.equal(result.stops.length, 3);
+  assert.equal(windows[0].targetMiles, 75);
+  assert.ok(Math.abs(windows[1].targetMiles - 294.9) < .001);
+  assert.ok(result.stops.every((stop) => stop.legMiles <= stop.window.rangeMiles - 75));
+});
+
+test('starting below the refill level chooses a nearby reachable station immediately', async () => {
+  const result = await planDriveStops({ routeMiles: 100, initialRange: 15, fullRange: 300, refillPercent: 10, fuelType: 'regular', lookup: async (window) => inWindow([station('near', 1, 4), station('cheap-later', 9, 2), station('out-of-reach', 20, 1)], window) });
+  assert.equal(result.complete, true);
+  assert.equal(result.stops[0].station.id, 'near');
+  assert.equal(result.stops[0].window.targetMiles, 0);
+});
+
+test('Maps preference uses Apple on iPhone by default and Google on Android', () => {
+  assert.equal(preferredMapsApp(null, 'ios'), 'apple');
+  assert.equal(preferredMapsApp('google', 'ios'), 'google');
+  assert.equal(preferredMapsApp('apple', 'android'), 'google');
+});
+
 test('long trips plan multiple reachable refills from the actual chosen stops', async () => {
   const available = [station('first-cheap', 80, 3), station('first-late', 90, 4), station('second', 247, 3.1), station('third', 412, 3.2)];
   const queried = [];
@@ -40,7 +76,7 @@ test('long trips plan multiple reachable refills from the actual chosen stops', 
 });
 
 test('a later missing stop retains earlier stops and marks the trip incomplete', async () => {
-  const result = await planDriveStops({ routeMiles: 500, initialRange: 100, fullRange: 190, fuelType: 'regular', lookup: async (window) => inWindow([station('first', 85, 3)], window) });
+  const result = await planDriveStops({ routeMiles: 500, initialRange: 100, fullRange: 190, fuelType: 'regular', lookup: async (window) => inWindow([station('first', 75, 3)], window) });
   assert.equal(result.complete, false);
   assert.equal(result.stops.length, 1);
   assert.ok(result.gap.searchEndMiles < 500);

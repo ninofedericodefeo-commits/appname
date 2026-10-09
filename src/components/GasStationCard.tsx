@@ -1,4 +1,6 @@
 import { colors } from '@/theme';
+import { useSettingsStore } from '@/stores/settingsStore';
+import { preferredMapsApp } from '@/features/stations/preferences';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Link } from 'expo-router';
@@ -31,6 +33,8 @@ export function GasStationCard({
   canAddReceipt?: boolean;
   onReported?: () => void;
 }) {
+  const mapsPreference = useSettingsStore((state) => state.mapsPreference);
+  const mapsApp = preferredMapsApp(mapsPreference, Platform.OS);
   const price = station.prices.find((item) => item.fuelType === fuelType);
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -91,8 +95,7 @@ export function GasStationCard({
         </View>
       </View>
       {canOpenMaps && <View style={styles.mapActions}>
-        {Platform.OS === 'ios' && <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(appleMapsDirections(station))}><Text style={styles.mapButtonText}>Apple Maps ↗</Text></Pressable>}
-        <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(googleMapsDirections(station))}><Text style={styles.mapButtonText}>Google Maps ↗</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.mapButtonText}>{mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'} ↗</Text></Pressable>
         {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
       </View>}
       {canAddReceipt && <Link href={{ pathname: '/report-receipt', params: { stationId: station.id, stationName: station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Add receipt for this station ↗</Text></Pressable></Link>}

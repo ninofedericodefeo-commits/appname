@@ -44,7 +44,10 @@ export async function describeLocation(coordinates: { latitude: number; longitud
 
 export async function geocodeDestination(address: string) {
   if (Platform.OS === 'web') throw new Error('Address lookup is available in the iPhone or Android app. Enter destination coordinates in this preview.');
-  const [result] = await Location.geocodeAsync(address);
+  let results: Location.LocationGeocodedLocation[];
+  try { results = await Location.geocodeAsync(address); }
+  catch { throw new Error('Destination address lookup is unavailable. Try again, or enter latitude, longitude instead.'); }
+  const [result] = results;
   if (!result) throw new Error('Destination not found. Try a fuller address or coordinates.');
   return { latitude: result.latitude, longitude: result.longitude };
 }

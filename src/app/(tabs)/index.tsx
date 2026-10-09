@@ -1,6 +1,7 @@
+import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -98,7 +99,7 @@ export default function GasScreen() {
     <SafeAreaView style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.brand}>GASFINDER</Text>
+          <View style={styles.pillRow}><Text style={styles.brand}>GASFINDER</Text><Link href="/settings" asChild><Pressable accessibilityRole="button" style={styles.filterToggle}><Text style={styles.sourceText}>Settings ›</Text></Pressable></Link></View>
           <Text style={styles.title}>Gas stations</Text>
           <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
         </View>
