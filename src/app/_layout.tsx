@@ -65,7 +65,7 @@ function SubscriptionReviewPrompt() {
     if (Platform.OS === 'web') return;
     function openSubscriptionReview(response: Notifications.NotificationResponse) {
       if (response.notification.request.content.data?.kind === 'subscription-review') {
-        router.navigate('/subscriptions');
+        router.navigate({ pathname: '/subscriptions', params: { section: 'subscriptions' } });
         Notifications.clearLastNotificationResponse();
       }
     }
@@ -151,6 +151,8 @@ export default function RootLayout() {
           contentStyle: { backgroundColor: colors.paper },
         }}>
           <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
+          <Stack.Screen name="spending" options={{ headerShown: false, animation: 'none' }} />
+          <Stack.Screen name="activity" options={{ headerShown: false, animation: 'none' }} />
         </Stack>
       </View>
       <SubscriptionReviewPrompt />

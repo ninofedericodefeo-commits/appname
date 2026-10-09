@@ -2,7 +2,7 @@ import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
@@ -46,7 +46,7 @@ function Choice({
   );
 }
 
-export default function SpendingScreen() {
+export default function SpendingPausePanel() {
   const { enabled, delayHours, items, setEnabled, setDelayHours, addPurchase, recordOutcome, removePurchase } = usePurchasePauseStore();
   const [purchaseName, setPurchaseName] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
@@ -104,15 +104,14 @@ export default function SpendingScreen() {
       setBuyError('This purchase has already been logged.'); return;
     }
     if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
+    Keyboard.dismiss();
     setPendingBought(null);
-    router.dismissAll();
-    router.navigate('/investment');
+    router.setParams({ section: 'goals' });
   }
 
   return (
-    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
+    <View style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <Text style={styles.kicker}>MONEY</Text>
         <Text style={styles.title}>Spending pause</Text>
 
         <View style={styles.card}>
@@ -272,7 +271,7 @@ export default function SpendingScreen() {
           </ScrollView></SafeAreaView>
         </Modal>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -323,5 +322,4 @@ const styles = StyleSheet.create({
   removeButton: { paddingVertical: 8 },
   removeText: { color: colors.danger, fontSize: 12, fontWeight: '700' },
   confirmCard: { backgroundColor: colors.dangerPale, borderWidth: 1, borderColor: colors.accent, borderRadius: 10, padding: 15 },
-  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.7, marginBottom: 1 },
 });
