@@ -179,6 +179,7 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
   return <View style={styles.content}>
     <View style={styles.header}><Text style={styles.title}>Savings</Text><Action label="Settings" secondary onPress={() => { Keyboard.dismiss(); closeEditor(); setShowSettings(!showSettings); }} /></View>
     <Text style={styles.intro}>Choose a rule for each purchase. Your pocket is an on-device estimate; money stays in your account.</Text>
+    <Action label="View activity ↓" secondary onPress={onViewActivity} />
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <>
       {showCreateForm ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setShowCreateForm(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setShowCreateForm(false); }} /> : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.hint}>Choose a target and a set-aside rule you can edit any time.</Text><Action label="Set a goal" onPress={() => setShowCreateForm(true)} /></View>}
@@ -197,7 +198,6 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
       {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your pocket as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); closeEditor(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
       <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Connect Apple Pay purchases ↗</Text><Text style={styles.hint}>Install the logging shortcut, then choose your card in Shortcuts.</Text></Pressable></Link>
     </>}
-    <Action label="View activity ↓" secondary onPress={onViewActivity} />
   </View>;
 }
 
