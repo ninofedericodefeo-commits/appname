@@ -1,20 +1,18 @@
 import { colors } from '@/theme';
-import { useRef, useState, type ReactNode } from 'react';
+import { useRef, useState } from 'react';
 import { Link } from 'expo-router';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
 import { IconButton } from '@/components/IconButton';
+import GoalEditor from '@/features/goals/GoalEditor';
 import GoalProgressCard from '@/features/goals/GoalProgressCard';
-import { DEFAULT_SET_ASIDE_RULE, validDeadline } from '@/features/goals/logic';
 import { goalWidgetAvailable } from '@/features/goals/widget';
-import type { Goal, GoalKind, SetAsideRule } from '@/features/goals/logic';
+import type { Goal } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { formatAmount, formatMoney as money } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 
 const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-const tomorrowKey = () => { const date = new Date(); date.setDate(date.getDate() + 1); return localDateKey(date); };
 
 function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
@@ -28,75 +26,6 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
   </Pressable>;
 }
 
-function GoalEditor({ goal, reservedCents, onSave, onCancel, onLowerPocket, children }: {
-  children?: ReactNode;
-  goal: Goal | null;
-  reservedCents: number;
-  onSave: (input: { title: string; kind: GoalKind; targetCents: number; deadline: string | null; setAsideRule: SetAsideRule }, assignAll: boolean) => boolean;
-  onCancel?: () => void;
-  onLowerPocket?: (cents: number) => boolean;
-}) {
-  const [title, setTitle] = useState(goal?.title ?? '');
-  const kind: GoalKind = goal?.kind ?? 'money';
-  const [target, setTarget] = useState(goal ? formatAmount(goal.targetCents) : '');
-  const [timed, setTimed] = useState(!!goal?.deadline);
-  const [deadline, setDeadline] = useState(goal?.deadline ?? '');
-  const [assignAll, setAssignAll] = useState(false);
-  const currentRule = goal?.setAsideRule ?? DEFAULT_SET_ASIDE_RULE;
-  const [ruleMode, setRuleMode] = useState<SetAsideRule['mode']>(currentRule.mode);
-  const [fixedAmount, setFixedAmount] = useState(currentRule.mode === 'fixed' ? formatAmount(currentRule.cents) : '1.00');
-  const [percentAmount, setPercentAmount] = useState(currentRule.mode === 'percent' ? String(currentRule.percent) : '5');
-  const [roundIncrement, setRoundIncrement] = useState(currentRule.mode === 'round' ? currentRule.incrementCents : 100);
-  const [lowerAmount, setLowerAmount] = useState('');
-  const [error, setError] = useState('');
-
-  function save() {
-    const targetCents = parseDollars(target);
-    if (!title.trim() || title.trim().length > 80) { setError('Enter a title up to 80 characters.'); return; }
-    if (targetCents === null || targetCents <= 0) { setError('Enter a target greater than $0.'); return; }
-    if (timed && deadline !== goal?.deadline && !validDeadline(deadline)) { setError('Choose a future date from the calendar.'); return; }
-    const fixedCents = parseDollars(fixedAmount);
-    const percent = Number(percentAmount);
-    if (ruleMode === 'fixed' && (fixedCents === null || fixedCents <= 0)) { setError('Enter a fixed amount greater than $0.'); return; }
-    if (ruleMode === 'percent' && (!percentAmount.trim() || !Number.isFinite(percent) || percent <= 0 || percent > 100)) { setError('Enter a percent above 0 and no greater than 100.'); return; }
-    const setAsideRule: SetAsideRule = ruleMode === 'fixed' ? { mode: 'fixed', cents: fixedCents! } : ruleMode === 'percent' ? { mode: 'percent', percent } : { mode: 'round', incrementCents: roundIncrement };
-    if (!onSave({ title, kind, targetCents, deadline: timed ? deadline : null, setAsideRule }, assignAll)) {
-      setError('Could not save this goal. Please try again.');
-      return;
-    }
-    setError('');
-  }
-
-  function lowerPocket() {
-    const cents = parseDollars(lowerAmount);
-    if (!onLowerPocket || cents === null || cents <= 0 || !onLowerPocket(cents)) { setError('Enter an amount no greater than the money assigned to this goal.'); return; }
-    setLowerAmount('');
-    setError('');
-  }
-
-  return <View style={styles.card}>
-    <Text style={styles.section}>{goal ? 'Edit goal' : 'Set your goal'}</Text>
-    <Text style={styles.label}>Title</Text>
-    <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="What are you saving for?" maxLength={80} accessibilityLabel="Goal title" />
-    <Text style={styles.label}>Target amount</Text>
-    <TextInput style={styles.input} value={target} onChangeText={setTarget} placeholder="500.00" keyboardType="decimal-pad" accessibilityLabel="Goal target amount" />
-    <Text style={styles.label}>Set aside after each purchase</Text>
-    <View style={styles.row}><Choice label="Fixed amount" selected={ruleMode === 'fixed'} onPress={() => setRuleMode('fixed')} /><Choice label="Percent" selected={ruleMode === 'percent'} onPress={() => setRuleMode('percent')} /><Choice label="Round up" selected={ruleMode === 'round'} onPress={() => setRuleMode('round')} /></View>
-    {ruleMode === 'fixed' && <TextInput style={styles.input} value={fixedAmount} onChangeText={setFixedAmount} placeholder="1.00" keyboardType="decimal-pad" accessibilityLabel="Fixed dollars per purchase" />}
-    {ruleMode === 'percent' && <TextInput style={styles.input} value={percentAmount} onChangeText={setPercentAmount} placeholder="5" keyboardType="decimal-pad" accessibilityLabel="Percent of each purchase" />}
-    {ruleMode === 'round' && <View style={styles.row}>{[100, 500, 1000].map((increment) => <Choice key={increment} label={`Next $${increment / 100}`} selected={roundIncrement === increment} onPress={() => setRoundIncrement(increment)} />)}</View>}
-    <Text style={styles.hint}>This rule updates your pocket estimate when a purchase is logged. You can edit it whenever you want.</Text>
-    <Text style={styles.label}>Timing</Text>
-    <View style={styles.row}><Choice label="Untimed" selected={!timed} onPress={() => setTimed(false)} /><Choice label="Timed" selected={timed} onPress={() => setTimed(true)} /></View>
-    {timed && <><Text style={styles.label}>Target date</Text><CalendarDateField label="Goal target date" value={deadline} onChange={setDeadline} minimumDate={tomorrowKey()} /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
-    {!goal && reservedCents > 0 && <><Text style={styles.label}>Existing pocket money</Text><Text style={styles.hint}>Your pocket already has {money(reservedCents)} earmarked. Assigning it changes goal progress, not the pocket total.</Text><View style={styles.row}><Choice label="Assign none" selected={!assignAll} onPress={() => setAssignAll(false)} /><Choice label="Assign all" selected={assignAll} onPress={() => setAssignAll(true)} /></View></>}
-    {goal && onLowerPocket && <View style={styles.warning}><Text style={styles.section}>Lower pocket for this goal</Text><Text style={styles.hint}>Currently assigned: {money(goal.savedCents)}. Lowering it also lowers goal progress. No money moves in your account.</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={lowerAmount} onChangeText={setLowerAmount} placeholder="Amount to remove" keyboardType="decimal-pad" accessibilityLabel="Lower goal pocket by" /><Action label="Lower pocket" secondary onPress={lowerPocket} disabled={goal.savedCents === 0} /></View></View>}
-    <Text style={styles.hint}>Money stays in your existing account. This app cannot verify your balance, transfer funds, or buy stocks.</Text>
-    {error ? <Text style={styles.error}>{error}</Text> : null}
-    <View style={styles.row}><Action label={goal ? 'Save goal' : 'Create goal'} onPress={save} />{onCancel && <Action label="Cancel" secondary onPress={onCancel} />}</View>
-    {children}
-  </View>;
-}
 
 function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => void }) {
   const { goalSettings, updateGoalSettings, endGoal } = usePocketStore();
@@ -187,6 +116,7 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
       </View>
     </View>
     <Text style={styles.intro}>Your pocket is an estimate.</Text>
+    <Link href="/amazon-goal" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Goal from Amazon link ↗</Text></Pressable></Link>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <>
       {showCreateForm ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setShowCreateForm(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setShowCreateForm(false); }} /> : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.hint}>Choose a target and a set-aside rule you can edit any time.</Text><Action label="Set a goal" onPress={() => setShowCreateForm(true)} /></View>}

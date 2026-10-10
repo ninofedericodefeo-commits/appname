@@ -31,9 +31,9 @@ That is a useful foundation for testing the experience, but simulated values mus
 - One active savings goal can use all or none of an existing pocket amount, accept confirmed set-asides, and show suggestions based on manually logged purchases and an optional deadline. An optional iPhone widget shows goal progress, with amounts hidden by default. Neither goals nor the widget represent a verified balance or an investment.
 - A local subscription tracker now records monthly or yearly renewal dates and user-entered prices. It prompts for each renewal on the preceding calendar day and can schedule optional local 9 AM notifications. A plan-to-cancel decision is a reminder to act with the provider, not a cancellation or blocked charge.
 
-## Next: Amazon links as goals
+## Amazon links as goals
 
-Add an explicit paste → product/price preview → editable goal → confirmation flow. Keep it local, with a manual price fallback when Amazon data cannot be read reliably. Explore an optional Safari helper before considering an eligible product API; do not assume free automatic lookup is available for every link. Implementation stages and acceptance checks are in [Amazon goals plan](docs/AMAZON_GOALS_PLAN.md).
+The initial local paste → manually entered product/price preview → editable goal → confirmation flow is implemented. Direct Amazon product links and a.co short links are supported, with the existing goal deadline, savings rule and pocket assignment controls. Next, explore an optional Safari helper and verify permitted extraction before considering an eligible product API. Automatic lookup is not enabled. Implementation status and acceptance checks are in [Amazon goals plan](docs/AMAZON_GOALS_PLAN.md).
 
 ## Product principles
 

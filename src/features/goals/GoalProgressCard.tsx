@@ -1,8 +1,10 @@
 import { useState } from 'react';
+import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { IconButton } from '@/components/IconButton';
 import { progressPercent } from '@/features/goals/logic';
+import { parseAmazonLink } from '@/features/goals/amazonLink';
 import type { Goal } from '@/features/goals/logic';
 import { formatCompactMoney, formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
@@ -12,6 +14,7 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, editing }: {
 }) {
   const [showRemaining, setShowRemaining] = useState(false);
   const percent = progressPercent(goal);
+  const productLink = goal.product ? parseAmazonLink(goal.product.sourceUrl).value : null;
   return <View style={styles.card}>
     <View style={styles.top}>
       <Text style={styles.date}>{goal.deadline ? new Date(`${goal.deadline}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
@@ -21,6 +24,10 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, editing }: {
       </View>
     </View>
     <Text style={styles.title}>{goal.title}</Text>
+    {goal.product && productLink && <View style={styles.product}>
+      {goal.product.variant ? <Text style={styles.date}>{goal.product.variant}</Text> : null}
+      <Link href={productLink.sourceUrl} target="_blank" asChild><Pressable accessibilityRole="link" accessibilityLabel="View goal product on Amazon" style={styles.productLink}><Text style={styles.productText}>View on Amazon ↗</Text></Pressable></Link>
+    </View>}
     <Pressable accessibilityRole="button" accessibilityLabel={`${formatMoney(goal.savedCents)} of ${formatMoney(goal.targetCents)}`}
       accessibilityHint="Show or hide the amount left" accessibilityState={{ expanded: showRemaining }}
       onPress={() => setShowRemaining(!showRemaining)} style={styles.totalButton}>
@@ -44,6 +51,7 @@ const styles = StyleSheet.create({
   date: { color: colors.lime, fontSize: 12, flex: 1 },
   actions: { flexDirection: 'row', gap: 6 },
   title: { color: colors.surface, fontSize: 22, fontWeight: '700', lineHeight: 29 },
+  product: { gap: 4 }, productLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, productText: { color: colors.lime, fontSize: 13, fontWeight: '700' },
   totalButton: { minHeight: 54, justifyContent: 'center', paddingVertical: 6 },
   saved: { color: colors.surface, fontSize: 37, lineHeight: 47, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
   target: { color: colors.lime, fontSize: 25, fontWeight: '500', letterSpacing: -0.5 },

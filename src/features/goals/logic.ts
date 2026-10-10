@@ -1,4 +1,6 @@
 import { formatMoney } from '../../lib/money.ts';
+import { validAmazonProductGoal } from './amazonLink.ts';
+import type { AmazonProductGoal } from './amazonLink.ts';
 
 export type GoalKind = 'item' | 'money';
 export type SetAsideRule = { mode: 'fixed'; cents: number } | { mode: 'percent'; percent: number } | { mode: 'round'; incrementCents: number };
@@ -40,7 +42,40 @@ export type Goal = {
   setAsideRule: SetAsideRule;
   savedCents: number;
   createdAt: string;
+  product?: AmazonProductGoal;
 };
+
+export type GoalInput = { title: string; kind: GoalKind; targetCents: number; deadline: string | null; setAsideRule: SetAsideRule; product?: AmazonProductGoal };
+
+export function validGoalInput(input: GoalInput, existingDeadline?: string | null) {
+  return input.title.trim().length > 0 && input.title.trim().length <= 80 &&
+    (input.kind === 'item' || input.kind === 'money') && validSetAsideRule(input.setAsideRule) &&
+    Number.isSafeInteger(input.targetCents) && input.targetCents > 0 && input.targetCents <= 100_000_000 &&
+    (input.deadline === null || input.deadline === existingDeadline || validDeadline(input.deadline)) &&
+    (input.product === undefined || (validAmazonProductGoal(input.product) && input.product.priceCents === input.targetCents && input.product.title === input.title.trim()));
+}
+
+export function createGoalFromInput(input: GoalInput, reservedCents: number, assignAll: boolean, id: string, now = new Date()): Goal | null {
+  if (!validGoalInput(input)) return null;
+  return {
+    id, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents, deadline: input.deadline,
+    setAsideRule: input.setAsideRule, savedCents: startingGoalCents(reservedCents, assignAll), createdAt: now.toISOString(),
+    ...(input.product ? { product: input.product } : {}),
+  };
+}
+
+export function editGoalFromInput(goal: Goal, input: GoalInput): Goal | null {
+  if (!validGoalInput(input, goal.deadline)) return null;
+  // Retain the source when older callers edit an existing product goal.
+  const product = input.product ?? (goal.product ? {
+    ...goal.product, title: input.title.trim(), priceCents: input.targetCents,
+    priceReadAt: goal.product.priceCents === input.targetCents ? goal.product.priceReadAt : new Date().toISOString(),
+  } : undefined);
+  return {
+    ...goal, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents,
+    deadline: input.deadline, setAsideRule: input.setAsideRule, ...(product ? { product } : {}),
+  };
+}
 
 export type ArchivedGoal = Goal & { endedAt: string; result: 'reached' | 'stopped' };
 

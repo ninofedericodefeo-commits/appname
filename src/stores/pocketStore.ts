@@ -5,8 +5,8 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { canReserve } from '@/features/pocket/logic';
 import { applyBankImport } from '@/features/bank/importLogic';
 import type { BankPurchase } from '@/features/bank/importLogic';
-import { DEFAULT_GOAL_SETTINGS, DEFAULT_SET_ASIDE_RULE, automaticSetAsideCents, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, startingGoalCents, validDeadline, validSetAsideRule } from '@/features/goals/logic';
-import type { ArchivedGoal, Goal, GoalKind, GoalSettings, LoggedPurchase, SetAsideRule } from '@/features/goals/logic';
+import { DEFAULT_GOAL_SETTINGS, DEFAULT_SET_ASIDE_RULE, automaticSetAsideCents, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, createGoalFromInput, editGoalFromInput } from '@/features/goals/logic';
+import type { ArchivedGoal, Goal, GoalInput, GoalSettings, LoggedPurchase } from '@/features/goals/logic';
 
 export type PocketEntry = {
   id: string;
@@ -16,8 +16,6 @@ export type PocketEntry = {
   goalId?: string;
   purchaseId?: string;
 };
-
-type GoalInput = { title: string; kind: GoalKind; targetCents: number; deadline: string | null; setAsideRule: SetAsideRule };
 
 type PocketState = {
   reportedBalanceCents: number | null;
@@ -49,14 +47,6 @@ type PocketState = {
 
 function entry(kind: PocketEntry['kind'], amountCents: number, goalId?: string, purchaseId?: string): PocketEntry {
   return { id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, amountCents, createdAt: new Date().toISOString(), kind, goalId, purchaseId };
-}
-
-function validGoalInput(input: GoalInput, existingDeadline?: string | null) {
-  return input.title.trim().length > 0 && input.title.trim().length <= 80 &&
-    (input.kind === 'item' || input.kind === 'money') &&
-    validSetAsideRule(input.setAsideRule) &&
-    Number.isSafeInteger(input.targetCents) && input.targetCents > 0 &&
-    (input.deadline === null || input.deadline === existingDeadline || validDeadline(input.deadline));
 }
 
 export const usePocketStore = create<PocketState>()(
@@ -94,13 +84,9 @@ export const usePocketStore = create<PocketState>()(
       },
       createGoal: (input, assignAll) => {
         const state = get();
-        if (state.activeGoal || !validGoalInput(input)) return false;
-        const goal: Goal = {
-          id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          title: input.title.trim(), kind: input.kind, targetCents: input.targetCents,
-          deadline: input.deadline, setAsideRule: input.setAsideRule, savedCents: startingGoalCents(state.reservedCents, assignAll),
-          createdAt: new Date().toISOString(),
-        };
+        if (state.activeGoal) return false;
+        const goal = createGoalFromInput(input, state.reservedCents, assignAll, `${Date.now()}-${Math.random().toString(36).slice(2)}`);
+        if (!goal) return false;
         set({ activeGoal: goal, entries: assignAll && state.reservedCents > 0
           ? [entry('assign', state.reservedCents, goal.id), ...state.entries]
           : state.entries });
@@ -108,8 +94,9 @@ export const usePocketStore = create<PocketState>()(
       },
       updateGoal: (input) => {
         const goal = get().activeGoal;
-        if (!goal || !validGoalInput(input, goal.deadline)) return false;
-        set({ activeGoal: { ...goal, title: input.title.trim(), kind: input.kind, targetCents: input.targetCents, deadline: input.deadline, setAsideRule: input.setAsideRule } });
+        const edited = goal ? editGoalFromInput(goal, input) : null;
+        if (!edited) return false;
+        set({ activeGoal: edited });
         return true;
       },
       endGoal: () => {
