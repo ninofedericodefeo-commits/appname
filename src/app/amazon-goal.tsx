@@ -78,7 +78,7 @@ export default function AmazonGoalScreen() {
           </View>
           {confirmArchive && <View style={styles.warning}>
             <Text style={styles.heading}>Finish {activeGoal.title}?</Text>
-            <Text style={styles.hint}>Its progress will stay in Activity. Its {formatMoney(activeGoal.savedCents)} stays in your pocket, ready to assign to a new goal.</Text>
+            <Text style={styles.hint}>Its progress will stay in Past goals. Its {formatMoney(activeGoal.savedCents)} stays in your set-aside balance, ready to assign to a new goal.</Text>
             <View style={styles.row}><Button label="Confirm archive" onPress={() => { endGoal(); setConfirmArchive(false); }} /><Button label="Keep current goal" secondary onPress={() => setConfirmArchive(false)} /></View>
           </View>}
         </View>

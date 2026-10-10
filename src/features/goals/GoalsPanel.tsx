@@ -1,6 +1,6 @@
 import { colors } from '@/theme';
 import { useRef, useState } from 'react';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { IconButton } from '@/components/IconButton';
@@ -49,7 +49,7 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
     <View style={styles.card}>
       <View style={styles.rowBetween}><Text style={styles.section}>Goal settings</Text><Action label="Close" secondary onPress={onClose} /></View>
       {goal && <View style={styles.row}><Action label="Finish and archive goal" secondary onPress={() => setConfirmEnd(true)} /></View>}
-      {confirmEnd && <View style={styles.warning}><Text style={styles.section}>End this goal?</Text><Text style={styles.hint}>Its progress will be saved in history. Money remains earmarked in the pocket and becomes available to assign to your next goal.</Text><View style={styles.row}><Action label="End goal" onPress={() => { endGoal(); setConfirmEnd(false); onClose(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmEnd(false)} /></View></View>}
+      {confirmEnd && <View style={styles.warning}><Text style={styles.section}>End this goal?</Text><Text style={styles.hint}>Its progress will be saved in history. Money remains set aside in your account and becomes available to assign to your next goal.</Text><View style={styles.row}><Action label="End goal" onPress={() => { endGoal(); setConfirmEnd(false); onClose(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmEnd(false)} /></View></View>}
       <Text style={styles.label}>Savings suggestions</Text>
       <View style={styles.row}><Choice label="On" selected={goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: true })} /><Choice label="Off" selected={!goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: false })} /></View>
       <Text style={styles.label}>Maximum suggested per purchase ($)</Text>
@@ -68,7 +68,7 @@ function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => vo
   </View>;
 }
 
-export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => void }) {
+export default function GoalsPanel() {
   const { activeGoal, reservedCents, reportedBalanceCents, createGoal, updateGoal, deleteGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
   const [showSettings, setShowSettings] = useState(false);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -111,11 +111,11 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
     <View style={styles.header}>
       <Text style={styles.title}>Savings</Text>
       <View style={styles.row}>
-        <IconButton icon="activity" label="View activity" onPress={onViewActivity} />
+        <IconButton icon="activity" label="View transactions" onPress={() => router.push('/account-transactions')} />
         <IconButton icon="settings" label="Goal settings" selected={showSettings} onPress={() => { Keyboard.dismiss(); closeEditor(); setShowSettings(!showSettings); }} />
       </View>
     </View>
-    <Text style={styles.intro}>Your pocket is an estimate.</Text>
+    <Text style={styles.intro}>Your savings stay in your bank account.</Text>
     <Link href="/amazon-goal" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Goal from Amazon link ↗</Text></Pressable></Link>
     {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
     {!activeGoal ? <>
@@ -128,11 +128,11 @@ export default function GoalsPanel({ onViewActivity }: { onViewActivity: () => v
           <Action label={showMoneyForm ? 'Hide set-aside form' : 'Set money aside'} secondary disabled={remaining === 0 && !showMoneyForm} onPress={() => { Keyboard.dismiss(); setShowMoneyForm(!showMoneyForm); }} />
           <Action label={showPurchaseForm ? 'Hide purchase form' : 'Log a purchase'} onPress={() => { Keyboard.dismiss(); setShowPurchaseForm(!showPurchaseForm); }} />
         </View>
-        {showMoneyForm && <View style={styles.manualForm}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your pocket estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Savings pocket if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>}
-        {showPurchaseForm && <View style={styles.manualForm}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates this pocket estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>}
+        {showMoneyForm && <View style={styles.manualForm}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your set-aside estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Account if you want an available-to-spend estimate.' : `Estimated available before this change: ${money(reportedBalanceCents - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>}
+        {showPurchaseForm && <View style={styles.manualForm}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates your set-aside estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>}
         {error ? <Text style={styles.error}>{error}</Text> : null}
       </GoalEditor>}
-      {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your pocket as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); closeEditor(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
+      {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your set-aside balance as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); closeEditor(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
       <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Connect Apple Pay purchases ↗</Text><Text style={styles.hint}>Install the logging shortcut, then choose your card in Shortcuts.</Text></Pressable></Link>
     </>}
   </View>;

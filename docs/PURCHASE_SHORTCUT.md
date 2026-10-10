@@ -8,7 +8,7 @@ Apple still requires choosing a Wallet card and saving its Transaction automatio
 
 Returning from Shortcuts automatically moves to **Check your first purchase**. If iOS doesn't deliver a foreground event, **I saved the automation** does the same. Neither return nor confirmation is treated as proof that automation is enabled. Only a newly received shortcut purchase, timestamped after the check began, changes the card to **Purchase received**. Existing imports and manual entries do not count. This confirms an incoming purchase, not a verified Wallet connection. **Finish or change card setup** returns to the card guide. Starting the guide again does not disable or delete any iOS automation.
 
-The shortcut extracts the numeric Amount, Merchant and Currency Code, URL-encodes them and opens `gasfinder://import-purchase`. The app rejects non-USD currency, validates the amount and merchant, deduplicates repeat opens within the same minute when no source ID is supplied, records the purchase locally and applies the active goal's rule to the pocket estimate. It does not convert currencies or move bank funds. Unsupported purchases can still be logged in Edit goal.
+The shortcut extracts the numeric Amount, Merchant and Currency Code, URL-encodes them and opens `gasfinder://import-purchase`. The app rejects non-USD currency, validates the amount and merchant, deduplicates repeat opens within the same minute when no source ID is supplied, records the purchase locally and applies the active goal's rule to the set-aside estimate. It does not convert currencies or move bank funds. Unsupported purchases can still be logged in Account → Transactions or Edit goal.
 
 ## Maintaining the template
 
@@ -20,8 +20,8 @@ The shortcut extracts the numeric Amount, Merchant and Currency Code, URL-encode
 
 1. Import with the app button and inspect the encoding actions: Amount and Merchant must refer to Shortcut Input.
 2. Enable a Transaction automation for a USD Wallet card and pass its transaction input.
-3. After a real supported tap, verify merchant, actual amount and rule-based pocket change in Activity.
-4. Reopen the same link within the minute: one purchase and one pocket change only.
+3. After a real supported tap, verify merchant, actual amount and rule-based savings contribution in Account → Transactions.
+4. Reopen the same link within the minute: one purchase and one savings contribution only.
 5. Cancel installation, go back and retry; ensure no installed/enabled status appears. Check unavailable Shortcuts/file-sharing errors.
 6. Return from card setup, including cancellation: the guide waits for a purchase rather than declaring the automation connected. Reopen the page/app to check the saved guide step.
 7. Confirm a manual purchase and an old shortcut import cannot satisfy the new-purchase check. Change the instruction layout and check the older iOS route.

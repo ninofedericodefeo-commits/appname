@@ -9,7 +9,7 @@ export type Tab = 'index' | 'investment' | 'pocket' | 'subscriptions';
 const tabs = [
   { id: 'index', label: 'Gas' },
   { id: 'investment', label: 'Goals' },
-  { id: 'pocket', label: 'Pocket' },
+  { id: 'pocket', label: 'Account' },
   { id: 'subscriptions', label: 'Subs' },
 ] as const;
 

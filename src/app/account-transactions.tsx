@@ -3,28 +3,29 @@ import { Stack, router } from 'expo-router';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { LogPurchase } from '@/features/pocket/LogPurchase';
 import { TransactionRow } from '@/features/pocket/TransactionRow';
-import { pocketTransactions } from '@/features/pocket/transactions';
+import { filterTransactions, pocketTransactions } from '@/features/pocket/transactions';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 
 export default function AccountTransactionsScreen() {
-  const { accountTransactions, purchases } = usePocketStore();
+  const { accountTransactions, purchases, entries } = usePocketStore();
   const [query, setQuery] = useState('');
-  const [filter, setFilter] = useState<'all' | 'out' | 'in' | 'pending'>('all');
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases), [accountTransactions, purchases]);
-  const filtered = useMemo(() => transactions.filter((item) => (!query.trim() || `${item.title} ${item.accountLabel}`.toLowerCase().includes(query.trim().toLowerCase())) &&
-    (filter === 'all' || filter === 'in' && item.amountCents > 0 || filter === 'out' && item.amountCents < 0 || filter === 'pending' && item.status === 'pending')), [transactions, query, filter]);
-  const filters = [{ value: 'all', label: 'All' }, { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }, { value: 'pending', label: 'Pending' }] as const;
+  const [filter, setFilter] = useState<'all' | 'out' | 'in' | 'pending' | 'savings'>('all');
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries), [accountTransactions, purchases, entries]);
+  const filtered = useMemo(() => filterTransactions(transactions, query, filter), [transactions, query, filter]);
+  const filters = [{ value: 'all', label: 'All' }, { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }, { value: 'pending', label: 'Pending' }, { value: 'savings', label: 'Savings' }] as const;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <Stack.Screen options={{ title: 'Transactions' }} />
     <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <FlatList data={filtered} keyExtractor={(item) => item.id} initialNumToRender={12} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag" contentContainerStyle={styles.content}
         ListHeaderComponent={<View style={styles.header}>
           <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>Transactions</Text><Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/bank-import')}><Text style={styles.link}>Import</Text></Pressable></View>
+          <LogPurchase />
           <TextInput style={styles.search} placeholder="Search transactions" accessibilityLabel="Search transactions" value={query} onChangeText={setQuery} autoCorrect={false} returnKeyType="search" />
           <View style={styles.filters}>{filters.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: filter === item.value }} style={[styles.filter, filter === item.value && styles.selected]} onPress={() => setFilter(item.value)}><Text style={[styles.filterLabel, filter === item.value && styles.selectedLabel]}>{item.label}</Text></Pressable>)}</View>
-          <Text style={styles.note}>{filtered.length} transaction{filtered.length === 1 ? '' : 's'} · statement imports and logged purchases</Text>
+          <Text style={styles.note}>{filtered.length} transaction{filtered.length === 1 ? '' : 's'} · bank history, purchases and savings</Text>
         </View>}
         renderItem={({ item }) => <View style={styles.item}><TransactionRow transaction={item} /></View>}
         ItemSeparatorComponent={() => <View style={styles.separator} />}

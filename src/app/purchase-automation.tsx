@@ -153,10 +153,10 @@ export default function PurchaseAutomationScreen() {
           <Text style={styles.section}>{received ? 'Purchase received' : '3. Check your first purchase'}</Text>
           {received ? <>
             <Text style={styles.received}>{formatMoney(received.amountCents)} · {received.title}</Text>
-            <Text style={styles.body}>A purchase arrived from Shortcuts. Check that it matches your Wallet tap in Activity, along with any set-aside from your goal’s rule.</Text>
-            <Button label="Open Goals & Activity" onPress={() => router.navigate('/investment')} />
+            <Text style={styles.body}>A purchase arrived from Shortcuts. Check that it matches your Wallet tap in Transactions, along with any set-aside from your goal’s rule.</Text>
+            <Button label="Open Transactions" onPress={() => router.push('/account-transactions')} />
           </> : <>
-            <Text style={styles.body}>If you saved the Transaction automation, leave it enabled. After your next supported Apple Pay tap, the purchase will appear here and in Activity.</Text>
+            <Text style={styles.body}>If you saved the Transaction automation, leave it enabled. After your next supported Apple Pay tap, the purchase will appear here and in Transactions.</Text>
             <Text style={styles.waiting}>Waiting for a purchase from Shortcuts</Text>
             <Text style={styles.hint}>Coming back from Shortcuts does not confirm the automation is on. There’s no need to make a purchase just to test it.</Text>
           </>}

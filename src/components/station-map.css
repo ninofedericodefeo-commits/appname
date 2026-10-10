@@ -1,10 +1,15 @@
-.station-map-shell { position: relative; height: 370px; width: 100%; background: #E8EFDD; font-family: system-ui, sans-serif; }
+.station-map-shell { position: relative; height: 370px; width: 100%; background: #edf0e9; font-family: system-ui, sans-serif; }
 .station-map { height: 100%; width: 100%; }
-.station-pin { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 5px 9px; background: #173A35; color: #FFFEF9; border: 2px solid #FFFEF9; border-radius: 22px; box-shadow: 0 2px 7px #173A3540; font-weight: 800; font-size: 13px; }
-.station-pin.example { background: #FFFEF9; color: #61756B; border-color: #B9C8BA; }
-.station-pin.selected { background: #A63F21; color: #FFFEF9; border-color: #FFFEF9; }
-.map-message { position: absolute; z-index: 1100; left: 10px; right: 50px; top: 10px; padding: 10px; border-radius: 6px; background: #FFFEF9; color: #173A35; font-size: 12px; box-shadow: 0 2px 8px #173A3520; }
-.map-message button { min-height: 34px; border: 1px solid #B9C8BA; background: #E8EFDD; color: #173A35; border-radius: 4px; }
-.map-legend { position: absolute; left: 8px; bottom: 26px; z-index: 1000; background: #FFFEF9EE; color: #A33124; padding: 5px 8px; font-size: 10px; border-radius: 4px; pointer-events: none; }
-.station-map .leaflet-control-attribution { font-size: 10px; }
-.station-map .leaflet-control-zoom a { width: 40px; height: 40px; line-height: 40px; color: #173A35; }
+.station-pin { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-width: 52px; min-height: 44px; padding: 7px 12px; background: #fffef9; color: #173a35; border: 2px solid #173a35; border-radius: 22px; box-shadow: 0 3px 12px #173a3533; font: 800 14px system-ui, sans-serif; cursor: pointer; }
+.station-pin.unknown { border-color: #fffef9; }
+.station-pin.selected { background: #173a35; color: #fffef9; border-color: #fffef9; }
+.station-pin:focus-visible, .map-center:focus-visible { outline: 3px solid #2878d3; outline-offset: 3px; }
+.map-location { width: 14px; height: 14px; background: #2878d3; border: 3px solid white; border-radius: 50%; box-shadow: 0 0 0 8px #2878d326, 0 2px 5px #173a3540; }
+.map-center { position: absolute; z-index: 3; top: 112px; right: 12px; width: 44px; height: 44px; border: 0; border-radius: 14px; background: #fffef9; color: #173a35; box-shadow: 0 3px 12px #173a352b; font: 28px system-ui; cursor: pointer; }
+.map-message { position: absolute; z-index: 3; left: 12px; right: 70px; top: 12px; padding: 12px; border-radius: 12px; background: #fffef9; color: #173a35; font-size: 12px; box-shadow: 0 2px 8px #173a3520; }
+.map-message button { min-height: 44px; border: 0; background: #e8efdd; color: #173a35; border-radius: 7px; padding: 8px 12px; margin-top: 8px; }
+.map-legend { position: absolute; left: 8px; bottom: 28px; z-index: 2; background: #fffef9ee; color: #a33124; padding: 5px 8px; font-size: 10px; border-radius: 6px; pointer-events: none; }
+.station-map .maplibregl-ctrl-top-right { z-index: 3; top: 2px; right: 2px; }
+.station-map .maplibregl-ctrl-group { border-radius: 14px; overflow: hidden; box-shadow: 0 3px 12px #173a352b; background: #fffef9; }
+.station-map .maplibregl-ctrl-group button { width: 44px; height: 44px; }
+.station-map .maplibregl-ctrl-attrib { font-size: 10px; }

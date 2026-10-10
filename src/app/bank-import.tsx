@@ -139,10 +139,10 @@ export default function BankImportScreen() {
         <Text style={styles.section}>Bank log saved</Text>
         <Text style={styles.body}>{done.transactionsAdded.toLocaleString()} new bank transactions · {done.imported.toLocaleString()} purchases added for goals and subscriptions.</Text>
         {done.transactionsUpdated > 0 && <Text style={styles.hint}>{done.transactionsUpdated.toLocaleString()} bank transactions updated.</Text>}
-        <Text style={styles.body}>{formatMoney(done.savedCents)} added to the pocket estimate.</Text>
+        <Text style={styles.body}>{formatMoney(done.savedCents)} added to the set-aside estimate.</Text>
         {done.skipped > 0 && <Text style={styles.hint}>{done.skipped.toLocaleString()} duplicate or invalid rows weren’t added.</Text>}
-        <Button label="Open Pocket" onPress={() => router.navigate('/pocket')} />
-        <Button label="Back to Savings & Activity" onPress={() => router.navigate('/investment')} />
+        <Button label="Open Account" onPress={() => router.navigate('/pocket')} />
+        <Button label="Open savings goals" onPress={() => router.navigate('/investment')} />
         <Button label="Review subscription suggestions" onPress={() => router.navigate('/subscriptions')} />
         <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
       </View> : <>
@@ -198,7 +198,7 @@ export default function BankImportScreen() {
             </>}
           </View>}
           {!review.error && <View style={styles.card}>
-            <View style={styles.ruleRow}><Check checked={saveHistory} label="Save bank history to Pocket" onPress={() => setSaveHistory(!saveHistory)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>Save bank history to Pocket</Text><Text style={styles.hint}>{historyReview.rows.length.toLocaleString()} readable transactions, including deposits, transfers and fees.</Text></View></View>
+            <View style={styles.ruleRow}><Check checked={saveHistory} label="Save bank history to Account" onPress={() => setSaveHistory(!saveHistory)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>Save bank history to Account</Text><Text style={styles.hint}>{historyReview.rows.length.toLocaleString()} readable transactions, including deposits, transfers and fees.</Text></View></View>
             <Text style={styles.hint}>Bank history is separate from the purchases selected above. It won’t change your saved balance or apply a savings rule to deposits, transfers or fees.</Text>
             <Button label={`${showHistory ? 'Hide' : 'Review'} bank history`} secondary onPress={() => setShowHistory(!showHistory)} />
             {showHistory && <>{historyReview.rows.slice(0, historyLimit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.historyRow}>
@@ -214,7 +214,7 @@ export default function BankImportScreen() {
               <Check checked={applyRule} label="Apply current goal rule to imported purchases" onPress={() => setApplyRule(!applyRule)} />
               <View style={styles.transactionMain}><Text style={styles.transactionTitle}>Apply my goal’s rule</Text><Text style={styles.hint}>{ruleDescription(pocket.activeGoal.setAsideRule)}</Text></View>
             </View> : <Text style={styles.hint}>Create a goal later to use this spending history for savings suggestions.</Text>}
-            <Text style={styles.body}>{formatMoney(plan.savedCents)} will be added to the pocket estimate{applyRule ? ', capped by your goal and entered balance' : ''}.</Text>
+            <Text style={styles.body}>{formatMoney(plan.savedCents)} will be added to the set-aside estimate{applyRule ? ', capped by your goal and entered balance' : ''}.</Text>
             <Text style={styles.hint}>Account balances aren’t changed by this import. Money stays in your account.</Text>
             <Button label={selected.length ? `Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}` : 'Save bank history'} disabled={!canImport || !!review.error || !hydrated || busy} onPress={importSelected} />
           </View>

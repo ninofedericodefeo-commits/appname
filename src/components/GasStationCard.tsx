@@ -89,9 +89,8 @@ export function GasStationCard({
         </View>
 
         <View style={styles.priceCol}>
-          <Text style={[styles.price, !price && styles.examplePrice]}>{price ? formatFuelPrice(price.price) : '$9.99'}</Text>
-          <Text style={styles.priceLabel}>/gal</Text>
-          {!price && <Text style={styles.exampleTag}>EXAMPLE · NOT REAL</Text>}
+          <Text style={[styles.price, !price && styles.unknownPrice]}>{price ? formatFuelPrice(price.price) : '—'}</Text>
+          <Text style={styles.priceLabel}>{price ? '/gal' : 'No price yet'}</Text>
         </View>
       </View>
       {canOpenMaps && <View style={styles.mapActions}>
@@ -183,10 +182,9 @@ const styles = StyleSheet.create({
     color: colors.accentDark,
     fontVariant: ['tabular-nums'],
   },
+  unknownPrice: { color: colors.muted },
   priceLabel: {
     fontSize: 12,
     color: colors.muted,
   },
-  examplePrice: { color: colors.muted },
-  exampleTag: { marginTop: 4, color: colors.danger, fontSize: 9, fontWeight: '800', textAlign: 'right', maxWidth: 100 },
 });

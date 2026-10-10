@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyBankImport, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '../src/features/bank/importLogic.ts';
-import { linkAccountTransactions, mergeAccountTransactions, pocketTransactions } from '../src/features/pocket/transactions.ts';
+import { filterTransactions, linkAccountTransactions, mergeAccountTransactions, pocketTransactions } from '../src/features/pocket/transactions.ts';
 import { availableCents } from '../src/features/pocket/logic.ts';
 
 const now = new Date('2026-10-10T12:00:00');
@@ -93,4 +93,54 @@ test('Legacy purchase imports link to new bank history without adding charges or
   assert.equal(availableCents(first.state.reportedBalanceCents, first.state.reservedCents), 296099);
   assert.equal(availableCents(10000, 25000), -15000);
   assert.equal(availableCents(null, 25000), null);
+});
+
+test('Unified history retains purchase controls on linked and standalone rows without rewriting bank data', () => {
+  const original = purchase({ decision: 'saved', savedCents: 100 });
+  const movement = read('Date,Description,Amount\n10/08/2026,Bank coffee description,-5').rows[0];
+  const bank = { ...movement, linkedPurchaseId: original.id };
+  const edited = { ...original, title: 'Edited savings purchase', amountCents: 600 };
+  const manual = purchase({ id: 'manual-2', title: 'Lunch' });
+  const history = pocketTransactions([bank], [edited, manual]);
+  assert.equal(history.length, 2);
+  const linked = history.find((row) => row.id === bank.id);
+  assert.equal(linked.purchase, edited);
+  assert.equal(linked.title, 'Bank coffee description');
+  assert.equal(linked.amountCents, -500);
+  assert.equal(history.find((row) => row.id === manual.id).purchase, manual);
+  const afterDelete = pocketTransactions([bank], [manual]);
+  assert.equal(afterDelete.find((row) => row.id === bank.id).purchase, undefined);
+  assert.equal(afterDelete.length, 2);
+});
+
+test('Savings adjustments join chronological history, purchase contributions fold into their purchase, and deleted contributions survive', () => {
+  const logged = purchase();
+  const entries = [
+    { id: 'reserve', amountCents: 25000, createdAt: '2026-10-10T12:00:00Z', kind: 'reserve' },
+    { id: 'release', amountCents: 5000, createdAt: '2026-10-09T12:00:00Z', kind: 'release' },
+    { id: 'assign', amountCents: 20000, createdAt: '2026-10-07T12:00:00Z', kind: 'assign', goalId: 'goal' },
+    { id: 'purchase', amountCents: 100, createdAt: logged.purchasedAt, kind: 'reserve', purchaseId: logged.id },
+    { id: 'bad-amount', amountCents: -100, createdAt: logged.purchasedAt, kind: 'reserve' },
+    { id: 'bad-date', amountCents: 100, createdAt: 'invalid', kind: 'release' },
+  ];
+  const history = pocketTransactions([], [logged], entries);
+  assert.deepEqual(history.map((row) => row.id), ['savings-reserve', 'savings-release', logged.id, 'savings-assign']);
+  assert.equal(history[1].amountCents, -5000);
+  assert.ok(history.filter((row) => row.source === 'savings').every((row) => row.status === 'adjustment'));
+  assert.ok(pocketTransactions([], [], entries).some((row) => row.id === 'savings-purchase'));
+});
+
+test('History filters distinguish bank credits/debits/pending from internal savings and pending savings decisions', () => {
+  const bank = read('Date,Description,Amount,Status\n10/08/2026,Coffee,-5,Pending\n10/09/2026,Payroll,2000,Posted').rows;
+  const logged = purchase({ id: 'manual-2', decision: 'pending', title: 'Lunch' });
+  const history = pocketTransactions(bank, [logged], [
+    { id: 'reserve', amountCents: 25000, createdAt: '2026-10-10T12:00:00Z', kind: 'reserve' },
+    { id: 'release', amountCents: 5000, createdAt: '2026-10-09T12:00:00Z', kind: 'release' },
+  ]);
+  assert.deepEqual(filterTransactions(history, '', 'in').map((row) => row.title), ['Payroll']);
+  assert.equal(filterTransactions(history, '', 'out').length, 2);
+  assert.deepEqual(filterTransactions(history, '', 'pending').map((row) => row.title), ['Coffee']);
+  assert.equal(filterTransactions(history, '', 'savings').length, 2);
+  assert.equal(filterTransactions(history, ' checking ', 'all').length, 2);
+  assert.equal(filterTransactions(history, ' LUNCH ', 'out')[0].purchase, logged);
 });

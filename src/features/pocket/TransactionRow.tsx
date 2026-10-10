@@ -1,26 +1,31 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import PurchaseCard from '@/features/goals/PurchaseCard';
+import { usePocketStore } from '@/stores/pocketStore';
 import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 import type { PocketTransaction } from './transactions';
 
-const sourceNames = { 'citizens-pdf': 'Citizens statement', csv: 'Bank CSV', manual: 'Manually logged', shortcut: 'Apple Pay Shortcut' };
-const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported', logged: 'Logged' };
+const sourceNames = { 'citizens-pdf': 'Citizens statement', csv: 'Bank CSV', manual: 'Manually logged', shortcut: 'Apple Pay Shortcut', savings: 'Savings adjustment' };
+const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported', logged: 'Logged', adjustment: 'Local only' };
 
 export function TransactionRow({ transaction }: { transaction: PocketTransaction }) {
+  const purchases = usePocketStore((state) => state.purchases);
+  const activeGoal = usePocketStore((state) => state.activeGoal);
+  const adjustment = transaction.source === 'savings';
   const [expanded, setExpanded] = useState(false);
-  const incoming = transaction.amountCents > 0;
-  const amount = `${incoming ? '+' : '−'}${formatMoney(Math.abs(transaction.amountCents))}`;
+  const incoming = !adjustment && transaction.amountCents > 0;
+  const amount = `${adjustment ? '' : incoming ? '+' : '−'}${formatMoney(Math.abs(transaction.amountCents))}`;
   const date = new Date(transaction.occurredAt);
   const shortDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = transaction.title.replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 2).toUpperCase();
   return <View style={styles.container}>
     <Pressable accessibilityRole="button" accessibilityLabel={`${transaction.title}, ${amount}, ${shortDate}. ${expanded ? 'Hide' : 'Show'} transaction details`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <View style={[styles.avatar, incoming && styles.creditAvatar]}><Text style={styles.initials}>{incoming ? '+' : initials || '↗'}</Text></View>
+      <View style={[styles.avatar, incoming && styles.creditAvatar]}><Text style={styles.initials}>{adjustment ? '↔' : incoming ? '+' : initials || '↗'}</Text></View>
       <View style={styles.main}>
         <Text style={styles.title} numberOfLines={2}>{transaction.title}</Text>
-        <Text style={styles.meta}>{shortDate}{transaction.status === 'pending' ? ' · Pending' : ''}</Text>
+        <Text style={styles.meta}>{shortDate}{adjustment ? ' · Savings' : transaction.status === 'pending' ? ' · Pending' : transaction.purchase?.decision === 'pending' ? ' · Savings review' : ''}</Text>
       </View>
       <Text style={[styles.amount, incoming && styles.credit]}>{amount}</Text>
       <Text style={styles.chevron}>{expanded ? '⌄' : '›'}</Text>
@@ -29,6 +34,9 @@ export function TransactionRow({ transaction }: { transaction: PocketTransaction
       <Text style={styles.detailText}>{sourceNames[transaction.source]} · {statusNames[transaction.status]}</Text>
       {transaction.accountLabel ? <Text style={styles.detailText}>{transaction.accountLabel}</Text> : null}
       <Text style={styles.detailText}>{transaction.title}</Text>
+      {adjustment && <Text style={styles.detailText}>Changes what is set aside. Money stays in your bank account.</Text>}
+      {transaction.purchase && (transaction.purchase.title !== transaction.title || transaction.purchase.amountCents !== Math.abs(transaction.amountCents)) && <Text style={styles.detailText}>Savings record: {transaction.purchase.title} · {formatMoney(transaction.purchase.amountCents)}</Text>}
+      {transaction.purchase && <PurchaseCard purchase={transaction.purchase} history={purchases} goal={activeGoal} compact />}
       {transaction.status === 'recorded' && <Text style={styles.detailText}>Posting status wasn’t included in the export.</Text>}
     </View>}
   </View>;

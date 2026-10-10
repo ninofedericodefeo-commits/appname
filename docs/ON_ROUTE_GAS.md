@@ -1,8 +1,8 @@
 # Gas map and trip planning
 
-Gas opens in **Map**, with an optional **List** view. Select a price marker to see directions, reports and history. Stations arrive from the nearby search progressively. An unknown price is labeled `$9.99*` on the map and **EXAMPLE · NOT REAL** in its card; sample stations are labeled too. Neither fictional prices nor legacy investing data inform trip recommendations. Google-provider results, if configured, stay in List rather than being drawn on an OpenStreetMap basemap.
+Gas opens in **Map**, with an optional **List** view. Select a price marker to see directions, reports and history. Stations arrive from the nearby search progressively. Unknown prices say **Gas** on the map and **No price yet** in their card. The sample-data banner is removed. **Report a price** and **Gas on your drive** sit below the map. Google-provider results, if configured, stay in List rather than being drawn on an OpenStreetMap basemap; choose Nearby map inside Filters to return.
 
-The map uses bundled Leaflet 1.9.4 in an Expo DOM component, with react-native-webview on iOS/Android and normal DOM on web. Only visible OpenStreetMap tiles are requested, with attribution, native app identification, and normal HTTP caching; no prefetch or offline download. `EXPO_PUBLIC_MAP_TILE_URL` can override the tile endpoint (choose a provider permitting this usage and retain required attribution). No Google map key or paid API is needed. Public tiles, OSRM routing and Overpass station lookup require internet and are best-effort services.
+The map uses bundled MapLibre GL JS 6.13.0 in an Expo DOM component, with react-native-webview on iOS/Android and normal DOM on web. OpenFreeMap's Positron style provides vector streets, labels and water with required OpenFreeMap/OpenMapTiles/OpenStreetMap attribution. Price pills, numbered route stops, a blue location dot, zoom controls, recentering and a blue drive route are supported. Selection and price updates preserve the user's map position; a new location or route fits the results. Empty routes clear the route line. The matching module worker is loaded from the pinned official package on UNPKG. OpenFreeMap public hosting is free with no key, registration or billing account. No prefetch or offline download is added. `EXPO_PUBLIC_MAP_TILE_URL` is no longer used. Internet/WebGL are required; loading failures offer Retry and the station List remains available. Public map hosting, OSRM routing and Overpass station lookup are best-effort services.
 
 ## Save cars once
 
@@ -62,7 +62,8 @@ References:
 - https://docs.expo.dev/guides/dom-components/
 - https://developer.apple.com/documentation/mapkit/unified-map-urls
 - https://developers.google.com/maps/documentation/urls/get-started
-- https://operations.osmfoundation.org/policies/tiles/
+- https://openfreemap.org/quick_start/
+- https://maplibre.org/maplibre-gl-js/docs/
 
 ## Keyboard handling
 
@@ -93,3 +94,8 @@ Use EAS development builds once an enrolled developer account and EAS profiles a
 - iOS, Android and web bundles export; lint and TypeScript pass.
 - Mobile web preview: destination-first form, saved refill preference after reload and invalid refill input checked. Native keyboard behavior and Maps app handoff still require the physical-phone checks below.
 - A live 533-mile Philadelphia-to-Charlotte route with a 25%-full estimated Subaru and 10% refill level returned Flying J near mile 45 and BP near mile 343. The primary station lookup returned HTTP 504; the backup succeeded. These are mapped stations with unknown prices, not verified road access or pump prices.
+
+### Account/Gas cleanup verification (October 10, 2026)
+
+- MapLibre/OpenFreeMap Positron loads in the mobile web preview without a key. Synthetic Philadelphia points verify priced/unknown numbered markers, selected state, price updates with unchanged camera, route line clearing, zoom and recenter. Gas has no sample-data banner; both gas actions sit below the map.
+- Lint, TypeScript, 113 logic tests and iOS/Android/web exports pass. Installed iPhone/Android status-bar positioning, WebGL/module-worker loading, offline Retry, pinch zoom and scrolling remain physical-device checks.

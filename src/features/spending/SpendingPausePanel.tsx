@@ -111,7 +111,7 @@ export default function SpendingPausePanel() {
     if (pendingBought.waiting) recordOutcome(pendingBought.id, 'bought');
     Keyboard.dismiss();
     setPendingBought(null);
-    router.navigate('/investment');
+    router.push('/account-transactions');
   }
 
   return (

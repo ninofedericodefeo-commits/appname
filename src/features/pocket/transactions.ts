@@ -13,8 +13,10 @@ export type AccountTransaction = {
 };
 
 export type PocketTransaction = Omit<AccountTransaction, 'source' | 'status'> & {
-  source: AccountTransaction['source'] | 'manual' | 'shortcut';
-  status: AccountTransaction['status'] | 'logged';
+  source: AccountTransaction['source'] | 'manual' | 'shortcut' | 'savings';
+  status: AccountTransaction['status'] | 'logged' | 'adjustment';
+  purchase?: LoggedPurchase;
+  adjustmentKind?: SavingsAdjustment['kind'];
 };
 
 export function mergeAccountTransactions(existing: AccountTransaction[], incoming: AccountTransaction[], now = new Date()) {
@@ -40,23 +42,33 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
   return { transactions: [...transactions.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated };
 }
 
-export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[]): PocketTransaction[] {
+export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
+
+export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = []): PocketTransaction[] {
   const linked = new Set(bank.map((item) => item.linkedPurchaseId).filter(Boolean));
   const seen = new Set(bank.map((item) => item.id));
-  const rows: PocketTransaction[] = [...bank];
+  const byPurchase = new Map(purchases.map((item) => [item.id, item]));
+  const rows: PocketTransaction[] = bank.map((item) => ({ ...item, purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
   for (const purchase of purchases) {
     if (linked.has(purchase.id) || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 || !Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
     seen.add(purchase.id);
     rows.push({ id: purchase.id, title: purchase.title, amountCents: -purchase.amountCents, occurredAt: purchase.purchasedAt,
       source: purchase.source === 'bank-import' ? purchase.bankSource ?? 'csv' : purchase.source === 'shortcut' ? 'shortcut' : 'manual',
       status: purchase.bankSource === 'citizens-pdf' ? 'posted' : purchase.source === 'bank-import' ? 'recorded' : 'logged',
-      accountLabel: purchase.bankAccountLabel ?? '' });
+      accountLabel: purchase.bankAccountLabel ?? '', purchase });
+  }
+  for (const item of adjustments) {
+    // The purchase detail already shows the savings contribution for this entry.
+    if (item.purchaseId && byPurchase.has(item.purchaseId)) continue;
+    if (!Number.isSafeInteger(item.amountCents) || item.amountCents <= 0 || !Number.isFinite(Date.parse(item.createdAt))) continue;
+    rows.push({ id: `savings-${item.id}`, title: item.kind === 'assign' ? 'Assigned savings to goal' : item.kind === 'reserve' ? 'Money set aside' : 'Set-aside reduced',
+      amountCents: item.kind === 'release' ? -item.amountCents : item.amountCents, occurredAt: item.createdAt, source: 'savings', status: 'adjustment', accountLabel: '', adjustmentKind: item.kind });
   }
   return rows.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
 }
 
 // A bank movement and its savings purchase describe the same charge. Keep the
-// bank row in Pocket while preserving the purchase in Goals and subscriptions.
+// bank row in Account while preserving the purchase for savings and subscriptions.
 export function linkAccountTransactions<T extends AccountTransaction & { rowNumber: number }>(
   movements: T[], purchases: { rowNumber: number; id: string; duplicate: 'known' | 'possible' | null; matchId?: string }[], selectedIds: Set<string>,
 ): T[] {
@@ -66,4 +78,10 @@ export function linkAccountTransactions<T extends AccountTransaction & { rowNumb
     const linkedPurchaseId = purchase && (selectedIds.has(purchase.id) || purchase.duplicate === 'known' ? purchase.id : purchase.matchId);
     return linkedPurchaseId ? { ...item, linkedPurchaseId } : item;
   });
+}
+
+export function filterTransactions(rows: PocketTransaction[], query: string, filter: 'all' | 'out' | 'in' | 'pending' | 'savings') {
+  const search = query.trim().toLowerCase();
+  return rows.filter((item) => (!search || `${item.title} ${item.accountLabel}`.toLowerCase().includes(search)) &&
+    (filter === 'all' || filter === 'savings' && item.source === 'savings' || filter === 'in' && item.source !== 'savings' && item.amountCents > 0 || filter === 'out' && item.source !== 'savings' && item.amountCents < 0 || filter === 'pending' && item.status === 'pending'));
 }
