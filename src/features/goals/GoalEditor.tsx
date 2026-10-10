@@ -81,7 +81,7 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
   return <View style={styles.card}>
     <Text style={styles.section}>{goal ? 'Edit goal' : product ? 'Review your product goal' : 'Set your goal'}</Text>
     {product && <View style={styles.productPreview}>
-      <Text style={styles.label}>AMAZON · USD · ENTERED BY YOU</Text>
+      <Text style={styles.label}>AMAZON · USD · {product.priceSource === 'amazon-page' && previewCents === product.priceCents && variant.trim() === product.variant ? 'PRICE FROM AMAZON' : 'ENTERED BY YOU'}</Text>
       <Text style={styles.productTitle}>{title.trim() || 'Add the product name below'}</Text>
       {variant.trim() ? <Text style={styles.hint}>{variant.trim()}</Text> : null}
       <Text style={styles.productPrice}>{previewCents ? money(previewCents) : 'Enter the price you see on Amazon'}</Text>
@@ -90,14 +90,14 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
         if (link) void Linking.openURL(link.sourceUrl).catch(() => setError('Could not open Amazon. Copy the source link and open it in your browser.'));
       }}><Text style={styles.linkText}>Open product on Amazon ↗</Text></Pressable>
       <Text selectable style={styles.sourceUrl}>{product.sourceUrl}</Text>
-      {product.priceReadAt && <Text style={styles.hint}>Target entered {new Date(product.priceReadAt).toLocaleDateString()}. Check Amazon for the current price.</Text>}
+      {product.priceReadAt && <Text style={styles.hint}>{product.priceSource === 'amazon-page' ? 'Price read' : 'Target entered'} {new Date(product.priceReadAt).toLocaleDateString()}. Check Amazon for the current price.</Text>}
     </View>}
     <Text style={styles.label}>Title</Text>
     <TextInput style={styles.input} value={title} onChangeText={setTitle} placeholder="What are you saving for?" maxLength={80} accessibilityLabel="Goal title" />
     {product && <><Text style={styles.label}>Variant (optional)</Text><TextInput style={styles.input} value={variant} onChangeText={setVariant} placeholder="Size, color or model" maxLength={120} accessibilityLabel="Product variant" /></>}
     <Text style={styles.label}>{product ? 'Price / savings target (USD)' : 'Target amount'}</Text>
     <TextInput style={styles.input} value={target} onChangeText={setTarget} placeholder={product ? 'Enter the full USD price' : '500.00'} keyboardType="decimal-pad" accessibilityLabel="Goal target amount" />
-    {product && <Text style={styles.hint}>Enter the full price for the variant you want, rather than a monthly payment or a “from” price. Add tax and shipping if you want to save for them too.</Text>}
+    {product && <Text style={styles.hint}>Check the full price for your selected option. Tax and shipping are not included in the imported price; add them to your target if needed.</Text>}
     <Text style={styles.label}>Set aside after each purchase</Text>
     <View style={styles.row}><Choice label="Fixed amount" selected={ruleMode === 'fixed'} onPress={() => setRuleMode('fixed')} /><Choice label="Percent" selected={ruleMode === 'percent'} onPress={() => setRuleMode('percent')} /><Choice label="Round up" selected={ruleMode === 'round'} onPress={() => setRuleMode('round')} /></View>
     {ruleMode === 'fixed' && <TextInput style={styles.input} value={fixedAmount} onChangeText={setFixedAmount} placeholder="1.00" keyboardType="decimal-pad" accessibilityLabel="Fixed dollars per purchase" />}

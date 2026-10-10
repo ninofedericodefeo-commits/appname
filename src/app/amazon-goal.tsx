@@ -6,7 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { amazonProductDraft, parseAmazonLink } from '@/features/goals/amazonLink';
-import type { AmazonProductDraft } from '@/features/goals/amazonLink';
+import type { AmazonLink, AmazonProductDraft } from '@/features/goals/amazonLink';
+import AmazonProductLookup from '@/features/goals/AmazonProductLookup';
 import GoalEditor from '@/features/goals/GoalEditor';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -24,16 +25,25 @@ export default function AmazonGoalScreen() {
   const [link, setLink] = useState('');
   const [draft, setDraft] = useState<AmazonProductDraft | null>(null);
   const [busy, setBusy] = useState(false);
+  const [lookup, setLookup] = useState<{ link: AmazonLink; id: number } | null>(null);
+  const [lookupMessage, setLookupMessage] = useState('');
   const [error, setError] = useState('');
   const [editingCurrent, setEditingCurrent] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
 
+  function leave() {
+    request.current++; setLookup(null); setBusy(false);
+    Keyboard.dismiss(); router.navigate('/investment');
+  }
+
   function review(text: string) {
+    const id = ++request.current;
+    setBusy(false); setLookup(null); setDraft(null); setLookupMessage('');
     const parsed = parseAmazonLink(text);
     if (!parsed.value) { setError(parsed.error); setDraft(null); return; }
-    setDraft(amazonProductDraft(parsed.value)); setError(''); Keyboard.dismiss();
+    setLookup({ link: parsed.value, id }); setError(''); Keyboard.dismiss();
   }
 
   async function paste() {
@@ -43,6 +53,7 @@ export default function AmazonGoalScreen() {
       const text = await Clipboard.getStringAsync();
       if (current !== request.current) return;
       setLink(text.slice(0, 2048));
+      setBusy(false);
       review(text);
     } catch {
       if (current === request.current) setError('Could not read the clipboard. Paste your Amazon link into the field instead.');
@@ -55,7 +66,7 @@ export default function AmazonGoalScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>SAVINGS GOALS</Text>
       <Text style={styles.title}>Goal from link</Text>
-      <Text style={styles.body}>Save toward something you found on Amazon.</Text>
+      <Text style={styles.body}>Paste an Amazon link to fill in the product name and price.</Text>
       {!ready ? <View style={styles.row}><ActivityIndicator color={colors.primary} /><Text style={styles.body}>Loading your goals…</Text></View> : activeGoal ? <>
         <View style={styles.card}>
           <Text style={styles.heading}>You have an active goal</Text>
@@ -73,32 +84,41 @@ export default function AmazonGoalScreen() {
         </View>
         {editingCurrent && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onCancel={() => setEditingCurrent(false)} onSave={(input) => {
           const saved = updateGoal(input);
-          if (saved) { Keyboard.dismiss(); router.navigate('/investment'); }
+          if (saved) leave();
           return saved;
         }} />}
       </> : <>
         {!draft ? <View style={styles.card}>
           <Text style={styles.heading}>Paste an Amazon product link</Text>
-          <TextInput accessibilityLabel="Amazon product link" value={link} onChangeText={(text) => { request.current++; setBusy(false); setLink(text); setError(''); }} style={styles.input} placeholder="https://www.amazon.com/dp/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" maxLength={2048} onSubmitEditing={() => review(link)} />
-          <View style={styles.row}><Button label={busy ? 'Reading clipboard…' : 'Paste link'} secondary disabled={busy} onPress={() => void paste()} /><Button label="Review link" disabled={busy} onPress={() => review(link)} /></View>
+          <TextInput accessibilityLabel="Amazon product link" value={link} onChangeText={(text) => { request.current++; setBusy(false); setLookup(null); setLink(text); setError(''); }} style={styles.input} placeholder="https://www.amazon.com/dp/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" maxLength={2048} onSubmitEditing={() => review(link)} />
+          <View style={styles.row}><Button label={busy ? 'Reading clipboard…' : 'Paste link'} secondary disabled={busy || !!lookup} onPress={() => void paste()} /><Button label="Get product details" disabled={busy || !!lookup} onPress={() => review(link)} /></View>
+          {lookup && <View style={styles.notice}>
+            <View style={styles.row}><ActivityIndicator color={colors.primary} /><Text accessibilityLiveRegion="polite" style={styles.body}>Reading the product name and price…</Text></View>
+            <Text style={styles.hint}>This can take a few seconds. You can review and edit the details before creating a goal.</Text>
+            <View style={styles.row}><Button label="Enter details manually" secondary onPress={() => { request.current++; setDraft(amazonProductDraft(lookup.link)); setLookup(null); setLookupMessage('Enter the product name and full USD price you see on Amazon.'); }} /><Button label="Cancel lookup" secondary onPress={() => { request.current++; setLookup(null); }} /></View>
+          </View>}
           <Text style={styles.hint}>Supports amazon.com products and a.co short links. Clipboard access happens only when you tap Paste link.</Text>
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
         </View> : <>
           <View style={styles.notice}>
-            <Text style={styles.heading}>Add the details you see on Amazon</Text>
-            <Text style={styles.hint}>{draft.asin ? 'Your product link is ready.' : 'Your short link is saved. Open it on Amazon to check the item and currency.'} Product names and prices are entered by you. USD only.</Text>
-            <Button label="Change link" secondary onPress={() => { setDraft(null); setError(''); }} />
+            <Text style={styles.heading}>{draft.priceSource === 'amazon-page' ? 'Product details filled in' : 'Check the product details'}</Text>
+            <Text accessibilityLiveRegion="polite" style={styles.hint}>{lookupMessage || 'Review the name, selected option and full USD price before saving. Tax and shipping are not included.'}</Text>
+            <View style={styles.row}><Button label="Change link" secondary onPress={() => { request.current++; setDraft(null); setError(''); }} /><Button label="Retry lookup" secondary onPress={() => review(link)} /></View>
           </View>
-          <GoalEditor key={draft.sourceUrl} goal={null} draft={draft} reservedCents={reservedCents} onCancel={() => { Keyboard.dismiss(); router.navigate('/investment'); }} onSave={(input, assignAll) => {
+          <GoalEditor key={draft.sourceUrl} goal={null} draft={draft} reservedCents={reservedCents} onCancel={leave} onSave={(input, assignAll) => {
             if (!ready) return false;
             const saved = createGoal(input, assignAll);
-            if (saved) { Keyboard.dismiss(); router.navigate('/investment'); }
+            if (saved) leave();
             return saved;
           }} />
         </>}
       </>}
-      <Button label="Back to Goals" secondary onPress={() => { Keyboard.dismiss(); router.navigate('/investment'); }} />
+      <Button label="Back to Goals" secondary onPress={leave} />
     </FormScrollView>
+    {ready && !activeGoal && lookup && <AmazonProductLookup key={lookup.id} link={lookup.link} onResult={(result) => {
+      if (lookup.id !== request.current) return;
+      setDraft(result.draft); setLookupMessage(result.message ?? ''); setLookup(null);
+    }} />}
   </SafeAreaView>;
 }
 

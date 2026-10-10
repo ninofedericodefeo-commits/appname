@@ -8,12 +8,12 @@ export type AmazonProductDraft = {
   currency: 'USD';
   priceCents: number | null;
   priceReadAt: string | null;
-  priceSource: 'manual';
+  priceSource: 'manual' | 'amazon-page';
 };
 
 export type AmazonProductGoal = AmazonProductDraft & { priceCents: number; priceReadAt: string };
 
-// Parse locally. Short links are retained without fetching or following redirects.
+// Parse locally before any network request. Lookup resolves short links separately.
 export function parseAmazonLink(input: string): { value: AmazonLink; error?: never } | { value?: never; error: string } {
   const text = input.trim();
   if (!text || text.length > 2048 || /[\s\\\x00-\x1f\x7f]/.test(text)) return { error: 'Paste one Amazon product link.' };
@@ -45,14 +45,16 @@ export function validAmazonProductGoal(product: AmazonProductGoal) {
   const link = parseAmazonLink(product.sourceUrl).value;
   return !!link && link.sourceUrl === product.sourceUrl && link.asin === product.asin &&
     validText(product.title, 80, true) && validText(product.variant, 120) && product.currency === 'USD' &&
-    product.priceSource === 'manual' && Number.isSafeInteger(product.priceCents) && product.priceCents > 0 && product.priceCents <= 100_000_000 &&
+    (product.priceSource === 'manual' || (product.priceSource === 'amazon-page' && link.kind === 'product')) && Number.isSafeInteger(product.priceCents) && product.priceCents > 0 && product.priceCents <= 100_000_000 &&
     typeof product.priceReadAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(product.priceReadAt) && Number.isFinite(Date.parse(product.priceReadAt));
 }
 
 export function confirmAmazonProduct(draft: AmazonProductDraft, title: string, priceCents: number, variant: string, now = new Date()): AmazonProductGoal | null {
+  const unchangedOffer = draft.priceCents === priceCents && draft.variant === variant.trim();
   const product: AmazonProductGoal = {
     ...draft, title: title.trim(), variant: variant.trim(), priceCents,
-    priceReadAt: draft.priceCents === priceCents && draft.priceReadAt ? draft.priceReadAt : now.toISOString(),
+    priceSource: unchangedOffer ? draft.priceSource : 'manual',
+    priceReadAt: unchangedOffer && draft.priceReadAt ? draft.priceReadAt : now.toISOString(),
   };
   return validAmazonProductGoal(product) ? product : null;
 }

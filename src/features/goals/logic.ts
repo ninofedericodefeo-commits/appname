@@ -69,6 +69,7 @@ export function editGoalFromInput(goal: Goal, input: GoalInput): Goal | null {
   // Retain the source when older callers edit an existing product goal.
   const product = input.product ?? (goal.product ? {
     ...goal.product, title: input.title.trim(), priceCents: input.targetCents,
+    priceSource: goal.product.priceCents === input.targetCents ? goal.product.priceSource : 'manual' as const,
     priceReadAt: goal.product.priceCents === input.targetCents ? goal.product.priceReadAt : new Date().toISOString(),
   } : undefined);
   return {

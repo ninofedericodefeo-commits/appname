@@ -33,7 +33,7 @@ That is a useful foundation for testing the experience, but simulated values mus
 
 ## Amazon links as goals
 
-The initial local paste → manually entered product/price preview → editable goal → confirmation flow is implemented. Direct Amazon product links and a.co short links are supported, with the existing goal deadline, savings rule and pocket assignment controls. Next, explore an optional Safari helper and verify permitted extraction before considering an eligible product API. Automatic lookup is not enabled. Implementation status and acceptance checks are in [Amazon goals plan](docs/AMAZON_GOALS_PLAN.md).
+The paste → automatic product name/full USD price → editable preview → confirmed goal flow is implemented for public Amazon pages. Direct product links and a.co redirects are validated; blocked or unclear prices offer retry/manual entry. Existing deadline, savings rule and pocket assignment controls are reused. Native reads the page in a temporary WebView; production web requires the exported API server. The live server check returned an Amazon service error; real iPhone/Android extraction still needs verification. Images and an optional shared-page helper remain future work. Implementation status and acceptance checks are in [Amazon goals plan](docs/AMAZON_GOALS_PLAN.md).
 
 ## Product principles
 
