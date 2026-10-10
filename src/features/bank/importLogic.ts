@@ -4,14 +4,14 @@ import { parseDollars } from '../pocket/logic.ts';
 
 export const MAX_CSV_BYTES = 2_000_000;
 export const MAX_CSV_ROWS = 5000;
-export type BankCSV = { headers: string[]; rows: string[][]; headerRow?: number };
+export type BankCSV = { headers: string[]; rows: string[][]; headerRow?: number; source?: 'citizens-pdf'; locations?: { page: number; line: number }[] };
 export type BankMapping = {
   date: number; description: number; amount: number; debit: number; credit: number;
   currency: number; type: number; status: number; transactionId: number;
   mode: 'signed' | 'debit-credit'; spendingSign: 'negative' | 'positive'; dateOrder: 'mdy' | 'dmy';
 };
-export type BankPurchase = { id: string; title: string; amountCents: number; purchasedAt: string };
-export type BankPreviewRow = BankPurchase & { rowNumber: number; duplicate: 'known' | 'possible' | null; matchTitle?: string };
+export type BankPurchase = { id: string; title: string; amountCents: number; purchasedAt: string; bankSource?: 'csv' | 'citizens-pdf'; bankAccountLabel?: string; recurringHint?: boolean };
+export type BankPreviewRow = BankPurchase & { rowNumber: number; pageNumber?: number; lineNumber?: number; duplicate: 'known' | 'possible' | null; matchTitle?: string };
 export type ImportEntry = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 export type BankImportState = {
   activeGoal: Goal | null; reservedCents: number; reportedBalanceCents: number | null;
@@ -120,7 +120,7 @@ function dayKey(iso: string) {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-// Two 32-bit hashes form a stable local identity. The original CSV and account
+// Two 32-bit hashes form a stable local identity. The original bank file and account
 // number are not persisted. Repeated equal purchases use an occurrence index.
 function identity(value: string) {
   let a = 2166136261, b = 5381;
@@ -146,7 +146,7 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
     if (get(mapping.status).toLowerCase().includes('pending')) { exclude('Pending transaction'); return; }
     if (mapping.currency >= 0 && !['USD', 'US DOLLAR', 'US DOLLARS'].includes(get(mapping.currency).toUpperCase())) { exclude('Currency is not USD'); return; }
     const type = normalize(get(mapping.type));
-    if (/^(credit|deposit|refund|transfer|payment|payment received|credit card payment|card payment|balance payment)$/.test(type)) { exclude('Credit, refund, payment or transfer'); return; }
+    if (/^(credit|deposit|refund|transfer|payment|payment received|credit card payment|card payment|balance payment|fee)$/.test(type)) { exclude('Credit, refund, payment, transfer or fee'); return; }
     let amountCents: number | null;
     if (mapping.mode === 'debit-credit') {
       const raw = get(mapping.debit);
@@ -174,7 +174,10 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
     const duplicate = known.has(id) ? 'known' : match ? 'possible' : null;
     // Duplicate bank IDs in one file are never selected twice.
     known.add(id);
-    rows.push({ id, title: description.slice(0, 80), amountCents, purchasedAt, rowNumber, duplicate, matchTitle: match?.title });
+    rows.push({ id, title: description.slice(0, 80), amountCents, purchasedAt, rowNumber, duplicate, matchTitle: match?.title,
+      bankSource: csv.source ?? 'csv', bankAccountLabel: accountLabel.trim(), recurringHint: /\brecurring\b/i.test(description),
+      ...(csv.locations?.[index] ? { pageNumber: csv.locations[index].page, lineNumber: csv.locations[index].line } : {}),
+    });
   });
   return { rows, excluded };
 }

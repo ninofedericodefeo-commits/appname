@@ -22,7 +22,7 @@ export default function ActivityPanel() {
 
   return <View style={styles.content}>
     <View>
-      <View style={styles.header}><Text accessibilityRole="header" style={styles.heading}>Activity</Text><IconButton icon="upload" label="Import bank CSV" onPress={() => router.push('/bank-import')} /></View>
+      <View style={styles.header}><Text accessibilityRole="header" style={styles.heading}>Activity</Text><IconButton icon="upload" label="Import bank PDF or CSV" onPress={() => router.push('/bank-import')} /></View>
       <Text style={styles.hint}>Pocket estimate: {money(reservedCents)}</Text>
     </View>
     <View style={styles.group}>
@@ -30,7 +30,7 @@ export default function ActivityPanel() {
       {purchases.length === 0 && <View style={styles.emptyCard}>
         <View style={styles.header}><Text style={styles.placeholderTitle}>Purchase</Text><Text style={styles.placeholderAmount}>—</Text></View>
         <Text style={styles.hint}>Date · Source · Set aside</Text>
-        <Text style={styles.emptyHint}>No purchases yet. Connect Apple Pay, import a bank CSV, or log one in Edit goal.</Text>
+        <Text style={styles.emptyHint}>No purchases yet. Connect Apple Pay, import a bank PDF or CSV, or log one in Edit goal.</Text>
       </View>}
       {orderedPurchases.slice(0, purchaseLimit).map((purchase) => <PurchaseCard key={purchase.id} purchase={purchase} history={purchases} goal={activeGoal} />)}
       {purchaseLimit < purchases.length && <More label="Show more purchases" onPress={() => setPurchaseLimit((limit) => limit + 5)} />}

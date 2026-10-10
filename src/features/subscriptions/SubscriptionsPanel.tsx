@@ -1,7 +1,11 @@
 import { formatAmount, formatMoney } from '@/lib/money';
 import { parseDollars } from '@/features/pocket/logic';
 import { colors } from '@/theme';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { Link } from 'expo-router';
+import { usePocketStore } from '@/stores/pocketStore';
+import { suggestBankSubscriptions } from './bankSuggestions';
+import type { BankSubscriptionSuggestion } from './bankSuggestions';
 import { AppState, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey as calendarDateKey } from '@/components/CalendarDateField';
@@ -14,8 +18,14 @@ const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
 function nextLeapYear(start: number) { let year = start; while (new Date(year, 1, 29).getMonth() !== 1) year++; return year; }
 
 export default function SubscriptionsPanel() {
-  const { subscriptions, remindersEnabled, setRemindersEnabled, saveSubscription, setActive, review, removeSubscription } = useSubscriptionStore();
+  const { subscriptions, remindersEnabled, setRemindersEnabled, saveSubscription, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions } = useSubscriptionStore();
+  const purchases = usePocketStore((state) => state.purchases);
+  const pocketReady = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
+  const subsReady = useSyncExternalStore(useSubscriptionStore.persist.onFinishHydration, useSubscriptionStore.persist.hasHydrated, () => false);
   const [today, setToday] = useState(() => new Date());
+  const [bankSuggestion, setBankSuggestion] = useState<BankSubscriptionSuggestion | null>(null);
+  const [suggestionLimit, setSuggestionLimit] = useState(5);
+  const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(purchases, subscriptions, dismissedBankSuggestions, today) : [], [purchases, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
   const [cadence, setCadence] = useState<Subscription['cadence']>('monthly');
@@ -54,11 +64,13 @@ export default function SubscriptionsPanel() {
     setDay('1');
     setMonth(1);
     setEditingId(null);
+    setBankSuggestion(null);
     setShowForm(false);
     setError('');
   }
 
   function save() {
+    if (!subsReady) return;
     const trimmedName = name.trim();
     const amountCents = parseDollars(amount) ?? NaN;
     const billingDay = Number(day);
@@ -69,13 +81,14 @@ export default function SubscriptionsPanel() {
     if (!/^\d+$/.test(day.trim()) || !Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31) {
       return setError('Enter a renewal day from 1 to 31.');
     }
-    saveSubscription({ name: trimmedName, amountCents, cadence, day: billingDay, month }, editingId ?? undefined);
+    saveSubscription({ name: trimmedName, amountCents, cadence, day: billingDay, month, ...(bankSuggestion ? { bankMerchantKey: bankSuggestion.merchantKey } : {}) }, editingId ?? undefined);
     resetForm();
   }
 
   function edit(subscription: Subscription) {
     setShowForm(true);
     setEditingId(subscription.id);
+    setBankSuggestion(null);
     setName(subscription.name);
     setAmount(formatAmount(subscription.amountCents));
     setCadence(subscription.cadence);
@@ -137,10 +150,54 @@ export default function SubscriptionsPanel() {
     );
   }
 
+  const form = showForm ? (
+    <View style={styles.card}>
+      <Text style={styles.sectionTitle}>{editingId ? 'Edit subscription' : 'Add a subscription'}</Text>
+      {bankSuggestion && <Text style={styles.bodyText}>From bank history. Price and renewal date are estimates from posted charges. Confirm them with the provider before adding.</Text>}
+      <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name, such as Music" accessibilityLabel="Subscription name" maxLength={80} />
+      <TextInput style={styles.input} value={amount} onChangeText={setAmount} placeholder="Renewal price in dollars" accessibilityLabel="Renewal price" keyboardType="decimal-pad" />
+      <Text style={styles.fieldLabel}>Renews</Text>
+      <View style={styles.actions}>
+        {(['monthly', 'yearly'] as const).map((value) => (
+          <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: cadence === value }} style={[styles.choice, cadence === value && styles.choiceActive]} onPress={() => setCadence(value)}>
+            <Text style={[styles.choiceLabel, cadence === value && styles.choiceActiveLabel]}>{value === 'monthly' ? 'Every month' : 'Every year'}</Text>
+          </Pressable>
+        ))}
+      </View>
+      <CalendarDateField key={`${editingId ?? 'new'}-${cadence}-${recurrenceDate}`} label="Renewal date" value={recurrenceDate} displayValue={cadence === 'monthly' ? `Day ${day} of each month` : `${monthNames[month - 1]} ${day} each year`} onChange={(date) => { const [, selectedMonth, selectedDate] = date.split('-').map(Number); setDay(String(selectedDate)); setMonth(selectedMonth); }} />
+      <Text style={styles.smallNote}>For months without that day, the renewal is shown on the last day of the month.</Text>
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <Pressable accessibilityRole="button" style={styles.saveButton} onPress={save}><Text style={styles.saveLabel}>{editingId ? 'Save changes' : 'Add subscription'}</Text></Pressable>
+      {(editingId || bankSuggestion) && <Pressable accessibilityRole="button" style={styles.cancelEdit} onPress={resetForm}><Text style={styles.textButtonLabel}>Cancel</Text></Pressable>}
+    </View>
+  ) : null;
+
   return (
     <View style={styles.content}>
       <Text style={styles.title}>Subscriptions & pause</Text>
       <Text style={styles.intro}>Review renewals and give new purchases time before you buy.</Text>
+
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>From bank history ({suggestions.length})</Text>
+        <Text style={styles.bodyText}>Import statements to find recurring charges. Review each suggestion before adding it.</Text>
+        <Link href="/bank-import" style={styles.textButtonLabel}>Import bank PDF or CSV</Link>
+        {(bankSuggestion ? suggestions.filter((suggestion) => suggestion.key === bankSuggestion.key) : suggestions.slice(0, suggestionLimit)).map((suggestion) => <View key={suggestion.key} style={styles.reviewRow}>
+          <View style={styles.rowBetween}><Text style={styles.subscriptionName}>{suggestion.name}</Text><Text style={styles.subscriptionAmount}>{formatMoney(suggestion.amountCents)}</Text></View>
+          <Text style={styles.meta}>{suggestion.confidence === 'repeated' ? `Repeats ${suggestion.cadence}` : 'Possible subscription · one charge'}</Text>
+          <Text style={styles.smallNote}>{suggestion.evidence.map((charge) => `${new Date(charge.date).toLocaleDateString()}: ${formatMoney(charge.amountCents)}`).join(' · ')}</Text>
+          <View style={styles.actions}>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Review ${suggestion.name} suggestion`} style={styles.primaryButton} onPress={() => {
+              resetForm(); setBankSuggestion(suggestion); setName(suggestion.name); setAmount(formatAmount(suggestion.amountCents));
+              setCadence(suggestion.cadence); setDay(String(suggestion.day)); setMonth(suggestion.month); setShowForm(true);
+            }}><Text style={styles.primaryLabel}>Review & add</Text></Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Dismiss ${suggestion.name} suggestion`} style={styles.secondaryButton} onPress={() => { dismissBankSuggestion(suggestion.key); if (bankSuggestion?.key === suggestion.key) resetForm(); }}><Text style={styles.secondaryLabel}>Dismiss</Text></Pressable>
+          </View>
+        </View>)}
+        {!bankSuggestion && suggestionLimit < suggestions.length && <Pressable accessibilityRole="button" style={styles.choice} onPress={() => setSuggestionLimit(suggestionLimit + 5)}><Text style={styles.choiceLabel}>Show more suggestions</Text></Pressable>}
+        {dismissedBankSuggestions.length > 0 && <Pressable accessibilityRole="button" style={styles.choice} onPress={restoreBankSuggestions}><Text style={styles.choiceLabel}>Restore dismissed suggestions</Text></Pressable>}
+      </View>
+
+      {bankSuggestion && form}
 
       {due.length > 0 && (
         <View style={styles.reviewCard}>
@@ -190,26 +247,8 @@ export default function SubscriptionsPanel() {
         </View>
       )}
 
-      {showForm && (
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>{editingId ? 'Edit subscription' : 'Add a subscription'}</Text>
-          <TextInput style={styles.input} value={name} onChangeText={setName} placeholder="Name, such as Music" accessibilityLabel="Subscription name" maxLength={80} />
-          <TextInput style={styles.input} value={amount} onChangeText={setAmount} placeholder="Renewal price in dollars" accessibilityLabel="Renewal price" keyboardType="decimal-pad" />
-          <Text style={styles.fieldLabel}>Renews</Text>
-          <View style={styles.actions}>
-            {(['monthly', 'yearly'] as const).map((value) => (
-              <Pressable key={value} accessibilityRole="button" accessibilityState={{ selected: cadence === value }} style={[styles.choice, cadence === value && styles.choiceActive]} onPress={() => setCadence(value)}>
-                <Text style={[styles.choiceLabel, cadence === value && styles.choiceActiveLabel]}>{value === 'monthly' ? 'Every month' : 'Every year'}</Text>
-              </Pressable>
-            ))}
-          </View>
-          <CalendarDateField key={`${editingId ?? 'new'}-${cadence}-${recurrenceDate}`} label="Renewal date" value={recurrenceDate} displayValue={cadence === 'monthly' ? `Day ${day} of each month` : `${monthNames[month - 1]} ${day} each year`} onChange={(date) => { const [, selectedMonth, selectedDate] = date.split('-').map(Number); setDay(String(selectedDate)); setMonth(selectedMonth); }} />
-          <Text style={styles.smallNote}>For months without that day, the renewal is shown on the last day of the month.</Text>
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable accessibilityRole="button" style={styles.saveButton} onPress={save}><Text style={styles.saveLabel}>{editingId ? 'Save changes' : 'Add subscription'}</Text></Pressable>
-          {editingId && <Pressable accessibilityRole="button" style={styles.cancelEdit} onPress={resetForm}><Text style={styles.textButtonLabel}>Stop editing</Text></Pressable>}
-        </View>
-      )}
+
+      {!bankSuggestion && form}
 
       <Text style={styles.footer}>Saved only on this device. GasFinder does not connect to subscription accounts or stop charges.</Text>
       {removeId && (

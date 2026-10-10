@@ -87,6 +87,9 @@ export type LoggedPurchase = {
   purchasedAt: string;
   sourcePauseId?: string;
   source?: 'manual' | 'shortcut' | 'bank-import';
+  bankSource?: 'csv' | 'citizens-pdf';
+  bankAccountLabel?: string;
+  recurringHint?: boolean;
   decision: 'pending' | 'skipped' | 'saved';
   savedCents?: number;
 };

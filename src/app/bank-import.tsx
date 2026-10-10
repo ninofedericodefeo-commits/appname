@@ -7,7 +7,10 @@ import { FormScrollView } from '@/components/FormScrollView';
 import { IconButton } from '@/components/IconButton';
 import { applyBankImport, guessMapping, MAX_CSV_BYTES, parseBankCSV, previewBankCSV } from '@/features/bank/importLogic';
 import type { BankCSV, BankMapping } from '@/features/bank/importLogic';
-import { pickBankCSV } from '@/features/bank/pickBankCSV';
+import { pickBankFile } from '@/features/bank/pickBankFile';
+import PDFStatementReader from '@/features/bank/PDFStatementReader';
+import { parseCitizensStatement } from '@/features/bank/citizensStatement';
+import type { CitizensStatement } from '@/features/bank/citizensStatement';
 import { ruleDescription } from '@/features/goals/logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -36,6 +39,8 @@ export default function BankImportScreen() {
   const pocket = usePocketStore();
   const hydrated = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const [csv, setCSV] = useState<BankCSV | null>(null);
+  const [pdfJob, setPDFJob] = useState<{ id: number; name: string; base64: string } | null>(null);
+  const [statement, setStatement] = useState<CitizensStatement | null>(null);
   const [mapping, setMapping] = useState<BankMapping | null>(null);
   const [name, setName] = useState('');
   const [accountDraft, setAccountDraft] = useState<string | null>(null);
@@ -54,6 +59,16 @@ export default function BankImportScreen() {
   const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number } | null>(null);
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
+  useEffect(() => {
+    if (!pdfJob) return;
+    // The host also times out if the native DOM engine fails to load.
+    const timer = setTimeout(() => {
+      if (request.current !== pdfJob.id) return;
+      request.current++; setPDFJob(null); setBusy(false);
+      setError('Reading this PDF took too long. Try a smaller statement.');
+    }, 45_000);
+    return () => clearTimeout(timer);
+  }, [pdfJob]);
   const review = useMemo(() => {
     if (!csv || !mapping) return { rows: [], excluded: [], error: '' };
     try { return { ...previewBankCSV(csv, mapping, account, pocket.purchases, pocket.bankImportKeys), error: '' }; }
@@ -67,31 +82,35 @@ export default function BankImportScreen() {
 
   function load(text: string, filename: string) {
     const parsed = parseBankCSV(text);
+    setStatement(null);
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setPaste(''); setShowPaste(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map());
     Keyboard.dismiss();
   }
+  function cancelReading() { request.current++; setPDFJob(null); setBusy(false); }
   async function chooseFile() {
     const current = ++request.current;
     setBusy(true); setError('');
+    let readingPDF = false;
     try {
-      const file = await pickBankCSV();
-      if (current === request.current && file) load(file.text, file.name);
+      const file = await pickBankFile();
+      if (current !== request.current || !file) return;
+      if (file.kind === 'csv') load(file.text, file.name);
+      else { readingPDF = true; setStatement(null); setPDFJob({ id: current, name: file.name, base64: file.base64 }); }
     } catch (cause) {
       if (current !== request.current) return;
       const message = cause instanceof Error ? cause.message : '';
       setError(/native module|ExpoDocumentPicker|Cannot find native/i.test(message)
         ? 'File picking needs a rebuilt app. You can paste the CSV below to import now.'
-        : message || 'Could not open this file. Choose a CSV from Files or paste it below.');
-      setShowPaste(true);
-    } finally { if (current === request.current) setBusy(false); }
+        : message || 'Could not open this file. Choose a PDF or CSV from Files.');
+    } finally { if (current === request.current && !readingPDF) setBusy(false); }
   }
   function toggle(id: string) { setSelectionOverrides((previous) => new Map(previous).set(id, !selectedIds.has(id))); }
   function importSelected() {
     if (!hydrated || review.error || !selected.length || busy) return;
     const result = pocket.importBankPurchases(selected, applyRule && !!pocket.activeGoal, account);
-    setDone(result); setCSV(null); setMapping(null); setPaste(''); setSelectionOverrides(new Map()); setError('');
+    setDone(result); setCSV(null); setMapping(null); setStatement(null); setPaste(''); setSelectionOverrides(new Map()); setError('');
   }
   function columnField(field: Column) {
     return <Pressable key={field} accessibilityRole="button" accessibilityLabel={`Choose ${columnNames[field]} column`}
@@ -104,31 +123,35 @@ export default function BankImportScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>PURCHASE HISTORY</Text>
       <Text style={styles.title}>Import bank log</Text>
-      <Text style={styles.body}>Export transactions as CSV from your bank, then review them here. The file is read on your device.</Text>
+      <Text style={styles.body}>Choose a Citizens checking/savings statement PDF or a bank CSV, then review the purchases. Files are read on your device; imported charges also help find subscriptions.</Text>
       {done ? <View style={styles.card}>
         <Text style={styles.section}>{done.imported.toLocaleString()} purchase{done.imported === 1 ? '' : 's'} imported</Text>
         <Text style={styles.body}>{formatMoney(done.savedCents)} added to the pocket estimate.</Text>
         {done.skipped > 0 && <Text style={styles.hint}>{done.skipped.toLocaleString()} duplicate or invalid rows weren’t added.</Text>}
         <Button label="Back to Savings & Activity" onPress={() => router.navigate('/investment')} />
-        <Button label="Choose another CSV" secondary onPress={() => { setDone(null); void chooseFile(); }} />
+        <Button label="Review subscription suggestions" onPress={() => router.navigate('/subscriptions')} />
+        <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
       </View> : <>
         {!csv && <View style={styles.card}>
-          <Button label={busy ? 'Choosing file…' : 'Choose bank CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
-          {busy && <Button label="Cancel file selection" secondary onPress={() => { request.current++; setBusy(false); }} />}
+          <Button label={busy ? (pdfJob ? 'Reading PDF…' : 'Choosing file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
+          {busy && <Button label="Cancel" secondary onPress={cancelReading} />}
           <Button label={showPaste ? 'Hide pasted CSV' : 'Or paste CSV'} secondary onPress={() => setShowPaste(!showPaste)} />
           {showPaste && <><TextInput multiline value={paste} onChangeText={setPaste} maxLength={MAX_CSV_BYTES} style={[styles.input, styles.csvInput]}
             autoCorrect={false} autoCapitalize="none" accessibilityLabel="Bank CSV contents" placeholder={'Date,Description,Amount\n10/08/2026,Coffee,-4.50'} />
             <Button label="Review pasted CSV" disabled={!paste.trim() || busy || !hydrated} onPress={() => { try { load(paste, 'Pasted CSV'); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read this CSV.'); } }} /></>}
-          <Text style={styles.hint}>UTF-8 CSV, TSV or text exports · up to 2 MB / 5,000 rows. PDF and Excel statements need to be exported as CSV first.</Text>
+          <Text style={styles.hint}>Citizens checking/savings PDF: up to 10 MB / 40 pages. Download the original statement from Citizens, rather than a scan or photo. CSV, TSV or text exports: up to 2 MB / 5,000 rows.</Text>
         </View>}
         {csv && mapping && <>
           <View style={styles.card}>
-            <View style={styles.rowBetween}><Text style={styles.section}>Check columns</Text><Button label="Change file" secondary onPress={() => { setCSV(null); setMapping(null); setError(''); }} /></View>
+            <View style={styles.rowBetween}><Text style={styles.section}>{statement ? 'Citizens statement' : 'Check columns'}</Text><Button label="Change file" secondary onPress={() => { cancelReading(); setCSV(null); setMapping(null); setStatement(null); setError(''); }} /></View>
             <Text style={styles.hint}>{name} · {csv.rows.length.toLocaleString()} rows</Text>
             <Text style={styles.label}>Account nickname</Text>
             <TextInput value={account} onChangeText={setAccountDraft} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
             <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
-            {columnField('date')}{columnField('description')}
+            {statement && <><Text style={styles.body}>{statement.pages} pages · {statement.periods.join(' · ')}</Text><Text style={styles.hint}>Check every amount against your statement. Credits, transfers, checks and fees are excluded from purchase totals. Only supported deposit and withdrawal tables are read.</Text>
+              {statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} transaction rows could not be read and were skipped. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
+            </>}
+            {!statement && <>{columnField('date')}{columnField('description')}
             <View style={styles.row}><Choice label="One amount column" selected={mapping.mode === 'signed'} onPress={() => setMapping({ ...mapping, mode: 'signed' })} /><Choice label="Debit / credit columns" selected={mapping.mode === 'debit-credit'} onPress={() => setMapping({ ...mapping, mode: 'debit-credit' })} /></View>
             {mapping.mode === 'signed' ? <>{columnField('amount')}<Text style={styles.label}>Money spent is</Text><View style={styles.row}>
               <Choice label="Negative (−)" selected={mapping.spendingSign === 'negative'} onPress={() => setMapping({ ...mapping, spendingSign: 'negative' })} />
@@ -140,23 +163,23 @@ export default function BankImportScreen() {
             </View>
             <Button label={advanced ? 'Hide extra columns' : 'More columns'} secondary onPress={() => setAdvanced(!advanced)} />
             {advanced && <>{columnField('currency')}{columnField('type')}{columnField('status')}{columnField('transactionId')}</>}
-            <Text style={styles.hint}>USD only. Check the spending direction and exclude transfers or card payments before importing.</Text>
+            <Text style={styles.hint}>USD only. Check the spending direction and exclude transfers or card payments before importing.</Text></>}
           </View>
           {review.error ? <Text accessibilityRole="alert" style={styles.error}>{review.error}</Text> : <View style={styles.card}>
             <Text style={styles.section}>Review purchases</Text>
             <Text style={styles.hint}>Possible matches to existing purchases start unchecked. Already imported rows can’t be added again.</Text>
             <View style={styles.row}><Button label="Select new rows" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, !row.duplicate])))} /><Button label="Clear selection" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, false])))} /></View>
-            {review.rows.length === 0 && <Text style={styles.body}>No spending rows found. Check the columns and spending direction above.</Text>}
+            {review.rows.length === 0 && <Text style={styles.body}>No new spending rows found. Check the statement or selected columns above.</Text>}
             {review.rows.slice(0, limit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.transaction}>
-              <Check checked={row.duplicate !== 'known' && selectedIds.has(row.id)} disabled={row.duplicate === 'known'} label={`Import ${row.title}, ${formatMoney(row.amountCents)}, row ${row.rowNumber}`} onPress={() => toggle(row.id)} />
+              <Check checked={row.duplicate !== 'known' && selectedIds.has(row.id)} disabled={row.duplicate === 'known'} label={`Import ${row.title}, ${formatMoney(row.amountCents)}, ${row.pageNumber ? `PDF page ${row.pageNumber}, line ${row.lineNumber}` : `row ${row.rowNumber}`}`} onPress={() => toggle(row.id)} />
               <View style={styles.transactionMain}><View style={styles.rowBetween}><Text style={styles.transactionTitle}>{row.title}</Text><Text style={styles.amount}>{formatMoney(row.amountCents)}</Text></View>
-                <Text style={styles.hint}>{new Date(row.purchasedAt).toLocaleDateString()} · row {row.rowNumber}</Text>
+                <Text style={styles.hint}>{new Date(row.purchasedAt).toLocaleDateString()} · {row.pageNumber ? `PDF page ${row.pageNumber}, line ${row.lineNumber}` : `row ${row.rowNumber}`}</Text>
                 {row.duplicate && <Text style={styles.match}>{row.duplicate === 'known' ? 'Already imported' : `Same date and amount as “${row.matchTitle}”. Include only if this is a different purchase.`}</Text>}
               </View>
             </View>)}
             {limit < review.rows.length && <Button label="Show more rows" secondary onPress={() => setLimit(limit + 30)} />}
             {review.excluded.length > 0 && <><Button label={`${showExcluded ? 'Hide' : 'Show'} ${review.excluded.length.toLocaleString()} skipped row${review.excluded.length === 1 ? '' : 's'}`} secondary onPress={() => setShowExcluded(!showExcluded)} />
-              {showExcluded && <>{review.excluded.slice(0, excludedLimit).map((row) => <Text key={row.rowNumber} style={styles.hint}>Row {row.rowNumber}: {row.reason}</Text>)}
+              {showExcluded && <>{review.excluded.slice(0, excludedLimit).map((row) => <Text key={row.rowNumber} style={styles.hint}>{csv.locations?.[row.rowNumber - 2] ? `PDF page ${csv.locations[row.rowNumber - 2].page}, line ${csv.locations[row.rowNumber - 2].line}` : `Row ${row.rowNumber}`}: {row.reason}</Text>)}
                 {excludedLimit < review.excluded.length && <Button label="Show more skipped rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
             </>}
           </View>}
@@ -174,6 +197,16 @@ export default function BankImportScreen() {
       </>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     </FormScrollView>
+    {pdfJob && <PDFStatementReader key={pdfJob.id} base64={pdfJob.base64} dom={{ style: { width: 1, height: 1 }, scrollEnabled: false }} onRead={async (pages) => {
+      if (request.current !== pdfJob.id) return;
+      try {
+        const parsed = parseCitizensStatement(pages);
+        setStatement(parsed); setCSV(parsed.csv); setMapping(guessMapping(parsed.csv)); setName(pdfJob.name);
+        setPaste(''); setShowPaste(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
+        setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); Keyboard.dismiss();
+      } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read this Citizens statement.'); }
+      finally { setPDFJob(null); setBusy(false); }
+    }} onError={async (message) => { if (request.current === pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
     <Modal visible={column !== null} transparent animationType="fade" onRequestClose={() => setColumn(null)}>
       <View style={styles.scrim}><SafeAreaView style={styles.modal}>
         <View style={styles.modalHeader}><Text style={styles.section}>Choose {column ? columnNames[column].toLowerCase() : 'column'}</Text><IconButton icon="close" label="Close column selection" onPress={() => setColumn(null)} /></View>
