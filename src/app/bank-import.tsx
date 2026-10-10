@@ -5,12 +5,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { IconButton } from '@/components/IconButton';
-import { applyBankImport, guessMapping, MAX_CSV_BYTES, parseBankCSV, previewBankCSV } from '@/features/bank/importLogic';
+import { applyBankImport, guessMapping, MAX_CSV_BYTES, parseBankCSV, previewAccountTransactions, previewBankCSV } from '@/features/bank/importLogic';
 import type { BankCSV, BankMapping } from '@/features/bank/importLogic';
 import { pickBankFile } from '@/features/bank/pickBankFile';
 import PDFStatementReader from '@/features/bank/PDFStatementReader';
 import { parseCitizensStatement } from '@/features/bank/citizensStatement';
 import type { CitizensStatement } from '@/features/bank/citizensStatement';
+import { linkAccountTransactions, mergeAccountTransactions } from '@/features/pocket/transactions';
 import { ruleDescription } from '@/features/goals/logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -56,7 +57,10 @@ export default function BankImportScreen() {
   const [showExcluded, setShowExcluded] = useState(false);
   const [excludedLimit, setExcludedLimit] = useState(20);
   const [applyRule, setApplyRule] = useState(false);
-  const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number } | null>(null);
+  const [saveHistory, setSaveHistory] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historyLimit, setHistoryLimit] = useState(20);
+  const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number } | null>(null);
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
   useEffect(() => {
@@ -78,6 +82,13 @@ export default function BankImportScreen() {
     (selectionOverrides.get(row.id) ?? !row.duplicate)).map((row) => row.id)), [review.rows, selectionOverrides]);
   const selected = useMemo(() => review.rows.filter((row) => row.duplicate !== 'known' && selectedIds.has(row.id)), [review.rows, selectedIds]);
   const plan = useMemo(() => applyBankImport(pocket, selected, applyRule && !!pocket.activeGoal), [pocket, selected, applyRule]);
+  const historyReview = useMemo(() => {
+    if (!csv || !mapping || review.error) return { rows: [], excluded: [] };
+    return previewAccountTransactions(csv, mapping, account);
+  }, [csv, mapping, account, review.error]);
+  const history = useMemo(() => linkAccountTransactions(historyReview.rows, review.rows, selectedIds), [historyReview.rows, review.rows, selectedIds]);
+  const historyPlan = useMemo(() => mergeAccountTransactions(pocket.accountTransactions, saveHistory ? history : []), [pocket.accountTransactions, history, saveHistory]);
+  const canImport = selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0;
   const total = selected.reduce((sum, row) => sum + row.amountCents, 0);
 
   function load(text: string, filename: string) {
@@ -85,7 +96,7 @@ export default function BankImportScreen() {
     setStatement(null);
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setPaste(''); setShowPaste(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
-    setSelectionOverrides(new Map());
+    setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
     Keyboard.dismiss();
   }
   function cancelReading() { request.current++; setPDFJob(null); setBusy(false); }
@@ -108,8 +119,8 @@ export default function BankImportScreen() {
   }
   function toggle(id: string) { setSelectionOverrides((previous) => new Map(previous).set(id, !selectedIds.has(id))); }
   function importSelected() {
-    if (!hydrated || review.error || !selected.length || busy) return;
-    const result = pocket.importBankPurchases(selected, applyRule && !!pocket.activeGoal, account);
+    if (!hydrated || review.error || !canImport || busy) return;
+    const result = pocket.importBankPurchases(selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : []);
     setDone(result); setCSV(null); setMapping(null); setStatement(null); setPaste(''); setSelectionOverrides(new Map()); setError('');
   }
   function columnField(field: Column) {
@@ -121,13 +132,16 @@ export default function BankImportScreen() {
 
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <FormScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.kicker}>PURCHASE HISTORY</Text>
+      <Text style={styles.kicker}>BANK HISTORY</Text>
       <Text style={styles.title}>Import bank log</Text>
-      <Text style={styles.body}>Choose a Citizens checking/savings statement PDF or a bank CSV, then review the purchases. Files are read on your device; imported charges also help find subscriptions.</Text>
+      <Text style={styles.body}>Choose a Citizens checking/savings statement PDF or a bank CSV, then review the transactions. Files are read on your device; imported charges also help find subscriptions.</Text>
       {done ? <View style={styles.card}>
-        <Text style={styles.section}>{done.imported.toLocaleString()} purchase{done.imported === 1 ? '' : 's'} imported</Text>
+        <Text style={styles.section}>Bank log saved</Text>
+        <Text style={styles.body}>{done.transactionsAdded.toLocaleString()} new bank transactions · {done.imported.toLocaleString()} purchases added for goals and subscriptions.</Text>
+        {done.transactionsUpdated > 0 && <Text style={styles.hint}>{done.transactionsUpdated.toLocaleString()} bank transactions updated.</Text>}
         <Text style={styles.body}>{formatMoney(done.savedCents)} added to the pocket estimate.</Text>
         {done.skipped > 0 && <Text style={styles.hint}>{done.skipped.toLocaleString()} duplicate or invalid rows weren’t added.</Text>}
+        <Button label="Open Pocket" onPress={() => router.navigate('/pocket')} />
         <Button label="Back to Savings & Activity" onPress={() => router.navigate('/investment')} />
         <Button label="Review subscription suggestions" onPress={() => router.navigate('/subscriptions')} />
         <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
@@ -183,6 +197,17 @@ export default function BankImportScreen() {
                 {excludedLimit < review.excluded.length && <Button label="Show more skipped rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
             </>}
           </View>}
+          {!review.error && <View style={styles.card}>
+            <View style={styles.ruleRow}><Check checked={saveHistory} label="Save bank history to Pocket" onPress={() => setSaveHistory(!saveHistory)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>Save bank history to Pocket</Text><Text style={styles.hint}>{historyReview.rows.length.toLocaleString()} readable transactions, including deposits, transfers and fees.</Text></View></View>
+            <Text style={styles.hint}>Bank history is separate from the purchases selected above. It won’t change your saved balance or apply a savings rule to deposits, transfers or fees.</Text>
+            <Button label={`${showHistory ? 'Hide' : 'Review'} bank history`} secondary onPress={() => setShowHistory(!showHistory)} />
+            {showHistory && <>{historyReview.rows.slice(0, historyLimit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.historyRow}>
+              <View style={styles.rowBetween}><Text style={styles.transactionTitle}>{row.title}</Text><Text style={styles.amount}>{row.amountCents > 0 ? '+' : '−'}{formatMoney(Math.abs(row.amountCents))}</Text></View>
+              <Text style={styles.hint}>{new Date(row.occurredAt).toLocaleDateString()} · {row.status === 'recorded' ? 'Posting status not supplied' : row.status === 'pending' ? 'Pending' : 'Posted'} · {csv.locations?.[row.rowNumber - 2] ? `PDF page ${csv.locations[row.rowNumber - 2].page}` : `row ${row.rowNumber}`}</Text>
+            </View>)}{historyLimit < historyReview.rows.length && <Button label="Show more bank history" secondary onPress={() => setHistoryLimit(historyLimit + 30)} />}</>}
+            {historyReview.excluded.length > 0 && <Text style={styles.hint}>{historyReview.excluded.length.toLocaleString()} invalid, non-USD or empty rows won’t be saved to bank history.</Text>}
+            {saveHistory && <Text style={styles.body}>{historyPlan.added} new · {historyPlan.updated} updated bank transactions</Text>}
+          </View>}
           <View style={styles.card}>
             <Text style={styles.section}>{selected.length.toLocaleString()} selected · {formatMoney(total)}</Text>
             {pocket.activeGoal ? <View style={styles.ruleRow}>
@@ -191,7 +216,7 @@ export default function BankImportScreen() {
             </View> : <Text style={styles.hint}>Create a goal later to use this spending history for savings suggestions.</Text>}
             <Text style={styles.body}>{formatMoney(plan.savedCents)} will be added to the pocket estimate{applyRule ? ', capped by your goal and entered balance' : ''}.</Text>
             <Text style={styles.hint}>Account balances aren’t changed by this import. Money stays in your account.</Text>
-            <Button label={`Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}`} disabled={!selected.length || !!review.error || !hydrated || busy} onPress={importSelected} />
+            <Button label={selected.length ? `Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}` : 'Save bank history'} disabled={!canImport || !!review.error || !hydrated || busy} onPress={importSelected} />
           </View>
         </>}
       </>}
@@ -203,7 +228,7 @@ export default function BankImportScreen() {
         const parsed = parseCitizensStatement(pages);
         setStatement(parsed); setCSV(parsed.csv); setMapping(guessMapping(parsed.csv)); setName(pdfJob.name);
         setPaste(''); setShowPaste(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
-        setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); Keyboard.dismiss();
+        setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20); Keyboard.dismiss();
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read this Citizens statement.'); }
       finally { setPDFJob(null); setBusy(false); }
     }} onError={async (message) => { if (request.current === pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
@@ -235,5 +260,6 @@ const styles = StyleSheet.create({
   choice: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, padding: 10 }, selected: { backgroundColor: colors.ink, borderColor: colors.ink }, choiceText: { color: colors.ink, fontSize: 12, fontWeight: '700' }, selectedText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   transaction: { flexDirection: 'row', gap: 6, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 }, transactionMain: { flex: 1, gap: 4 }, transactionTitle: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '700' }, amount: { color: colors.ink, fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] }, match: { color: colors.accentDark, fontSize: 12, lineHeight: 18 },
   checkButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, check: { width: 24, height: 24, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }, ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  historyRow: { gap: 5, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 }, scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 }, modal: { maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 12, padding: 15 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between' }, option: { minHeight: 48, padding: 13, borderBottomWidth: 1, borderBottomColor: colors.line },
 });

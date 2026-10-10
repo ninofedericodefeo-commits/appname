@@ -2,6 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { mergeAccountTransactions } from '@/features/pocket/transactions';
+import type { AccountTransaction } from '@/features/pocket/transactions';
 import { canReserve } from '@/features/pocket/logic';
 import { applyBankImport } from '@/features/bank/importLogic';
 import type { BankPurchase } from '@/features/bank/importLogic';
@@ -25,9 +27,10 @@ type PocketState = {
   activeGoal: Goal | null;
   archivedGoals: ArchivedGoal[];
   purchases: LoggedPurchase[];
+  accountTransactions: AccountTransaction[];
   bankImportKeys: string[];
   bankImportAccountLabel: string;
-  importBankPurchases: (purchases: BankPurchase[], applyRule: boolean, accountLabel: string) => { imported: number; skipped: number; savedCents: number };
+  importBankPurchases: (purchases: BankPurchase[], applyRule: boolean, accountLabel: string, history?: AccountTransaction[]) => { imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number };
   goalSettings: GoalSettings;
   setReportedBalance: (cents: number) => void;
   reserve: (cents: number) => boolean;
@@ -59,12 +62,14 @@ export const usePocketStore = create<PocketState>()(
       activeGoal: null,
       archivedGoals: [],
       purchases: [],
+      accountTransactions: [],
       bankImportKeys: [],
       bankImportAccountLabel: 'Main account',
-      importBankPurchases: (purchases, applyRule, accountLabel) => {
+      importBankPurchases: (purchases, applyRule, accountLabel, history = []) => {
         const result = applyBankImport(get(), purchases, applyRule);
-        if (result.imported > 0) set({ ...result.state, bankImportAccountLabel: accountLabel.trim() });
-        return { imported: result.imported, skipped: result.skipped, savedCents: result.savedCents };
+        const movements = mergeAccountTransactions(get().accountTransactions, history);
+        if (result.imported > 0 || movements.added > 0 || movements.updated > 0) set({ ...result.state, accountTransactions: movements.transactions, bankImportAccountLabel: accountLabel.trim() });
+        return { imported: result.imported, skipped: result.skipped, savedCents: result.savedCents, transactionsAdded: movements.added, transactionsUpdated: movements.updated };
       },
       goalSettings: DEFAULT_GOAL_SETTINGS,
       setReportedBalance: (cents) => {
@@ -167,13 +172,14 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }),
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 4,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 5,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
-        if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
+        if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
         return {
           ...previous,
           bankImportKeys: previous.bankImportKeys ?? [],
+          accountTransactions: previous.accountTransactions ?? [],
           bankImportAccountLabel: previous.bankImportAccountLabel ?? 'Main account',
           activeGoal: previous.activeGoal ? { ...previous.activeGoal, setAsideRule: previous.activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE } : null,
           archivedGoals: (previous.archivedGoals ?? []).map((goal) => ({ ...goal, setAsideRule: goal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE })),

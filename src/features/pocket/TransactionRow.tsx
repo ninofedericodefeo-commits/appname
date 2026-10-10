@@ -1,0 +1,48 @@
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+
+import { formatMoney } from '@/lib/money';
+import { colors } from '@/theme';
+import type { PocketTransaction } from './transactions';
+
+const sourceNames = { 'citizens-pdf': 'Citizens statement', csv: 'Bank CSV', manual: 'Manually logged', shortcut: 'Apple Pay Shortcut' };
+const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported', logged: 'Logged' };
+
+export function TransactionRow({ transaction }: { transaction: PocketTransaction }) {
+  const [expanded, setExpanded] = useState(false);
+  const incoming = transaction.amountCents > 0;
+  const amount = `${incoming ? '+' : '−'}${formatMoney(Math.abs(transaction.amountCents))}`;
+  const date = new Date(transaction.occurredAt);
+  const shortDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  const initials = transaction.title.replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 2).toUpperCase();
+  return <View style={styles.container}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${transaction.title}, ${amount}, ${shortDate}. ${expanded ? 'Hide' : 'Show'} transaction details`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <View style={[styles.avatar, incoming && styles.creditAvatar]}><Text style={styles.initials}>{incoming ? '+' : initials || '↗'}</Text></View>
+      <View style={styles.main}>
+        <Text style={styles.title} numberOfLines={2}>{transaction.title}</Text>
+        <Text style={styles.meta}>{shortDate}{transaction.status === 'pending' ? ' · Pending' : ''}</Text>
+      </View>
+      <Text style={[styles.amount, incoming && styles.credit]}>{amount}</Text>
+      <Text style={styles.chevron}>{expanded ? '⌄' : '›'}</Text>
+    </Pressable>
+    {expanded && <View style={styles.details}>
+      <Text style={styles.detailText}>{sourceNames[transaction.source]} · {statusNames[transaction.status]}</Text>
+      {transaction.accountLabel ? <Text style={styles.detailText}>{transaction.accountLabel}</Text> : null}
+      <Text style={styles.detailText}>{transaction.title}</Text>
+      {transaction.status === 'recorded' && <Text style={styles.detailText}>Posting status wasn’t included in the export.</Text>}
+    </View>}
+  </View>;
+}
+
+const styles = StyleSheet.create({
+  container: { backgroundColor: colors.surface },
+  row: { minHeight: 86, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  creditAvatar: { backgroundColor: colors.paleGreen }, initials: { color: colors.primary, fontSize: 13, fontWeight: '800' },
+  main: { flex: 1, gap: 5 }, title: { color: colors.ink, fontSize: 15, fontWeight: '600', lineHeight: 20 },
+  meta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  amount: { color: colors.ink, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'], flexShrink: 0 },
+  credit: { color: colors.primary }, chevron: { color: colors.primary, fontSize: 23 }, pressed: { opacity: 0.65 },
+  details: { backgroundColor: colors.paper, borderRadius: 8, padding: 12, gap: 5, marginBottom: 12 },
+  detailText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
+});

@@ -3,7 +3,8 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { extractPDFText } from '../src/features/bank/extractPDFText.ts';
 import { parseCitizensStatement } from '../src/features/bank/citizensStatement.ts';
-import { applyBankImport, guessMapping, parseBankCSV, previewBankCSV } from '../src/features/bank/importLogic.ts';
+import { applyBankImport, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '../src/features/bank/importLogic.ts';
+import { linkAccountTransactions, mergeAccountTransactions, pocketTransactions } from '../src/features/pocket/transactions.ts';
 import { suggestBankSubscriptions } from '../src/features/subscriptions/bankSuggestions.ts';
 
 const now = new Date('2026-10-10T12:00:00');
@@ -33,6 +34,13 @@ test('The bundled PDF engine extracts a real synthetic PDF, imports only purchas
   const result = applyBankImport(state(), rows.rows, false, now);
   assert.equal(result.imported, 9); assert.equal(result.savedCents, 0); assert.equal(result.state.reservedCents, 0);
   assert.equal(result.state.purchases[0].bankSource, 'citizens-pdf');
+  const movements = previewAccountTransactions(parsed.csv, guessMapping(parsed.csv), 'Main checking', now);
+  assert.equal(movements.rows.length, 21); assert.equal(movements.excluded.length, 0);
+  assert.equal(movements.rows.filter((row) => row.amountCents === 200000).length, 3);
+  assert.equal(movements.rows.filter((row) => row.amountCents === -300).length, 3);
+  const ledger = mergeAccountTransactions([], linkAccountTransactions(movements.rows, rows.rows, new Set(rows.rows.map((row) => row.id))), now);
+  assert.equal(pocketTransactions(ledger.transactions, result.state.purchases).length, 21);
+  assert.equal(result.state.reportedBalanceCents, 250000);
   assert.ok(review(parsed, result.state.purchases, result.state.bankImportKeys).rows.every((row) => row.duplicate === 'known'));
   const netflix = suggestBankSubscriptions(result.state.purchases, [], [], now).find((suggestion) => suggestion.name === 'Netflix');
   assert.equal(netflix.cadence, 'monthly'); assert.equal(netflix.evidence.length, 3); assert.equal(netflix.amountCents, 1699);
