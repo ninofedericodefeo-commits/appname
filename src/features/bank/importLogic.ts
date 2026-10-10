@@ -121,8 +121,9 @@ function dayKey(iso: string) {
   return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
 }
 
-// Two 32-bit hashes form a stable local identity. The original bank file and account
-// number are not persisted. Repeated equal purchases use an occurrence index.
+// Two 32-bit hashes form a stable local transaction identity without embedding
+// an account number. Repeated equal purchases use an occurrence index. Original
+// files are kept separately in the local Imports archive after confirmation.
 function identity(value: string) {
   let a = 2166136261, b = 5381;
   for (let i = 0; i < value.length; i++) { a = Math.imul(a ^ value.charCodeAt(i), 16777619); b = Math.imul(b, 33) ^ value.charCodeAt(i); }

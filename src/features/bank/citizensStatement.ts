@@ -168,10 +168,11 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
   }
   flush();
   if (csv.rows.length > MAX_CSV_ROWS) throw new Error('Import at most 5,000 transactions at a time.');
-  if (!csv.rows.length) throw new Error('No supported transaction table was found. Choose a downloaded Citizens checking/savings statement with dated deposits and withdrawals.');
   const latest = balances.sort((a, b) => b.asOf.localeCompare(a.asOf))[0];
   const conflict = latest && balances.some((balance) => balance.asOf === latest.asOf && balance.amountCents !== latest.amountCents);
   if (conflict) warnings.push({ page: latest.page, line: latest.line, reason: 'Conflicting closing balances; update your balance manually' });
+  if (!csv.rows.length && (!latest || conflict)) throw new Error('No supported transaction table or clear closing balance was found. Choose a downloaded Citizens checking/savings statement.');
+  if (!csv.rows.length) warnings.push({ page: latest.page, line: latest.line, reason: 'No transactions could be read; this import updates only the closing balance' });
   const pageCounts = pages.map((page) => ({ page: page.page, spending: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[2]).length, credits: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[3]).length }));
   return { csv, pages: pages.length, periods, warnings, balance: latest && !conflict ? latest : null, pageCounts };
 }

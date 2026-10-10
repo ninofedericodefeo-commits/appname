@@ -18,19 +18,19 @@ export function statementBalanceKey(balance: StatementBalance, account: string) 
 }
 export function statementBalanceStatus(state: AccountImportState, balance: StatementBalance, account: string, now = new Date()) {
   if (!Number.isSafeInteger(balance.amountCents) || Math.abs(balance.amountCents) > 100_000_000 || !/^\d{4}-\d{2}-\d{2}$/.test(balance.asOf) || !parseBankDate(balance.asOf, 'mdy', now)) return 'invalid';
-  if (state.statementBalanceKeys?.includes(statementBalanceKey(balance, account))) return 'applied';
+  if (state.statementBalanceKeys?.includes(statementBalanceKey(balance, account)) && state.reportedBalanceCents === balance.amountCents && state.balanceAsOf === balance.asOf && state.balanceSource === 'citizens-pdf') return 'applied';
   return state.balanceAsOf && balance.asOf < state.balanceAsOf ? 'older' : 'new';
 }
 
 export function applyAccountImport(state: AccountImportState, candidates: BankPurchase[], applyRule: boolean, account: string, history: AccountTransaction[], options: AccountImportOptions = {}, now = new Date()) {
   const balance = options.balance;
   const status = balance ? statementBalanceStatus(state, balance, account, now) : 'invalid';
-  // A confirmed statement sets the closing balance once; its debits are already
+  // A confirmed statement sets the closing balance; its debits are already
   // included in that amount. Savings rules are capped against the new balance.
   const balanceUpdated = !!balance && (status === 'new' || status === 'older');
   const withBalance: AccountImportState = balanceUpdated ? { ...state,
     reportedBalanceCents: balance!.amountCents, balanceAsOf: balance!.asOf, balanceSource: 'citizens-pdf', balanceUpdatedAt: now.toISOString(),
-    statementBalanceKeys: [...(state.statementBalanceKeys ?? []), statementBalanceKey(balance!, account)],
+    statementBalanceKeys: [...new Set([...(state.statementBalanceKeys ?? []), statementBalanceKey(balance!, account)])],
   } : state;
   const result = applyBankImport(withBalance, candidates, applyRule, now);
   const keys = new Set(result.state.bankImportKeys);

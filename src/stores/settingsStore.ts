@@ -10,6 +10,8 @@ type SettingsState = {
   selectedFuelType: FuelType;
   selectedRadius: number;
   sortOrder: SortOption;
+  hideUnpricedStations: boolean;
+  setHideUnpricedStations: (hide: boolean) => void;
   mapsPreference: MapsApp | null;
   refillPercent: number;
   setMapsPreference: (app: MapsApp) => void;
@@ -23,6 +25,8 @@ export const useSettingsStore = create<SettingsState>()(persist((set) => ({
   selectedFuelType: 'regular',
   selectedRadius: 5,
   sortOrder: 'price',
+  hideUnpricedStations: false,
+  setHideUnpricedStations: (hideUnpricedStations) => set({ hideUnpricedStations }),
   mapsPreference: null,
   refillPercent: 10,
   setMapsPreference: (mapsPreference) => set({ mapsPreference }),

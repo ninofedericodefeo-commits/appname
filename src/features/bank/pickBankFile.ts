@@ -4,8 +4,9 @@ import { File, Paths } from 'expo-file-system';
 import { MAX_CSV_BYTES } from './importLogic';
 import { MAX_PDF_BYTES } from './pdfTypes';
 import type { IncomingBankFile } from './incomingBankFile';
+import type { BankFile } from './bankFileTypes';
 
-export type BankFile = { name: string; kind: 'csv'; text: string } | { name: string; kind: 'pdf'; base64: string };
+export type { BankFile } from './bankFileTypes';
 
 export async function readIncomingBankFile(incoming: IncomingBankFile): Promise<BankFile> {
   if (!/^(?:file|content):\/\//i.test(incoming.uri) || Platform.OS === 'web') throw new Error('Choose the downloaded statement from Files.');
@@ -17,7 +18,7 @@ export async function readIncomingBankFile(incoming: IncomingBankFile): Promise<
     if (original.size > maxBytes) throw new Error(pdf ? 'Choose a PDF under 10 MB.' : 'Choose a CSV under 2 MB.');
     await original.copy(copy);
     if (copy.size > maxBytes) throw new Error(pdf ? 'Choose a PDF under 10 MB.' : 'Choose a CSV under 2 MB.');
-    if (!pdf) return { name: incoming.name, kind: 'csv', text: await copy.text() };
+    if (!pdf) return { name: incoming.name, kind: 'csv', text: await copy.text(), base64: await copy.base64() };
     const base64 = await copy.base64();
     if (base64.length > Math.ceil(MAX_PDF_BYTES / 3) * 4) throw new Error('Choose a PDF under 10 MB.');
     return { name: incoming.name, kind: 'pdf', base64 };
@@ -46,16 +47,15 @@ export async function pickBankFile(): Promise<BankFile | null> {
     if (size > (pdf ? MAX_PDF_BYTES : MAX_CSV_BYTES)) throw new Error(pdf ? 'Choose a PDF under 10 MB.' : 'Choose a CSV under 2 MB.');
     if (!pdf) {
       const text = Platform.OS === 'web' && asset.file ? await asset.file.text() : await copied!.text();
-      return { name: asset.name, kind: 'csv', text };
+      const base64 = Platform.OS === 'web' && asset.file ? browserBase64(new Uint8Array(await asset.file.arrayBuffer())) : await copied!.base64();
+      return { name: asset.name, kind: 'csv', text, base64 };
     }
     let base64: string;
     if (Platform.OS === 'web' && asset.file) {
       const bytes = new Uint8Array(await asset.file.arrayBuffer());
       if (bytes.byteLength > MAX_PDF_BYTES) throw new Error('Choose a PDF under 10 MB.');
       // Chunk conversion avoids argument/stack limits on phone browsers.
-      let binary = '';
-      for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
-      base64 = btoa(binary);
+      base64 = browserBase64(bytes);
     } else base64 = await copied!.base64();
     if (base64.length > Math.ceil(MAX_PDF_BYTES / 3) * 4) throw new Error('Choose a PDF under 10 MB.');
     return { name: asset.name, kind: 'pdf', base64 };
@@ -64,4 +64,10 @@ export async function pickBankFile(): Promise<BankFile | null> {
       try { copied.delete(); } catch { /* Remove only our cache copy. */ }
     }
   }
+}
+
+function browserBase64(bytes: Uint8Array) {
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 16384) binary += String.fromCharCode(...bytes.subarray(offset, offset + 16384));
+  return btoa(binary);
 }

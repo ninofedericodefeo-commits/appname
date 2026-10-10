@@ -64,15 +64,20 @@ test('Repeated bank reference IDs retain the app purchase link while adding only
   assert.equal(pocketTransactions(result.state.accountTransactions, result.state.purchases).length, 1);
 });
 
-test('Closing balance applies once without double-subtracting spending; a newer manual balance survives repeat/older statements', () => {
+test('A confirmed PDF restores its closing balance after a manual edit without duplicating transactions or balance keys', () => {
   const initial = state();
   const parsed = review('Date,Description,Amount\n09/08/2026,Shop,-10.00\n09/09/2026,Payroll,1000.00', initial);
   const result = applyAccountImport(initial, parsed.selected, false, 'Checking', parsed.movements, { balance }, now);
   assert.equal(result.state.reportedBalanceCents, balance.amountCents); assert.equal(result.state.balanceAsOf, '2026-09-30');
   assert.equal(result.state.reservedCents, 25000); assert.equal(result.transactionsAdded, 2);
   const manual = { ...result.state, reportedBalanceCents: 400000, balanceSource: 'manual', balanceAsOf: '2026-10-10' };
-  assert.equal(statementBalanceStatus(manual, balance, 'Checking', now), 'applied');
-  assert.equal(applyAccountImport(manual, [], false, 'Checking', [], { balance }, now).state.reportedBalanceCents, 400000);
+  assert.equal(statementBalanceStatus(manual, balance, 'Checking', now), 'older');
+  const restored = applyAccountImport(manual, [], false, 'Checking', [], { balance }, now);
+  assert.equal(restored.state.reportedBalanceCents, balance.amountCents);
+  assert.equal(restored.balanceUpdated, true); assert.equal(restored.transactionsAdded, 0);
+  assert.equal(restored.state.statementBalanceKeys.length, 1);
+  assert.equal(statementBalanceStatus(restored.state, balance, 'Checking', now), 'applied');
+  assert.equal(applyAccountImport(manual, [], false, 'Checking', [], {}, now).state.reportedBalanceCents, 400000);
   const older = { ...balance, asOf: '2026-08-31' };
   assert.equal(statementBalanceStatus(manual, older, 'Checking', now), 'older');
   assert.equal(statementBalanceStatus(manual, { ...balance, asOf: '2026-12-31' }, 'Checking', now), 'invalid');

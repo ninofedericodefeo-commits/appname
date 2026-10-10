@@ -1,6 +1,6 @@
 .station-map-shell { position: relative; height: 370px; width: 100%; background: #E8EFDD; font-family: system-ui, sans-serif; }
 .station-map { height: 100%; width: 100%; }
-.station-pin { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 5px 9px; background: #173A35; color: #FFFEF9; border: 2px solid #FFFEF9; border-radius: 22px; box-shadow: 0 2px 7px #173A3540; font-weight: 800; font-size: 13px; }
+.station-pin { box-sizing: border-box; display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 5px 9px; background: #173A35; color: #FFFEF9; border: 2px solid #FFFEF9; border-radius: 22px; box-shadow: 0 2px 7px #173A3540; font-weight: 800; font-size: 13px; white-space: nowrap; }
 .station-pin.example { background: #FFFEF9; color: #61756B; border-color: #B9C8BA; }
 .station-pin.selected { background: #A63F21; color: #FFFEF9; border-color: #FFFEF9; }
 .map-message { position: absolute; z-index: 1100; left: 10px; right: 50px; top: 10px; padding: 10px; border-radius: 6px; background: #FFFEF9; color: #173A35; font-size: 12px; box-shadow: 0 2px 8px #173A3520; }

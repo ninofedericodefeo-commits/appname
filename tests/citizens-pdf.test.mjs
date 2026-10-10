@@ -17,6 +17,13 @@ const page = (rows, { number = 1, period = '09/01/2026 - 09/30/2026', bank = 'Ci
 const state = () => ({ activeGoal: null, reservedCents: 0, reportedBalanceCents: 250000, purchases: [], entries: [], bankImportKeys: [] });
 const review = (statement, history = [], keys = []) => previewBankCSV(statement.csv, guessMapping(statement.csv), 'Main checking', history, keys, now);
 
+test('A statement with no readable transactions can still supply a clear closing balance', () => {
+  const parsed = parseCitizensStatement([page([], { section: 'Account summary', extra: line(60, ['Ending balance $2,456.42', 40]) })], now);
+  assert.equal(parsed.csv.rows.length, 0); assert.equal(parsed.balance.amountCents, 245642);
+  assert.equal(parsed.balance.asOf, '2026-09-30');
+  assert.match(parsed.warnings[0].reason, /No transactions could be read/);
+});
+
 test('The bundled PDF engine extracts a real synthetic PDF, imports only purchases and feeds subscription suggestions', async () => {
   const bytes = await readFile(new URL('./fixtures/citizens-synthetic.pdf', import.meta.url));
   // The engine must never fetch a worker, font or original statement over the network.

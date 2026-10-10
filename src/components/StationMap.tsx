@@ -53,11 +53,12 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
     for (const pin of pins) {
       const label = document.createElement('span');
       label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}`;
-      label.textContent = `${pin.stopNumber ? `${pin.stopNumber} · ` : ''}${pin.price === null ? 'Gas' : `$${pin.price.toFixed(2)}`}${pin.sample && pin.price !== null ? '*' : ''}`;
+      label.textContent = `${pin.stopNumber ? `${pin.stopNumber} · ` : ''}${pin.price === null ? 'N/A' : `$${pin.price.toFixed(3)}`}${pin.sample && pin.price !== null ? '*' : ''}`;
       const description = `${pin.name} · ${pin.price === null ? 'Price not reported' : `${pin.sample ? 'Sample price ' : 'Unverified price '}$${pin.price.toFixed(3)} per gallon`}`;
       const tooltip = document.createElement('span');
       tooltip.textContent = description;
-      const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: label, className: 'station-marker', iconSize: [88, 44], iconAnchor: [44, 22] }), title: description, alt: description })
+      const width = pin.stopNumber ? 112 : 88;
+      const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: label, className: 'station-marker', iconSize: [width, 44], iconAnchor: [width / 2, 22] }), title: description, alt: description })
         .bindTooltip(tooltip).on('click', () => { void onSelect(pin.id); }).addTo(group);
       if (pin.id === selectedId) marker.setZIndexOffset(1000);
     }
