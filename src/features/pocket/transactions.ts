@@ -75,7 +75,7 @@ export function linkAccountTransactions<T extends AccountTransaction & { rowNumb
   const byRow = new Map(purchases.map((item) => [item.rowNumber, item]));
   return movements.map((item) => {
     const purchase = byRow.get(item.rowNumber);
-    const linkedPurchaseId = purchase && (selectedIds.has(purchase.id) || purchase.duplicate === 'known' ? purchase.id : purchase.matchId);
+    const linkedPurchaseId = purchase && (selectedIds.has(purchase.id) ? purchase.id : purchase.matchId ?? (purchase.duplicate === 'known' ? purchase.id : undefined));
     return linkedPurchaseId ? { ...item, linkedPurchaseId } : item;
   });
 }

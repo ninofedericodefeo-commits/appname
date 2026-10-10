@@ -105,3 +105,45 @@ test('Reject unsupported bank/card/multi-account/currency/scanned PDFs and overs
   const abort = new AbortController(); abort.abort();
   await assert.rejects(extractPDFText('', abort.signal), /canceled/);
 });
+
+test('Page 2 card spending is read under withdrawal headings with counts/totals and page 3 credits remain intact', () => {
+  const first = page([], { extra: line(60, ['Ending balance $2,456.42', 40]), section: 'Account summary' });
+  const second = page([[['09-08', 40], ['POS Wawa', 110], ['4.47', 400]], [['09-08', 40], ['POS Wawa', 110], ['4.47', 400]], [['09-09', 40], ["Dunkin'", 110], ['6.08', 400]]], { number: 2, section: 'ATM and Debit Card Withdrawals (3)', headers: [['Date', 40], ['Transaction Description', 110], ['Amount ($)', 400]] });
+  const third = page([[['09/10', 40], ['Payroll', 110], ['100.00', 400]]], { number: 3, section: 'Deposits and Credits $100.00' });
+  const parsed = parseCitizensStatement([first, second, third], now);
+  assert.deepEqual(parsed.pageCounts, [{ page: 1, spending: 0, credits: 0 }, { page: 2, spending: 3, credits: 0 }, { page: 3, spending: 0, credits: 1 }]);
+  assert.equal(parsed.balance.amountCents, 245642); assert.equal(parsed.balance.asOf, '2026-09-30');
+  assert.equal(review(parsed).rows.length, 3);
+  assert.equal(previewAccountTransactions(parsed.csv, guessMapping(parsed.csv), 'Main checking', now).rows.length, 4);
+});
+
+test('Explicit debit/credit columns identify direction without a recognized section, and ambiguous directions warn', () => {
+  const parsed = parseCitizensStatement([page([
+    [['09/08', 40], ['Shop', 110], ['10.00', 350], ['0.00', 450]], [['09/09', 40], ['Payroll', 110], ['0.00', 350], ['100.00', 450]],
+    [['09/10', 40], ['Ambiguous', 110], ['10.00', 350], ['20.00', 450]],
+  ], { section: 'Transaction details', headers: [['Date', 40], ['Description', 110], ['Withdrawals', 350], ['Deposits', 450]] })], now);
+  assert.equal(parsed.csv.rows[0][2], '10.00'); assert.equal(parsed.csv.rows[1][3], '100.00');
+  assert.equal(parsed.csv.rows[0][1], 'Shop'); assert.equal(parsed.csv.rows[1][1], 'Payroll');
+  assert.equal(parsed.warnings.length, 1);
+});
+
+test('Balance extraction ignores beginning/running/average balances and refuses conflicting closing balances', () => {
+  const rows = [[['09/08', 40], ['Shop', 110], ['5.50', 400]]];
+  const first = page(rows, { period: '09/01/26 - 09/30/26', extra: [...line(45, ['Beginning balance $9,000.00', 40]), ...line(60, ['Closing balance $1,234.56', 40])] });
+  const parsed = parseCitizensStatement([first], now);
+  assert.equal(parsed.balance.amountCents, 123456);
+  const second = page(rows, { number: 2, extra: line(60, ['Ending balance $1,111.11', 40]) });
+  assert.equal(parseCitizensStatement([first, second], now).balance, null);
+  const absent = page(rows, { extra: line(60, ['Average daily balance $8,000.00', 40]) });
+  assert.equal(parseCitizensStatement([absent], now).balance, null);
+  const split = page(rows, { extra: [...line(55, ['Ending balance', 40]), ...line(68, ['$1,234.56', 400])] });
+  assert.equal(parseCitizensStatement([split], now).balance.amountCents, 123456);
+});
+
+test('Unknown spending on a later page warns instead of silently carrying an account-summary skip section', () => {
+  const first = page([], { section: 'Account summary' });
+  const second = page([[['09/08', 40], ['Shop', 110], ['5.50', 400]]], { number: 2, section: 'Unrecognized transactions' });
+  const third = page([[['09/09', 40], ['Payroll', 110], ['100.00', 400]]], { number: 3, section: 'Deposits' });
+  const parsed = parseCitizensStatement([first, second, third], now);
+  assert.equal(parsed.warnings[0].page, 2); assert.equal(parsed.pageCounts[1].spending, 0);
+});

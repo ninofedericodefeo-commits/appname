@@ -20,7 +20,7 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 }
 
 export default function PocketScreen() {
-  const { reportedBalanceCents, balanceUpdatedAt, reservedCents, activeGoal, entries, purchases, accountTransactions, setReportedBalance, reserve, release } = usePocketStore();
+  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, setReportedBalance, reserve, release } = usePocketStore();
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
@@ -60,9 +60,9 @@ export default function PocketScreen() {
         <View style={styles.pocketRow}><Text style={styles.pocketLabel}>Set aside</Text><Text style={styles.pocketValue}>{money(reservedCents)}</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel={showCurrentBalance ? 'Hide current bank balance' : 'Show current bank balance'} accessibilityState={{ expanded: showCurrentBalance }} onPress={() => setShowCurrentBalance(!showCurrentBalance)} style={styles.currentRow}>
           <Text style={styles.currentLabel}>Current balance</Text>
-          <View style={styles.currentValueGroup}><Text style={styles.currentValue}>{showCurrentBalance ? (reportedBalanceCents === null ? 'Not entered' : money(reportedBalanceCents)) : '••••'}</Text><Text style={styles.reveal}>{showCurrentBalance ? '⌄' : '›'}</Text></View>
+          <View style={styles.currentValueGroup}><Text style={styles.currentValue}>{showCurrentBalance ? (reportedBalanceCents === null ? 'Not entered' : money(reportedBalanceCents)) : 'Show'}</Text><Text style={styles.reveal}>{showCurrentBalance ? '⌄' : '›'}</Text></View>
         </Pressable>
-        {balanceUpdatedAt && <Text style={styles.updated}>Balance saved {new Date(balanceUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
+        {balanceSource === 'citizens-pdf' && balanceAsOf ? <Text style={styles.updated}>Statement balance · {new Date(`${balanceAsOf}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text> : balanceUpdatedAt && <Text style={styles.updated}>Balance saved {new Date(balanceUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
         {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>Your set-aside amount is above your saved bank balance. Update the balance or lower your set-aside amount.</Text>}
         <View style={styles.accountActions}>
           <AccountAction label="Update balance" path="m16 3 5 5M3 21l5-1L20 8a3.54 3.54 0 0 0-5-5L3 15v6Z" onPress={() => { Keyboard.dismiss(); setEditingBalance(!editingBalance); setEditingPocket(false); }} />

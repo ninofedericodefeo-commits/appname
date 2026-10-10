@@ -14,9 +14,17 @@ module.exports = ({ config }) => {
 
   return {
     ...config,
+    ios: { ...config.ios, infoPlist: { ...config.ios.infoPlist,
+      CFBundleDocumentTypes: [
+        ...(config.ios.infoPlist.CFBundleDocumentTypes ?? []),
+        { CFBundleTypeName: 'Bank statement', CFBundleTypeRole: 'Viewer', LSHandlerRank: 'Alternate', LSItemContentTypes: ['com.adobe.pdf', 'public.comma-separated-values-text'] },
+      ],
+      // iOS gives us an Inbox copy; this works with a free Personal Team.
+      LSSupportsOpeningDocumentsInPlace: false,
+    } },
     plugins: [...plugins, ['expo-sharing', {
-      ios: { enabled: enableIosCapabilities, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1 } },
-      android: { enabled: true, singleShareMimeTypes: ['text/plain'] },
+      ios: { enabled: enableIosCapabilities, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1, supportsFileWithMaxCount: 1 } },
+      android: { enabled: true, singleShareMimeTypes: ['text/plain', 'application/pdf', 'text/csv'] },
     }]],
     extra: {
       ...config.extra,

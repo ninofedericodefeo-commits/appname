@@ -140,8 +140,6 @@ function validateBankMapping(csv: BankCSV, mapping: BankMapping, accountLabel: s
 export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel: string, history: LoggedPurchase[], importedKeys: string[], now = new Date()) {
   validateBankMapping(csv, mapping, accountLabel);
   const known = new Set([...importedKeys, ...history.map((purchase) => purchase.id)]);
-  const matching = new Map<string, LoggedPurchase>();
-  for (const purchase of history) matching.set(`${dayKey(purchase.purchasedAt)}|${purchase.amountCents}`, purchase);
   const occurrences = new Map<string, number>();
   const rows: BankPreviewRow[] = [], excluded: { rowNumber: number; reason: string }[] = [];
   csv.rows.forEach((row, index) => {
@@ -175,16 +173,74 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
     const base = JSON.stringify([normalize(accountLabel), dayKey(purchasedAt), amountCents, normalize(description)]);
     const occurrence = (occurrences.get(base) ?? 0) + 1; occurrences.set(base, occurrence);
     const id = identity(sourceId ? JSON.stringify([normalize(accountLabel), 'id', sourceId]) : `${base}|${occurrence}`);
-    const match = matching.get(`${dayKey(purchasedAt)}|${amountCents}`);
-    const duplicate = known.has(id) ? 'known' : match ? 'possible' : null;
+    const duplicate = known.has(id) ? 'known' : null;
     // Duplicate bank IDs in one file are never selected twice.
     known.add(id);
-    rows.push({ id, title: description.slice(0, 80), amountCents, purchasedAt, rowNumber, duplicate, matchTitle: match?.title, matchId: match?.id,
+    rows.push({ id, title: description.slice(0, 80), amountCents, purchasedAt, rowNumber, duplicate,
       bankSource: csv.source ?? 'csv', bankAccountLabel: accountLabel.trim(), recurringHint: /\brecurring\b/i.test(description),
       ...(csv.locations?.[index] ? { pageNumber: csv.locations[index].page, lineNumber: csv.locations[index].line } : {}),
     });
   });
+  matchBankPurchases(rows, history, accountLabel);
   return { rows, excluded };
+}
+
+const calendarDay = (iso: string) => {
+  const date = new Date(iso);
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86400000;
+};
+function merchantWords(title: string) {
+  return normalize(title).replace(/\b(?:pos|purchase|debit|card|recurring|checkcard|visa|payment|ach|ref|reference|auth)\b|\d+|[^a-z ]/g, ' ').trim().split(/\s+/).filter((word) => word.length > 2);
+}
+
+// Reserve known matches first, then pair the strongest merchant/date matches.
+// Every existing purchase can explain only one row in this statement.
+function matchBankPurchases(rows: BankPreviewRow[], history: LoggedPurchase[], account: string) {
+  const byKey = new Map<string, LoggedPurchase>();
+  const byAmountDay = new Map<string, LoggedPurchase[]>();
+  for (const purchase of history) {
+    byKey.set(purchase.id, purchase);
+    for (const key of purchase.bankMatchKeys ?? []) byKey.set(key, purchase);
+    if (purchase.bankAccountLabel && normalize(purchase.bankAccountLabel) !== normalize(account)) continue;
+    if (!Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
+    const key = `${purchase.amountCents}|${calendarDay(purchase.purchasedAt)}`;
+    const group = byAmountDay.get(key) ?? [];
+    group.push(purchase); byAmountDay.set(key, group);
+  }
+  const used = new Set<string>();
+  for (const row of rows) {
+    const match = byKey.get(row.id);
+    if (match) {
+      row.duplicate = 'known'; row.matchId = match.id; row.matchTitle = match.title;
+      used.add(match.id);
+    }
+  }
+  for (const mode of ['exact', 'merchant', 'amount'] as const) {
+    for (const row of rows) {
+      if (row.duplicate === 'known' || row.matchId) continue;
+      const words = merchantWords(row.title);
+      let match: LoggedPurchase | undefined;
+      for (const delta of mode === 'amount' ? [0] : [0, -1, 1, -2, 2, -3, 3]) {
+        match = (byAmountDay.get(`${row.amountCents}|${calendarDay(row.purchasedAt) + delta}`) ?? []).find((purchase) => {
+          if (used.has(purchase.id)) return false;
+          if (mode === 'amount') return true;
+          const existing = merchantWords(purchase.title);
+          if (mode === 'exact') return words.length > 0 && words.join(' ') === existing.join(' ');
+          const shared = words.filter((word) => existing.includes(word)).length;
+          return shared > 0 && shared / Math.max(1, Math.min(words.length, existing.length)) >= 0.5;
+        });
+        if (match) break;
+      }
+      if (!match) continue;
+      row.duplicate = 'possible'; row.matchId = match.id; row.matchTitle = match.title;
+      used.add(match.id);
+    }
+  }
+  const matchedKeys = new Map(rows.filter((row) => row.matchId).map((row) => [row.id, row]));
+  for (const row of rows) {
+    const match = matchedKeys.get(row.id);
+    if (row.duplicate === 'known' && !row.matchId && match) { row.matchId = match.matchId; row.matchTitle = match.matchTitle; }
+  }
 }
 
 // Keep account movements separately from savings purchases. This lets Pocket

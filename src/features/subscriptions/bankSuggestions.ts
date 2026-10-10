@@ -31,9 +31,10 @@ export function suggestBankSubscriptions(history: LoggedPurchase[], subscription
   const groups = new Map<string, { merchant: ReturnType<typeof bankMerchant>; charges: LoggedPurchase[] }>();
   const seen = new Set<string>();
   const existing = new Set(subscriptions.flatMap((subscription) => [subscription.bankMerchantKey, bankMerchant(subscription.name).key]).filter(Boolean));
-  for (const purchase of history) {
+  for (const record of history) {
+    const purchase = { ...record, title: record.bankDescription ?? record.title, purchasedAt: record.bankPostedAt ?? record.purchasedAt };
     const date = new Date(purchase.purchasedAt);
-    if (purchase.source !== 'bank-import' || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 ||
+    if ((purchase.source !== 'bank-import' && !purchase.bankSource) || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 ||
       !Number.isFinite(date.getTime()) || date > now || calendarDay(now) - calendarDay(date) > 800 ||
       /\b(?:transfer|xfer|zelle|venmo|cash app|refund|reversal|atm|fee|overdraft|loan|mortgage)\b|credit card payment|cardmember payment/i.test(purchase.title)) continue;
     seen.add(purchase.id);

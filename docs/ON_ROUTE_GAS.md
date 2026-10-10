@@ -2,7 +2,7 @@
 
 Gas opens in **Map**, with an optional **List** view. Select a price marker to see directions, reports and history. Stations arrive from the nearby search progressively. Unknown prices say **Gas** on the map and **No price yet** in their card. The sample-data banner is removed. **Report a price** and **Gas on your drive** sit below the map. Google-provider results, if configured, stay in List rather than being drawn on an OpenStreetMap basemap; choose Nearby map inside Filters to return.
 
-The map uses bundled MapLibre GL JS 6.13.0 in an Expo DOM component, with react-native-webview on iOS/Android and normal DOM on web. OpenFreeMap's Positron style provides vector streets, labels and water with required OpenFreeMap/OpenMapTiles/OpenStreetMap attribution. Price pills, numbered route stops, a blue location dot, zoom controls, recentering and a blue drive route are supported. Selection and price updates preserve the user's map position; a new location or route fits the results. Empty routes clear the route line. The matching module worker is loaded from the pinned official package on UNPKG. OpenFreeMap public hosting is free with no key, registration or billing account. No prefetch or offline download is added. `EXPO_PUBLIC_MAP_TILE_URL` is no longer used. Internet/WebGL are required; loading failures offer Retry and the station List remains available. Public map hosting, OSRM routing and Overpass station lookup are best-effort services.
+The map uses bundled Leaflet 1.9.4 in an Expo DOM component, with react-native-webview on iOS/Android and normal DOM on web. The original raster OpenStreetMap map is restored at the user’s request. `EXPO_PUBLIC_MAP_TILE_URL` can override the tile URL; default tiles retain OpenStreetMap attribution. Price pins, unknown-price Gas pins, numbered route stops, zoom controls and drive-route lines are supported. Selection and price updates retain the map position. Internet is required; loading failures leave the station List available. No paid key, account, worker CDN or WebGL is required. Public tiles, OSRM routing and Overpass lookup are best-effort services.
 
 ## Save cars once
 
@@ -97,5 +97,5 @@ Use EAS development builds once an enrolled developer account and EAS profiles a
 
 ### Account/Gas cleanup verification (October 10, 2026)
 
-- MapLibre/OpenFreeMap Positron loads in the mobile web preview without a key. Synthetic Philadelphia points verify priced/unknown numbered markers, selected state, price updates with unchanged camera, route line clearing, zoom and recenter. Gas has no sample-data banner; both gas actions sit below the map.
+- The restored Leaflet/OpenStreetMap map loads at phone width without a key; both gas actions remain below the map and the sample banner remains removed. Unknown-price markers say Gas. Prior route/pin verification remains applicable to the restored implementation; physical native gestures need checking.
 - Lint, TypeScript, 113 logic tests and iOS/Android/web exports pass. Installed iPhone/Android status-bar positioning, WebGL/module-worker loading, offline Retry, pinch zoom and scrolling remain physical-device checks.
