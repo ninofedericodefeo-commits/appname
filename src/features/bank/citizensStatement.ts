@@ -6,7 +6,7 @@ import type { PDFTextItem, PDFTextPage } from './pdfTypes.ts';
 
 type Line = { text: string; items: PDFTextItem[]; number: number };
 export type StatementWarning = { page: number; line: number; reason: string };
-export type CitizensStatement = { csv: BankCSV; pages: number; periods: string[]; warnings: StatementWarning[]; balance: StatementBalance | null; pageCounts: { page: number; spending: number; credits: number }[] };
+export type CitizensStatement = { csv: BankCSV; pages: number; periods: string[]; warnings: StatementWarning[]; balance: StatementBalance | null; accountIdentifier: string | null; pageCounts: { page: number; spending: number; credits: number }[] };
 
 export function pdfLines(items: PDFTextItem[]): Line[] {
   const groups: { y: number; items: PDFTextItem[] }[] = [];
@@ -58,7 +58,7 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
   const headingText = pdfLines(pages[0].items).slice(0, 12).map((line) => line.text).join(' ');
   if (/\bcredit card statement\b/i.test(headingText) || (!/\b(?:checking|savings)\b/i.test(bankHeader) && /\b(?:minimum payment|payment due date)\b/i.test(headingText))) throw new Error('This looks like a credit card statement. Citizens checking and savings PDFs are supported first.');
   if (/\b(?:currency|amounts? in)\s*:?\s*(?:CAD|EUR|GBP|AUD|Canadian|Euros|Pounds)\b/i.test(allText)) throw new Error('Only USD Citizens statements are supported.');
-  const accountNumbers = [...allText.matchAll(/\baccount\s+(?:number|no\.?)\s*[:#]?\s*([*xX\d -]{4,})/gi)].map((match) => match[1].replace(/[^*xX\d]/g, ''));
+  const accountNumbers = [...allText.matchAll(/\baccount\s+(?:number|no\.?)\s*[:#]?\s*([*xX\d -]{4,})/gi)].map((match) => match[1].replace(/[^*xX\d]/g, '').toLowerCase());
   if (new Set(accountNumbers).size > 1) throw new Error('This PDF contains multiple accounts. Choose one checking or savings account statement at a time.');
   const csv: BankCSV = { headers: ['Date', 'Description', 'Debit', 'Credit', 'Type', 'Currency'], rows: [], source: 'citizens-pdf', locations: [] };
   const warnings: StatementWarning[] = [];
@@ -174,5 +174,5 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
   if (!csv.rows.length && (!latest || conflict)) throw new Error('No supported transaction table or clear closing balance was found. Choose a downloaded Citizens checking/savings statement.');
   if (!csv.rows.length) warnings.push({ page: latest.page, line: latest.line, reason: 'No transactions could be read; this import updates only the closing balance' });
   const pageCounts = pages.map((page) => ({ page: page.page, spending: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[2]).length, credits: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[3]).length }));
-  return { csv, pages: pages.length, periods, warnings, balance: latest && !conflict ? latest : null, pageCounts };
+  return { csv, pages: pages.length, periods, warnings, balance: latest && !conflict ? latest : null, accountIdentifier: accountNumbers[0] ?? null, pageCounts };
 }

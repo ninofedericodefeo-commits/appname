@@ -13,6 +13,7 @@ import type { BankFile } from '@/features/bank/bankFileTypes';
 import { readBankImport, saveBankImport } from '@/features/bank/importArchive';
 import { takeBankFile } from '@/features/bank/incomingBankFile';
 import { applyAccountImport, statementBalanceStatus } from '@/features/bank/accountImport';
+import { importSharedStatement, prepareAutomaticStatement } from '@/features/bank/statementAutomation';
 import PDFStatementReader from '@/features/bank/PDFStatementReader';
 import { parseCitizensStatement } from '@/features/bank/citizensStatement';
 import type { CitizensStatement } from '@/features/bank/citizensStatement';
@@ -20,6 +21,7 @@ import { linkAccountTransactions, mergeAccountTransactions } from '@/features/po
 import { ruleDescription } from '@/features/goals/logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
+import { useStatementAutomationStore } from '@/stores/statementAutomationStore';
 import { colors } from '@/theme';
 
 type Column = Exclude<keyof BankMapping, 'mode' | 'spendingSign' | 'dateOrder'>;
@@ -45,10 +47,12 @@ export default function BankImportScreen() {
   const { bankFileToken, archiveId } = useLocalSearchParams<{ bankFileToken?: string; archiveId?: string }>();
   const consumedToken = useRef('');
   const consumedArchive = useRef('');
+  const processedPDF = useRef(0);
   const pocket = usePocketStore();
   const hydrated = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
+  const automationHydrated = useSyncExternalStore(useStatementAutomationStore.persist.onFinishHydration, useStatementAutomationStore.persist.hasHydrated, () => false);
   const [csv, setCSV] = useState<BankCSV | null>(null);
-  const [pdfJob, setPDFJob] = useState<{ id: number; name: string; base64: string } | null>(null);
+  const [pdfJob, setPDFJob] = useState<{ id: number; name: string; base64: string; file: BankFile; shared: boolean } | null>(null);
   const [statement, setStatement] = useState<CitizensStatement | null>(null);
   const [sourceFile, setSourceFile] = useState<BankFile | null>(null);
   const [mapping, setMapping] = useState<BankMapping | null>(null);
@@ -58,7 +62,9 @@ export default function BankImportScreen() {
   const [paste, setPaste] = useState('');
   const [showPaste, setShowPaste] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [automaticSaving, setAutomaticSaving] = useState(false);
   const [error, setError] = useState('');
+  const [automaticReview, setAutomaticReview] = useState('');
   const [column, setColumn] = useState<Column | null>(null);
   const [advanced, setAdvanced] = useState(false);
   const [selectionOverrides, setSelectionOverrides] = useState<Map<string, boolean>>(new Map());
@@ -71,14 +77,15 @@ export default function BankImportScreen() {
   const [showHelp, setShowHelp] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
-  const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean } | null>(null);
+  const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean; automatic?: boolean } | null>(null);
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
   useEffect(() => {
     if (!pdfJob) return;
     // The host also times out if the native DOM engine fails to load.
     const timer = setTimeout(() => {
-      if (request.current !== pdfJob.id) return;
+      if (request.current !== pdfJob.id || processedPDF.current === pdfJob.id) return;
+      processedPDF.current = pdfJob.id;
       request.current++; setPDFJob(null); setBusy(false);
       setError('Reading this PDF took too long. Try a smaller statement.');
     }, 45_000);
@@ -112,15 +119,17 @@ export default function BankImportScreen() {
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setPaste(''); setShowPaste(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
+    setAutomaticReview('');
     Keyboard.dismiss();
   }, []);
-  const openFile = useCallback((file: BankFile, current: number) => {
+  const openFile = useCallback((file: BankFile, current: number, shared = false) => {
     setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setDone(null);
+    setAutomaticReview('');
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
-    else setPDFJob({ id: current, name: file.name, base64: file.base64 });
+    else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
   }, [load]);
   useEffect(() => {
-    if (!hydrated || !bankFileToken || consumedToken.current === bankFileToken) return;
+    if (!hydrated || !automationHydrated || !bankFileToken || consumedToken.current === bankFileToken) return;
     const current = ++request.current;
     void Promise.resolve().then(async () => {
       if (current !== request.current) return;
@@ -132,12 +141,14 @@ export default function BankImportScreen() {
         if (!incoming) throw new Error('This file handoff expired. Choose the statement from Files.');
         const file = await readIncomingBankFile(incoming);
         if (current !== request.current) return;
-        readingPDF = file.kind === 'pdf'; openFile(file, current);
+        const setup = useStatementAutomationStore.getState();
+        if (setup.enabled && setup.accountLabel) setAccountDraft(setup.accountLabel);
+        readingPDF = file.kind === 'pdf'; openFile(file, current, true);
       } catch (cause) {
         if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not open this shared statement. Choose it from Files.');
       } finally { if (current === request.current && !readingPDF) setBusy(false); }
     });
-  }, [bankFileToken, hydrated, openFile]);
+  }, [bankFileToken, hydrated, automationHydrated, openFile]);
   useEffect(() => {
     if (!hydrated || !archiveId || consumedArchive.current === archiveId) return;
     const current = ++request.current;
@@ -155,7 +166,7 @@ export default function BankImportScreen() {
       } finally { if (current === request.current && !readingPDF) setBusy(false); }
     });
   }, [archiveId, hydrated, openFile]);
-  function cancelReading() { request.current++; setPDFJob(null); setBusy(false); }
+  function cancelReading() { request.current++; setPDFJob(null); setBusy(false); setAutomaticSaving(false); setAutomaticReview(''); }
   async function chooseFile() {
     const current = ++request.current;
     setBusy(true); setError('');
@@ -183,6 +194,8 @@ export default function BankImportScreen() {
       });
       if (current !== request.current) return;
       const result = usePocketStore.getState().importBankPurchases(selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions);
+      if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
+        { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false });
       setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setPaste(''); setSelectionOverrides(new Map());
     } catch (cause) {
       if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not save the file in Imports. Try again.');
@@ -199,9 +212,9 @@ export default function BankImportScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>BANK HISTORY</Text>
       <Text style={styles.title}>Import bank log</Text>
-      <Text style={styles.body}>Choose a Citizens checking/savings statement PDF or a bank CSV, then review the transactions. Confirmed files are saved in your Imports folder; charges also help find subscriptions.</Text>
+      <Text style={styles.body}>Import a Citizens checking/savings PDF or bank CSV. Files are saved in Imports; spending also helps find subscriptions.</Text>
       {done ? <View style={styles.card}>
-        <Text style={styles.section}>Bank log saved</Text>
+        <Text style={styles.section}>{done.automatic ? 'Statement imported automatically' : 'Bank log saved'}</Text>
         <Text style={styles.body}>{done.transactionsAdded.toLocaleString()} new bank transactions · {done.imported.toLocaleString()} purchases added for goals and subscriptions.</Text>
         <Text style={styles.hint}>Your file is saved in Imports.</Text>
         {done.balanceUpdated && <Text style={styles.body}>Account balance updated from the statement’s closing balance.</Text>}
@@ -215,9 +228,10 @@ export default function BankImportScreen() {
         <Button label="Review subscription suggestions" onPress={() => router.navigate('/subscriptions')} />
         <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
       </View> : <>
-        {!csv && <View style={styles.card}>
-          <Button label={busy ? (pdfJob ? 'Reading PDF…' : 'Choosing file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
+        {(!csv || automaticSaving) && <View style={styles.card}>
+          <Button label={busy ? (automaticSaving ? 'Saving shared statement…' : pdfJob ? 'Reading PDF…' : 'Opening file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
           <Button label="Saved imports" secondary onPress={() => router.push('/bank-imports')} disabled={busy} />
+          <Button label="Set up quick statement import" secondary onPress={() => router.push('/statement-automation')} disabled={busy} />
           {busy && <Button label="Cancel" secondary onPress={cancelReading} />}
           <Button label={showPaste ? 'Hide pasted CSV' : 'Or paste CSV'} secondary onPress={() => setShowPaste(!showPaste)} />
           {showPaste && <><TextInput multiline value={paste} onChangeText={setPaste} maxLength={MAX_CSV_BYTES} style={[styles.input, styles.csvInput]}
@@ -227,21 +241,22 @@ export default function BankImportScreen() {
           {showHelp && <View style={styles.help}>
             <Text style={styles.section}>Send a PDF to Account</Text>
             <Button label="Open Citizens website" secondary onPress={() => { void Linking.openURL('https://www.citizensbank.com/mobile-and-online-banking/online-banking.aspx').catch(() => setError('Could not open Citizens. Sign in through your browser and open Document Center.')); }} />
-            <Text style={styles.body}>1. Sign in to Citizens online banking in Safari and open Document Center. Download your checking or savings statement PDF.</Text>
-            <Text style={styles.body}>2. Open the PDF, tap Share, then choose GasFinder (or Open in GasFinder). The app will read it and open this review automatically.</Text>
-            <Text style={styles.body}>3. Check the transactions and closing balance, then save the import.</Text>
+            <Text style={styles.body}>1. Open your checking or savings statement PDF in the Citizens app. You can also use Document Center in Citizens online banking.</Text>
+            <Text style={styles.body}>2. Tap Share, then GasFinder Import Statement (after adding the shortcut above), or Open in GasFinder.</Text>
+            <Text style={styles.body}>3. With automatic import enabled, matching PDFs that read cleanly are saved for you. Otherwise check this review and save.</Text>
             <Text style={styles.hint}>If GasFinder isn’t listed, use Save to Files, then choose the PDF here. Opening PDFs in GasFinder requires the latest app build.</Text>
             <Text style={styles.hint}>Citizens requires your sign-in to download statements. This handoff automates reading the downloaded PDF; it does not sign in to your bank.</Text>
             <Text style={styles.hint}>Enable Citizens’ e-statement alerts to know when your next statement is ready. Each confirmed import is kept here so you won’t need to download it again.</Text>
           </View>}
           <Text style={styles.hint}>Citizens checking/savings PDF: up to 10 MB / 40 pages. Download the original statement from Citizens, rather than a scan or photo. CSV, TSV or text exports: up to 2 MB / 5,000 rows.</Text>
         </View>}
-        {csv && mapping && <>
+        {csv && mapping && !automaticSaving && <>
+          {automaticReview ? <View style={styles.card}><Text style={styles.section}>A quick review is needed</Text><Text style={styles.body}>{automaticReview}</Text></View> : null}
           <View style={styles.card}>
             <View style={styles.rowBetween}><Text style={styles.section}>{statement ? 'Citizens statement' : 'Check columns'}</Text><Button label="Change file" secondary disabled={busy} onPress={() => { cancelReading(); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setError(''); }} /></View>
             <Text style={styles.hint}>{name} · {csv.rows.length.toLocaleString()} rows</Text>
             <Text style={styles.label}>Account nickname</Text>
-            <TextInput value={account} onChangeText={setAccountDraft} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
+            <TextInput value={account} onChangeText={setAccountDraft} editable={!busy} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
             <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
             {statement && <><Text style={styles.body}>{statement.pages} pages · {statement.periods.join(' · ')}</Text><Text style={styles.hint}>Check every amount against your statement. Credits, transfers, checks and fees are excluded from purchase totals. Spending is included in Account history.</Text>
               {statement.balance && <Text style={styles.transactionTitle}>Account balance {formatMoney(statement.balance.amountCents)} · closes {new Date(`${statement.balance.asOf}T12:00:00`).toLocaleDateString()}</Text>}
@@ -315,15 +330,41 @@ export default function BankImportScreen() {
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
     </FormScrollView>
     {pdfJob && <PDFStatementReader key={pdfJob.id} base64={pdfJob.base64} dom={{ style: { width: 1, height: 1 }, scrollEnabled: false }} onRead={async (pages) => {
-      if (request.current !== pdfJob.id) return;
+      if (request.current !== pdfJob.id || processedPDF.current === pdfJob.id) return;
+      processedPDF.current = pdfJob.id;
+      // Parsing is complete: the reader timeout must not cancel a file archive.
+      setPDFJob(null);
       try {
         const parsed = parseCitizensStatement(pages);
         setStatement(parsed); setBalanceOverride(null); setCSV(parsed.csv); setMapping(guessMapping(parsed.csv)); setName(pdfJob.name);
         setPaste(''); setShowPaste(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
         setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20); Keyboard.dismiss();
-      } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read this Citizens statement.'); }
-      finally { setPDFJob(null); setBusy(false); }
-    }} onError={async (message) => { if (request.current === pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
+        if (pdfJob.shared && useStatementAutomationStore.getState().enabled) {
+          setAutomaticSaving(true);
+          const result = await importSharedStatement({
+            prepare: () => {
+              const setup = useStatementAutomationStore.getState();
+              // The nickname shown in this draft must still be the configured one.
+              return setup.accountLabel.toLowerCase() !== account.trim().toLowerCase()
+                ? { status: 'review', reason: 'Your import account changed while this PDF was being read. Review the account nickname before saving.' }
+                : prepareAutomaticStatement(setup, true, parsed, usePocketStore.getState());
+            },
+            isCurrent: () => request.current === pdfJob.id,
+            archive: (automatic) => saveBankImport(pdfJob.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
+              purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf }),
+            commit: (automatic) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.accountLabel, automatic.history, { balance: automatic.balance }),
+          });
+          if (request.current !== pdfJob.id || result.status === 'canceled') return;
+          if (result.status === 'review') setAutomaticReview(result.reason);
+          else {
+            useStatementAutomationStore.getState().confirmImport(account, parsed.accountIdentifier,
+              { name: pdfJob.name, importedAt: new Date().toISOString(), balanceAsOf: parsed.balance!.asOf, automatic: true });
+            setDone({ ...result.result, automatic: true }); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null);
+          }
+        }
+      } catch (cause) { if (request.current === pdfJob.id) setError(cause instanceof Error ? cause.message : 'Could not read or save this Citizens statement. Review it and try again.'); }
+      finally { if (request.current === pdfJob.id) { setBusy(false); setAutomaticSaving(false); } }
+    }} onError={async (message) => { if (request.current === pdfJob.id && processedPDF.current !== pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
     <Modal visible={column !== null} transparent animationType="fade" onRequestClose={() => setColumn(null)}>
       <View style={styles.scrim}><SafeAreaView style={styles.modal}>
         <View style={styles.modalHeader}><Text style={styles.section}>Choose {column ? columnNames[column].toLowerCase() : 'column'}</Text><IconButton icon="close" label="Close column selection" onPress={() => setColumn(null)} /></View>

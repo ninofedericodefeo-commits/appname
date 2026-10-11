@@ -87,6 +87,7 @@ export default function PocketScreen() {
       </View>}
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
+      <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/statement-automation')}><Text style={styles.link}>Quick statement import ›</Text></Pressable>
     </FormScrollView>
   </SafeAreaView>;
 }
