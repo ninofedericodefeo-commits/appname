@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyBankImport, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '../src/features/bank/importLogic.ts';
-import { filterTransactions, linkAccountTransactions, mergeAccountTransactions, pocketTransactions, transactionDisplayName } from '../src/features/pocket/transactions.ts';
+import { filterTransactions, hideTransactionFromHistory, linkAccountTransactions, mergeAccountTransactions, pocketTransactions, transactionDisplayName } from '../src/features/pocket/transactions.ts';
+import { applyAccountImport } from '../src/features/bank/accountImport.ts';
+import { suggestBankSubscriptions } from '../src/features/subscriptions/bankSuggestions.ts';
 import { bankTransactionName } from '../src/features/bank/merchantName.ts';
 import { availableCents } from '../src/features/pocket/logic.ts';
 
@@ -12,6 +14,85 @@ function read(text, overrides = {}, account = 'Checking') {
   return { csv, mapping, ...previewAccountTransactions(csv, mapping, account, now) };
 }
 const purchase = (overrides = {}) => ({ id: 'manual-1', title: 'Coffee', amountCents: 500, purchasedAt: new Date(2026, 9, 8, 12).toISOString(), source: 'manual', decision: 'pending', ...overrides });
+
+test('Remove each history source, persist removal, and undo without changing the financial records', () => {
+  const bank = read('Date,Description,Amount\n10/08/2026,Coffee,-5\n10/09/2026,Payroll,2000').rows;
+  const purchases = [purchase(), purchase({ id: 'shortcut-1', source: 'shortcut' })];
+  const entries = [{ id: 'reserve', amountCents: 5000, createdAt: '2026-10-10T12:00:00Z', kind: 'reserve' }];
+  const original = structuredClone({ bank, purchases, entries });
+  const rows = pocketTransactions(bank, purchases, entries);
+  for (const row of rows) {
+    const result = hideTransactionFromHistory(rows, [], row.id);
+    const persisted = JSON.parse(JSON.stringify(result.hiddenIds));
+    assert.equal(pocketTransactions(bank, purchases, entries, persisted).length, rows.length - 1);
+    assert.ok(!pocketTransactions(bank, purchases, entries, persisted).some(item => item.id === row.id));
+    const restored = persisted.filter(id => !result.removedIds.includes(id));
+    assert.deepEqual(pocketTransactions(bank, purchases, entries, restored), rows);
+  }
+  assert.deepEqual({ bank, purchases, entries }, original);
+  assert.deepEqual(hideTransactionFromHistory(rows, [], 'unknown'), { hiddenIds: [], removedIds: [] });
+});
+
+test('Removing a linked purchase hides both identities, keeps real equal purchases, and survives reimport', () => {
+  const csv = parseBankCSV('Date,Description,Amount\n10/08/2026,Coffee,-5\n10/08/2026,Coffee,-5');
+  const logged = purchase();
+  const initial = { purchases: [logged], accountTransactions: [], bankImportKeys: [], entries: [], activeGoal: null, reportedBalanceCents: 100000, reservedCents: 5000 };
+  const mapping = guessMapping(csv);
+  const preview = previewBankCSV(csv, mapping, 'Checking', initial.purchases, [], now);
+  const selected = preview.rows.filter(row => !row.duplicate);
+  const history = linkAccountTransactions(previewAccountTransactions(csv, mapping, 'Checking', now).rows, preview.rows, new Set(selected.map(row => row.id)));
+  const first = applyAccountImport(initial, selected, false, 'Checking', history, { matches: preview.rows.filter(row => row.duplicate === 'possible') }, now).state;
+  const rows = pocketTransactions(first.accountTransactions, first.purchases);
+  const linked = rows.find(row => row.linkedPurchaseId === logged.id);
+  const removed = hideTransactionFromHistory(rows, [], linked.id);
+  assert.deepEqual(new Set(removed.hiddenIds), new Set([linked.id, logged.id]));
+  const state = { ...first, hiddenTransactionIds: removed.hiddenIds };
+  const repeated = applyAccountImport(state, [], false, 'Checking', history, {}, now);
+  assert.equal(repeated.transactionsAdded, 0); assert.equal(repeated.imported, 0);
+  assert.deepEqual(repeated.state.hiddenTransactionIds, removed.hiddenIds);
+  const visible = pocketTransactions(repeated.state.accountTransactions, repeated.state.purchases, [], repeated.state.hiddenTransactionIds);
+  assert.equal(visible.length, 1); assert.notEqual(visible[0].id, linked.id);
+  assert.equal(repeated.state.reportedBalanceCents, initial.reportedBalanceCents);
+  assert.equal(repeated.state.reservedCents, initial.reservedCents);
+  assert.deepEqual(pocketTransactions([], first.purchases, [], removed.hiddenIds).map(row => row.id), [visible[0].purchase.id]);
+});
+
+test('A removed manual purchase stays removed after bank linking and its savings contribution cannot resurface', () => {
+  const logged = purchase();
+  const contribution = { id: 'contribution', amountCents: 100, createdAt: logged.purchasedAt, purchaseId: logged.id, kind: 'reserve' };
+  const removed = hideTransactionFromHistory(pocketTransactions([], [logged], [contribution]), [], logged.id);
+  const bank = read('Date,Description,Amount\n10/08/2026,Coffee,-5').rows.map(row => ({ ...row, linkedPurchaseId: logged.id }));
+  assert.deepEqual(pocketTransactions(bank, [logged], [contribution], removed.hiddenIds), []);
+  assert.deepEqual(pocketTransactions(bank, [], [contribution], removed.hiddenIds), []);
+  // Undo only the IDs introduced by this removal, preserving earlier removals.
+  const prehidden = [bank[0].id];
+  const next = hideTransactionFromHistory(pocketTransactions(bank, [logged]), prehidden, bank[0].id);
+  assert.deepEqual(next.removedIds, [logged.id]);
+  assert.deepEqual(next.hiddenIds.filter(id => !next.removedIds.includes(id)), prehidden);
+});
+
+test('History removal preserves subscription evidence and already confirmed savings', () => {
+  const purchases = [purchase({ title: 'Netflix', source: 'bank-import', bankSource: 'citizens-pdf', bankAccountLabel: 'Checking', decision: 'saved', savedCents: 100, amountCents: 1599 })];
+  const before = suggestBankSubscriptions(purchases, [], [], now);
+  assert.equal(before.length, 1);
+  const removed = hideTransactionFromHistory(pocketTransactions([], purchases), [], purchases[0].id);
+  assert.deepEqual(pocketTransactions([], purchases, [], removed.hiddenIds), []);
+  assert.deepEqual(suggestBankSubscriptions(purchases, [], [], now), before);
+  assert.equal(purchases[0].savedCents, 100);
+});
+
+test('A removed Citizens row stays removed when reimport repairs its earlier parser identity', () => {
+  const csv = parseBankCSV('Date,Description,Debit,Credit\n10/08/2026,VENMO CASHOUT SAMPLE,,10');
+  csv.source = 'citizens-pdf';
+  const corrected = previewAccountTransactions(csv, guessMapping(csv), 'Checking', now).rows;
+  const old = { ...corrected[0], id: 'account-aaaaaaaaaaaaaaaa', amountCents: -1000 };
+  const state = { purchases: [], entries: [], activeGoal: null, bankImportKeys: [], reportedBalanceCents: 100000, reservedCents: 5000,
+    accountTransactions: [old], hiddenTransactionIds: [old.id] };
+  const result = applyAccountImport(state, [], false, 'Checking', corrected, {}, now);
+  assert.equal(result.transactionsAdded, 0); assert.equal(result.transactionsUpdated, 1);
+  assert.deepEqual(pocketTransactions(result.state.accountTransactions, [], [], result.state.hiddenTransactionIds), []);
+  assert.deepEqual(state.hiddenTransactionIds, [old.id]);
+});
 
 test('Account history retains signed deposits, transfers, fees and pending entries, rejects invalid/non-USD rows', () => {
   const history = read('Date,Description,Debit,Credit,Type,Status,Currency\n10/08/2026,Payroll,,2000,Deposit,Posted,USD\n10/08/2026,Transfer,250,,Transfer,Posted,USD\n10/08/2026,Service fee,3,,Fee,Posted,USD\n10/09/2026,Coffee,5,,Sale,Pending,USD\n10/08/2026,Ambiguous,1,2,Sale,Posted,USD\n10/08/2026,Euro,5,,Sale,Posted,EUR\n10/11/2026,Future,5,,Sale,Posted,USD\n10/08/2026,,5,,Sale,Posted,USD\n10/08/2026,Invalid,bad,,Sale,Posted,USD');

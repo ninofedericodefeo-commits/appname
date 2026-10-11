@@ -61,6 +61,11 @@ export default function StatementAutomationScreen() {
           {!isIPhone && <Text style={styles.hint}>Add this shortcut from GasFinder on your iPhone. You can configure automatic import below.</Text>}
           <Text style={styles.hint}>Keep the name “{STATEMENT_SHORTCUT_NAME}”. Returning here does not confirm it was added.</Text>
         </>}
+        <Text style={styles.section}>Get your Citizens PDF</Text>
+        <Text style={styles.body}>Open a checking or savings statement in the Citizens app, or Document Center in online banking. Tap Share → {Platform.OS === 'android' ? 'GasFinder' : 'GasFinder Import Statement'}. GasFinder reads and saves the PDF, then asks whether to use its closing balance.</Text>
+        <Text style={styles.hint}>If the share option isn’t listed, save the PDF to Files and choose it in Account → Import statement. Use the original PDF, not a scan or photo.</Text>
+        <Button label="Open Citizens online banking" secondary onPress={() => { void Linking.openURL('https://www.citizensbank.com/mobile-and-online-banking/online-banking.aspx').catch(() => setError('Could not open Citizens. Open online banking in your browser and use Document Center.')); }} />
+        <Text style={styles.hint}>Citizens requires you to sign in to download statements. Enable its e-statement alerts to know when the next one is ready.</Text>
       </View>
       <View style={styles.card}>
         <Text style={styles.section}>2. Choose how PDFs are saved</Text>

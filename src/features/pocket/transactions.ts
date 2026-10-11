@@ -34,6 +34,7 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
     rows.push(item); legacyByDate.set(key, rows);
   }
   let added = 0, updated = 0;
+  const replacedIds: { from: string; to: string }[] = [];
   for (const item of incoming) {
     if (!/^account-[a-f0-9]{16}$/.test(item.id) || !item.title.trim() || item.title.length > 80 ||
       !Number.isSafeInteger(item.amountCents) || item.amountCents === 0 || Math.abs(item.amountCents) > 100_000_000 ||
@@ -62,18 +63,19 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
       ...(item.linkedPurchaseId || old?.linkedPurchaseId ? { linkedPurchaseId: item.linkedPurchaseId ?? old?.linkedPurchaseId } : {}) };
     if (!old) added++;
     else if (JSON.stringify(old) !== JSON.stringify(next)) updated++;
-    if (old && old.id !== item.id) transactions.delete(old.id);
+    if (old && old.id !== item.id) { transactions.delete(old.id); replacedIds.push({ from: old.id, to: item.id }); }
     transactions.set(item.id, next);
   }
-  return { transactions: [...transactions.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated };
+  return { transactions: [...transactions.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
 }
 
 export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 
-export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = []): PocketTransaction[] {
+export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = [], hiddenIds: string[] = []): PocketTransaction[] {
   const linked = new Set(bank.map((item) => item.linkedPurchaseId).filter(Boolean));
   const seen = new Set(bank.map((item) => item.id));
   const byPurchase = new Map(purchases.map((item) => [item.id, item]));
+  const adjustmentPurchases = new Map(adjustments.map((item) => [`savings-${item.id}`, item.purchaseId]));
   const rows: PocketTransaction[] = bank.map((item) => ({ ...item, purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
   for (const purchase of purchases) {
     if (linked.has(purchase.id) || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 || !Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
@@ -90,7 +92,22 @@ export function pocketTransactions(bank: AccountTransaction[], purchases: Logged
     rows.push({ id: `savings-${item.id}`, title: item.kind === 'assign' ? 'Assigned savings to goal' : item.kind === 'reserve' ? 'Money set aside' : 'Set-aside reduced',
       amountCents: item.kind === 'release' ? -item.amountCents : item.amountCents, occurredAt: item.createdAt, source: 'savings', status: 'adjustment', accountLabel: '', adjustmentKind: item.kind });
   }
-  return rows.sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+  const hidden = new Set(hiddenIds);
+  return rows.filter((row) => !hidden.has(row.id) && !hidden.has(row.linkedPurchaseId ?? row.purchase?.id ?? '') &&
+    // A deleted purchase can leave its savings entry visible. Keep that entry
+    // hidden too when the user removed the purchase from history.
+    !(row.source === 'savings' && hidden.has(adjustmentPurchases.get(row.id) ?? '')))
+    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+}
+
+// Keep the original records for duplicate matching, balances and subscriptions.
+// Remember both identities so a linked bank row or purchase cannot resurface.
+export function hideTransactionFromHistory(rows: PocketTransaction[], hiddenIds: string[], id: string) {
+  const row = rows.find((item) => item.id === id);
+  if (!row) return { hiddenIds, removedIds: [] as string[] };
+  const hidden = new Set(hiddenIds);
+  const removedIds = [row.id, row.linkedPurchaseId ?? row.purchase?.id].filter((value): value is string => !!value && !hidden.has(value));
+  return { hiddenIds: [...new Set([...hiddenIds, ...removedIds])], removedIds: [...new Set(removedIds)] };
 }
 
 // A bank movement and its savings purchase describe the same charge. Keep the

@@ -6,6 +6,7 @@ import type { AccountTransaction } from '../pocket/transactions.ts';
 export type StatementBalance = { amountCents: number; asOf: string; page: number; line: number };
 export type AccountImportState = BankImportState & {
   accountTransactions: AccountTransaction[];
+  hiddenTransactionIds?: string[];
   balanceUpdatedAt?: string | null;
   balanceAsOf?: string | null;
   balanceSource?: 'manual' | 'citizens-pdf' | null;
@@ -48,7 +49,10 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
       bankSource: rows[0].bankSource, bankAccountLabel: account.trim(), recurringHint: purchase.recurringHint || rows.some((row) => row.recurringHint) };
   });
   const movements = mergeAccountTransactions(state.accountTransactions, history, now);
-  return { state: { ...withBalance, ...result.state, purchases, bankImportKeys: [...keys], accountTransactions: movements.transactions },
+  const hidden = new Set(state.hiddenTransactionIds ?? []);
+  for (const replacement of movements.replacedIds) if (hidden.has(replacement.from)) hidden.add(replacement.to);
+  return { state: { ...withBalance, ...result.state, purchases, bankImportKeys: [...keys], accountTransactions: movements.transactions,
+    ...(state.hiddenTransactionIds ? { hiddenTransactionIds: [...hidden] } : {}) },
     imported: result.imported, skipped: result.skipped, savedCents: result.savedCents,
     matched: matched.size, balanceUpdated, transactionsAdded: movements.added, transactionsUpdated: movements.updated };
 }

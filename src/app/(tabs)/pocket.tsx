@@ -20,7 +20,7 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 }
 
 export default function PocketScreen() {
-  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, setReportedBalance, reserve, release } = usePocketStore();
+  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, setReportedBalance, reserve, release } = usePocketStore();
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
@@ -33,7 +33,7 @@ export default function PocketScreen() {
   const balanceFontSize = availableLabel.length > 9 ? Math.max(28, Math.floor(414 / availableLabel.length)) : 46;
   const unassigned = reservedCents - (activeGoal?.savedCents ?? 0);
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries), [accountTransactions, purchases, entries]);
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds), [accountTransactions, purchases, entries, hiddenTransactionIds]);
 
   function updateBalance() {
     const cents = parseDollars(balanceInput);
@@ -87,7 +87,7 @@ export default function PocketScreen() {
       </View>}
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
-      <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/statement-automation')}><Text style={styles.link}>Quick statement import ›</Text></Pressable>
+      <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/settings')}><Text style={styles.link}>Settings ›</Text></Pressable>
     </FormScrollView>
   </SafeAreaView>;
 }

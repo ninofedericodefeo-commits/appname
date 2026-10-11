@@ -3,6 +3,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { AccountTransaction } from '@/features/pocket/transactions';
+import { hideTransactionFromHistory, pocketTransactions } from '@/features/pocket/transactions';
 import { canReserve } from '@/features/pocket/logic';
 import { applyAccountImport } from '@/features/bank/accountImport';
 import type { AccountImportOptions } from '@/features/bank/accountImport';
@@ -31,6 +32,9 @@ type PocketState = {
   archivedGoals: ArchivedGoal[];
   purchases: LoggedPurchase[];
   accountTransactions: AccountTransaction[];
+  hiddenTransactionIds: string[];
+  removeTransactionFromHistory: (id: string) => string[];
+  restoreTransactionsToHistory: (ids: string[]) => void;
   bankImportKeys: string[];
   bankImportAccountLabel: string;
   importBankPurchases: (purchases: BankPurchase[], applyRule: boolean, accountLabel: string, history?: AccountTransaction[], options?: AccountImportOptions) => { imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean };
@@ -69,6 +73,17 @@ export const usePocketStore = create<PocketState>()(
       archivedGoals: [],
       purchases: [],
       accountTransactions: [],
+      hiddenTransactionIds: [],
+      removeTransactionFromHistory: (id) => {
+        const state = get();
+        const result = hideTransactionFromHistory(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.hiddenTransactionIds, id);
+        if (result.removedIds.length) set({ hiddenTransactionIds: result.hiddenIds });
+        return result.removedIds;
+      },
+      restoreTransactionsToHistory: (ids) => {
+        const restored = new Set(ids);
+        set((state) => ({ hiddenTransactionIds: state.hiddenTransactionIds.filter((id) => !restored.has(id)) }));
+      },
       bankImportKeys: [],
       bankImportAccountLabel: 'Main account',
       importBankPurchases: (purchases, applyRule, accountLabel, history = [], options = {}) => {
@@ -180,7 +195,7 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }),
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 6,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 7,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
@@ -191,6 +206,7 @@ export const usePocketStore = create<PocketState>()(
           statementBalanceKeys: previous.statementBalanceKeys ?? [],
           bankImportKeys: previous.bankImportKeys ?? [],
           accountTransactions: previous.accountTransactions ?? [],
+          hiddenTransactionIds: previous.hiddenTransactionIds ?? [],
           bankImportAccountLabel: previous.bankImportAccountLabel ?? 'Main account',
           activeGoal: previous.activeGoal ? { ...previous.activeGoal, setAsideRule: previous.activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE } : null,
           archivedGoals: (previous.archivedGoals ?? []).map((goal) => ({ ...goal, setAsideRule: goal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE })),

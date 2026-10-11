@@ -1,12 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import * as Linking from 'expo-linking';
 import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { IconButton } from '@/components/IconButton';
-import { guessMapping, MAX_CSV_BYTES, parseBankCSV, previewAccountTransactions, previewBankCSV } from '@/features/bank/importLogic';
+import { guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '@/features/bank/importLogic';
 import type { BankCSV, BankMapping } from '@/features/bank/importLogic';
 import { pickBankFile, readIncomingBankFile } from '@/features/bank/pickBankFile';
 import type { BankFile } from '@/features/bank/bankFileTypes';
@@ -61,8 +60,6 @@ export default function BankImportScreen() {
   const [name, setName] = useState('');
   const [accountDraft, setAccountDraft] = useState<string | null>(null);
   const account = accountDraft ?? pocket.bankImportAccountLabel;
-  const [paste, setPaste] = useState('');
-  const [showPaste, setShowPaste] = useState(false);
   const [busy, setBusy] = useState(false);
   const [automaticSaving, setAutomaticSaving] = useState(false);
   const [pendingAutomatic, setPendingAutomatic] = useState<{ id: number; statement: CitizensStatement; file: BankFile; accountLabel: string } | null>(null);
@@ -77,7 +74,7 @@ export default function BankImportScreen() {
   const [applyRule, setApplyRule] = useState(false);
   const [saveHistory, setSaveHistory] = useState(true);
   const [balanceOverride, setBalanceOverride] = useState<boolean | null>(null);
-  const [showHelp, setShowHelp] = useState(false);
+  const [reviewOptions, setReviewOptions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
   const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean; automatic?: boolean } | null>(null);
@@ -115,21 +112,20 @@ export default function BankImportScreen() {
   const importOptions = useMemo(() => ({ matches: matchedRows, balance: updateBalance ? statement?.balance : null }), [matchedRows, updateBalance, statement?.balance]);
   const plan = useMemo(() => applyAccountImport(pocket, selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions), [pocket, selected, applyRule, account, saveHistory, history, importOptions]);
   const canImport = sourceFile !== null || selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0 || plan.matched > 0 || plan.balanceUpdated;
-  const total = selected.reduce((sum, row) => sum + row.amountCents, 0);
   const purchaseRows = useMemo(() => [...review.rows].sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt)), [review.rows]);
   const historyRows = useMemo(() => [...historyReview.rows].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [historyReview.rows]);
 
   const load = useCallback((text: string, filename: string) => {
     const parsed = parseBankCSV(text);
     setStatement(null); setBalanceOverride(null);
-    setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setPaste(''); setShowPaste(false);
+    setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setReviewOptions(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
     setAutomaticReview(''); setPendingAutomatic(null);
     Keyboard.dismiss();
   }, []);
   const openFile = useCallback((file: BankFile, current: number, shared = false) => {
-    setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setDone(null);
+    setReviewOptions(false); setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setDone(null);
     setAutomaticReview(''); setPendingAutomatic(null);
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
     else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
@@ -218,7 +214,7 @@ export default function BankImportScreen() {
       if (current !== request.current) return;
       const message = cause instanceof Error ? cause.message : '';
       setError(/native module|ExpoDocumentPicker|Cannot find native/i.test(message)
-        ? 'File picking needs a rebuilt app. You can paste the CSV below to import now.'
+        ? 'File picking needs the latest app build. Update GasFinder and choose your PDF or CSV again.'
         : message || 'Could not open this file. Choose a PDF or CSV from Files.');
     } finally { if (current === request.current && !readingPDF) setBusy(false); }
   }
@@ -235,85 +231,48 @@ export default function BankImportScreen() {
       const result = usePocketStore.getState().importBankPurchases(selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions);
       if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
         { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false });
-      setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setPaste(''); setSelectionOverrides(new Map());
+      setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
     } catch (cause) {
       if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not save the file in Imports. Try again.');
     } finally { if (current === request.current) setBusy(false); }
   }
   function columnField(field: Column) {
     return <Pressable key={field} accessibilityRole="button" accessibilityLabel={`Choose ${columnNames[field]} column`}
-      onPress={() => setColumn(field)} style={styles.field}>
+      onPress={() => { setReviewOptions(true); setColumn(field); }} style={styles.field}>
       <Text style={styles.label}>{columnNames[field]}</Text><Text style={styles.fieldValue}>{mapping && mapping[field] >= 0 ? csv?.headers[mapping[field]] : 'Not selected'} ▾</Text>
     </Pressable>;
   }
 
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <FormScrollView contentContainerStyle={styles.content}>
-      <Text style={styles.kicker}>BANK HISTORY</Text>
-      <Text style={styles.title}>Import bank log</Text>
-      <Text style={styles.body}>Import a Citizens checking/savings PDF or bank CSV. Files are saved in Imports; spending also helps find subscriptions.</Text>
+      <Text accessibilityRole="header" style={styles.title}>Import statement</Text>
       {done ? <View style={styles.card}>
-        <Text style={styles.section}>{done.automatic ? 'Statement imported' : 'Bank log saved'}</Text>
+        <Text style={styles.section}>{done.automatic ? 'Statement imported' : 'Import saved'}</Text>
         <Text style={styles.body}>{done.transactionsAdded.toLocaleString()} new bank transactions · {done.imported.toLocaleString()} purchases added for goals and subscriptions.</Text>
         <Text style={styles.hint}>Your file is saved in Imports.</Text>
         {done.balanceUpdated && <Text style={styles.body}>Account balance updated from the statement’s closing balance.</Text>}
         {done.matched > 0 && <Text style={styles.hint}>{done.matched} existing purchase{done.matched === 1 ? '' : 's'} matched to the statement without adding a second purchase.</Text>}
         {done.transactionsUpdated > 0 && <Text style={styles.hint}>{done.transactionsUpdated.toLocaleString()} bank transactions updated.</Text>}
-        <Text style={styles.body}>{formatMoney(done.savedCents)} added to the set-aside estimate.</Text>
+        {done.savedCents > 0 && <Text style={styles.body}>{formatMoney(done.savedCents)} added to the set-aside estimate.</Text>}
         {done.skipped > 0 && <Text style={styles.hint}>{done.skipped.toLocaleString()} duplicate or invalid rows weren’t added.</Text>}
         <Button label="Open Account" onPress={() => router.navigate('/pocket')} />
-        <Button label="Open saved imports" secondary onPress={() => router.push('/bank-imports')} />
-        <Button label="Open savings goals" onPress={() => router.navigate('/investment')} />
-        <Button label="Review subscription suggestions" onPress={() => router.navigate('/subscriptions')} />
+        <Pressable accessibilityRole="button" style={styles.smallLink} onPress={() => router.push('/bank-imports')}><Text style={styles.linkText}>Saved imports ›</Text></Pressable>
         <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
       </View> : <>
-        {(!csv || automaticSaving) && <View style={styles.card}>
+        {(!csv || automaticSaving) && <View style={styles.landing}>
           <Button label={busy ? (automaticSaving ? 'Saving shared statement…' : pdfJob ? 'Reading PDF…' : 'Opening file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
-          <Button label="Saved imports" secondary onPress={() => router.push('/bank-imports')} disabled={busy} />
-          <Button label="Set up quick statement import" secondary onPress={() => router.push('/statement-automation')} disabled={busy} />
+          <Pressable accessibilityRole="button" style={styles.smallLink} onPress={() => router.push('/bank-imports')}><Text style={styles.linkText}>Saved imports ›</Text></Pressable>
           {busy && <Button label="Cancel" secondary onPress={cancelReading} />}
-          <Button label={showPaste ? 'Hide pasted CSV' : 'Or paste CSV'} secondary onPress={() => setShowPaste(!showPaste)} />
-          {showPaste && <><TextInput multiline value={paste} onChangeText={setPaste} maxLength={MAX_CSV_BYTES} style={[styles.input, styles.csvInput]}
-            autoCorrect={false} autoCapitalize="none" accessibilityLabel="Bank CSV contents" placeholder={'Date,Description,Amount\n10/08/2026,Coffee,-4.50'} />
-            <Button label="Review pasted CSV" disabled={!paste.trim() || busy || !hydrated} onPress={() => { try { load(paste, 'Pasted transactions.csv'); setSourceFile({ name: 'Pasted transactions.csv', kind: 'csv', text: paste }); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not read this CSV.'); } }} /></>}
-          <Button label={showHelp ? 'Hide Citizens setup' : 'Get statements from Citizens'} secondary onPress={() => setShowHelp(!showHelp)} />
-          {showHelp && <View style={styles.help}>
-            <Text style={styles.section}>Send a PDF to Account</Text>
-            <Button label="Open Citizens website" secondary onPress={() => { void Linking.openURL('https://www.citizensbank.com/mobile-and-online-banking/online-banking.aspx').catch(() => setError('Could not open Citizens. Sign in through your browser and open Document Center.')); }} />
-            <Text style={styles.body}>1. Open your checking or savings statement PDF in the Citizens app. You can also use Document Center in Citizens online banking.</Text>
-            <Text style={styles.body}>2. Tap Share, then GasFinder Import Statement (after adding the shortcut above), or Open in GasFinder.</Text>
-            <Text style={styles.body}>3. Choose whether to use the PDF’s closing balance or keep your saved balance. With quick import enabled, clean matching PDFs then save for you. Otherwise check this review and save.</Text>
-            <Text style={styles.hint}>If GasFinder isn’t listed, use Save to Files, then choose the PDF here. Opening PDFs in GasFinder requires the latest app build.</Text>
-            <Text style={styles.hint}>Citizens requires your sign-in to download statements. This handoff automates reading the downloaded PDF; it does not sign in to your bank.</Text>
-            <Text style={styles.hint}>Enable Citizens’ e-statement alerts to know when your next statement is ready. Each confirmed import is kept here so you won’t need to download it again.</Text>
-          </View>}
-          <Text style={styles.hint}>Citizens checking/savings PDF: up to 10 MB / 40 pages. Download the original statement from Citizens, rather than a scan or photo. CSV, TSV or text exports: up to 2 MB / 5,000 rows.</Text>
         </View>}
         {csv && mapping && !automaticSaving && <>
           {automaticReview ? <View style={styles.card}><Text style={styles.section}>A quick review is needed</Text><Text style={styles.body}>{automaticReview}</Text></View> : null}
           <View style={styles.card}>
-            <View style={styles.rowBetween}><Text style={styles.section}>{statement ? 'Citizens statement' : 'Check columns'}</Text><Button label="Change file" secondary disabled={busy} onPress={() => { cancelReading(); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setError(''); }} /></View>
-            <Text style={styles.hint}>{name} · {csv.rows.length.toLocaleString()} rows</Text>
-            <Text style={styles.label}>Account nickname</Text>
-            <TextInput value={account} onChangeText={setAccountDraft} editable={!busy} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
-            <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
-            {statement && <><Text style={styles.body}>{statement.pages} pages · {statement.periods.join(' · ')}</Text><Text style={styles.hint}>Check every amount against your statement. Credits, transfers, checks and fees are excluded from purchase totals. Spending is included in Account history.</Text>
-              {statement.pageCounts.map((page) => <Text key={page.page} style={styles.hint}>Page {page.page}: {page.spending} spending · {page.credits} credits</Text>)}
-              {statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} reading warnings. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
-            </>}
-            {!statement && <>{columnField('date')}{columnField('description')}
-            <View style={styles.row}><Choice label="One amount column" selected={mapping.mode === 'signed'} onPress={() => setMapping({ ...mapping, mode: 'signed' })} /><Choice label="Debit / credit columns" selected={mapping.mode === 'debit-credit'} onPress={() => setMapping({ ...mapping, mode: 'debit-credit' })} /></View>
-            {mapping.mode === 'signed' ? <>{columnField('amount')}<Text style={styles.label}>Money spent is</Text><View style={styles.row}>
-              <Choice label="Negative (−)" selected={mapping.spendingSign === 'negative'} onPress={() => setMapping({ ...mapping, spendingSign: 'negative' })} />
-              <Choice label="Positive (+)" selected={mapping.spendingSign === 'positive'} onPress={() => setMapping({ ...mapping, spendingSign: 'positive' })} />
-            </View></> : <>{columnField('debit')}{columnField('credit')}</>}
-            <Text style={styles.label}>Date order</Text><View style={styles.row}>
-              <Choice label="Month / day" selected={mapping.dateOrder === 'mdy'} onPress={() => setMapping({ ...mapping, dateOrder: 'mdy' })} />
-              <Choice label="Day / month" selected={mapping.dateOrder === 'dmy'} onPress={() => setMapping({ ...mapping, dateOrder: 'dmy' })} />
-            </View>
-            <Button label={advanced ? 'Hide extra columns' : 'More columns'} secondary onPress={() => setAdvanced(!advanced)} />
-            {advanced && <>{columnField('currency')}{columnField('type')}{columnField('status')}{columnField('transactionId')}</>}
-            <Text style={styles.hint}>USD only. Check the spending direction and exclude transfers or card payments before importing.</Text></>}
+            <View style={styles.rowBetween}><Text style={styles.section}>Selected file</Text><Pressable accessibilityRole="button" style={styles.smallLink} disabled={busy} onPress={() => { cancelReading(); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setError(''); }}><Text style={styles.linkText}>Change file</Text></Pressable></View>
+            <Text style={styles.body}>{name}</Text>
+            <Text style={styles.hint}>{account} · {historyReview.rows.length.toLocaleString()} bank transactions · {selected.length.toLocaleString()} new purchases</Text>
+            {matchedRows.length > 0 && <Text style={styles.hint}>{matchedRows.length} possible purchase match{matchedRows.length === 1 ? '' : 'es'} will link to existing purchases. Use Import options if these were separate purchases.</Text>}
+            {statement && <Text style={styles.hint}>{statement.pages} pages · {statement.periods.join(' · ')}</Text>}
+            {statement && statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} reading warnings. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
           </View>
           {statement && <View style={styles.card}>
             <Text style={styles.section}>Use the PDF’s balance?</Text>
@@ -329,7 +288,29 @@ export default function BankImportScreen() {
               <Text style={styles.hint}>A statement shows the balance on its closing date. Later purchases and deposits may have changed it.</Text>
             </> : <Text style={styles.hint}>No clear closing balance was found. Update your balance manually in Account.</Text>}
           </View>}
-          {review.error ? <Text accessibilityRole="alert" style={styles.error}>{review.error}</Text> : <View style={styles.card}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: reviewOptions || !!review.error }} disabled={!!review.error} style={styles.optionsToggle} onPress={() => setReviewOptions(!reviewOptions)}><Text style={styles.linkText}>Import options</Text><Text style={styles.linkText}>{reviewOptions || review.error ? '⌄' : '›'}</Text></Pressable>
+          {(reviewOptions || !!review.error) && <>
+            <View style={styles.card}>
+            <Text style={styles.section}>{statement ? 'Account and statement details' : 'Account and CSV columns'}</Text>
+            <Text style={styles.label}>Account nickname</Text>
+            <TextInput value={account} onChangeText={setAccountDraft} editable={!busy} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
+            <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
+            {statement && <>{statement.pageCounts.map((page) => <Text key={page.page} style={styles.hint}>Page {page.page}: {page.spending} spending · {page.credits} credits</Text>)}</>}
+            {!statement && <>{columnField('date')}{columnField('description')}
+            <View style={styles.row}><Choice label="One amount column" selected={mapping.mode === 'signed'} onPress={() => setMapping({ ...mapping, mode: 'signed' })} /><Choice label="Debit / credit columns" selected={mapping.mode === 'debit-credit'} onPress={() => setMapping({ ...mapping, mode: 'debit-credit' })} /></View>
+            {mapping.mode === 'signed' ? <>{columnField('amount')}<Text style={styles.label}>Money spent is</Text><View style={styles.row}>
+              <Choice label="Negative (−)" selected={mapping.spendingSign === 'negative'} onPress={() => setMapping({ ...mapping, spendingSign: 'negative' })} />
+              <Choice label="Positive (+)" selected={mapping.spendingSign === 'positive'} onPress={() => setMapping({ ...mapping, spendingSign: 'positive' })} />
+            </View></> : <>{columnField('debit')}{columnField('credit')}</>}
+            <Text style={styles.label}>Date order</Text><View style={styles.row}>
+              <Choice label="Month / day" selected={mapping.dateOrder === 'mdy'} onPress={() => setMapping({ ...mapping, dateOrder: 'mdy' })} />
+              <Choice label="Day / month" selected={mapping.dateOrder === 'dmy'} onPress={() => setMapping({ ...mapping, dateOrder: 'dmy' })} />
+            </View>
+            <Button label={advanced ? 'Hide extra columns' : 'More columns'} secondary onPress={() => setAdvanced(!advanced)} />
+            {advanced && <>{columnField('currency')}{columnField('type')}{columnField('status')}{columnField('transactionId')}</>}
+            <Text style={styles.hint}>USD only. Check the spending direction and exclude transfers or card payments before importing.</Text></>}
+          </View>
+            {review.error ? <Text accessibilityRole="alert" style={styles.error}>{review.error}</Text> : <View style={styles.card}>
             <Text style={styles.section}>Review purchases</Text>
             <Text style={styles.hint}>Possible matches start unchecked and will link to the existing app purchase. Select a match only if it is a different purchase. One app purchase can match only one statement row.</Text>
             <View style={styles.row}><Button label="Select new rows" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, !row.duplicate])))} /><Button label="Clear selection" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, false])))} /></View>
@@ -347,7 +328,7 @@ export default function BankImportScreen() {
                 {excludedLimit < review.excluded.length && <Button label="Show more skipped rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
             </>}
           </View>}
-          {!review.error && <View style={styles.card}>
+            {!review.error && <View style={styles.card}>
             <View style={styles.ruleRow}><Check checked={saveHistory} label="Save bank history to Account" onPress={() => setSaveHistory(!saveHistory)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>Save bank history to Account</Text><Text style={styles.hint}>{historyReview.rows.length.toLocaleString()} readable transactions, including spending, deposits, transfers and fees.</Text></View></View>
             <Text style={styles.hint}>Bank history is separate from the purchases selected above. Deposits, transfers and fees won’t trigger a savings rule.{statement ? ' Your balance choice above controls the update.' : ''}</Text>
             <Button label={`${showHistory ? 'Hide' : 'Review'} bank history`} secondary onPress={() => setShowHistory(!showHistory)} />
@@ -358,16 +339,19 @@ export default function BankImportScreen() {
             {historyReview.excluded.length > 0 && <Text style={styles.hint}>{historyReview.excluded.length.toLocaleString()} invalid, non-USD or empty rows won’t be saved to bank history.</Text>}
             {saveHistory && <Text style={styles.body}>{historyPlan.added} new · {historyPlan.updated} updated bank transactions</Text>}
           </View>}
-          <View style={styles.card}>
-            <Text style={styles.section}>{selected.length.toLocaleString()} selected · {formatMoney(total)}</Text>
+            <View style={styles.card}>
+            <Text style={styles.section}>Savings rule</Text>
             {pocket.activeGoal ? <View style={styles.ruleRow}>
               <Check checked={applyRule} label="Apply current goal rule to imported purchases" onPress={() => setApplyRule(!applyRule)} />
               <View style={styles.transactionMain}><Text style={styles.transactionTitle}>Apply my goal’s rule</Text><Text style={styles.hint}>{ruleDescription(pocket.activeGoal.setAsideRule)}</Text></View>
             </View> : <Text style={styles.hint}>Create a goal later to use this spending history for savings suggestions.</Text>}
             <Text style={styles.body}>{formatMoney(plan.savedCents)} will be added to the set-aside estimate{applyRule ? ', capped by your goal and entered balance' : ''}.</Text>
-            <Text style={styles.hint}>{updateBalance ? 'Your Account balance will be updated to the closing balance above. Transactions won’t be subtracted a second time.' : 'Your saved Account balance will stay as entered.'} Money stays in your bank account.</Text>
-            <Text style={styles.hint}>The original file will be saved in Imports. Saving the same file again keeps one copy.</Text>
-            <Button label={busy ? 'Saving import…' : selected.length ? `Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}` : 'Save statement'} disabled={!canImport || !!review.error || !hydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
+          </View>
+          </>}
+          <View style={styles.card}>
+            <Text style={styles.body}>Your original file will be saved in Imports. Spending helps find subscriptions.</Text>
+            {applyRule && <Text style={styles.hint}>{formatMoney(plan.savedCents)} will be added to your set-aside estimate.</Text>}
+            <Button label={busy ? 'Saving import…' : 'Save import'} disabled={!canImport || !!review.error || !hydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
           </View>
         </>}
       </>}
@@ -381,7 +365,7 @@ export default function BankImportScreen() {
       try {
         const parsed = parseCitizensStatement(pages);
         setStatement(parsed); setBalanceOverride(null); setCSV(parsed.csv); setMapping(guessMapping(parsed.csv)); setName(pdfJob.name);
-        setPaste(''); setShowPaste(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
+        setReviewOptions(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
         setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20); Keyboard.dismiss();
         if (pdfJob.shared && useStatementAutomationStore.getState().enabled) {
           const result = prepareSharedStatement(parsed, account);
@@ -419,19 +403,20 @@ export default function BankImportScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.paper }, content: { padding: 20, paddingBottom: 36, gap: 16 },
-  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }, title: { color: colors.ink, fontSize: 32, fontWeight: '800' },
+  title: { color: colors.ink, fontSize: 32, fontWeight: '800' },
   section: { color: colors.ink, fontSize: 20, fontWeight: '800', flexShrink: 1 }, body: { color: colors.inkSoft, fontSize: 14, lineHeight: 21 },
   hint: { color: colors.muted, fontSize: 12, lineHeight: 18 }, label: { color: colors.inkSoft, fontSize: 12, fontWeight: '700' },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 10, padding: 15, gap: 12 },
   button: { minHeight: 46, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.ink, padding: 12, borderRadius: 7 },
   buttonText: { color: colors.surface, fontWeight: '800', fontSize: 13, textAlign: 'center' }, secondary: { backgroundColor: colors.paper, borderWidth: 1, borderColor: colors.line }, secondaryText: { color: colors.ink }, disabled: { opacity: 0.45 },
-  input: { minHeight: 46, padding: 12, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, fontSize: 15, color: colors.ink, backgroundColor: colors.surface }, csvInput: { minHeight: 150, textAlignVertical: 'top' },
+  input: { minHeight: 46, padding: 12, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, fontSize: 15, color: colors.ink, backgroundColor: colors.surface },
   field: { minHeight: 52, borderColor: colors.line, borderWidth: 1, borderRadius: 7, padding: 10, gap: 4 }, fieldValue: { color: colors.ink, fontSize: 15 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 },
   choice: { minHeight: 44, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, padding: 10 }, selected: { backgroundColor: colors.ink, borderColor: colors.ink }, choiceText: { color: colors.ink, fontSize: 12, fontWeight: '700' }, selectedText: { color: colors.surface, fontSize: 15, fontWeight: '700' },
   transaction: { flexDirection: 'row', gap: 6, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 }, transactionMain: { flex: 1, gap: 4 }, transactionTitle: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '700' }, amount: { color: colors.ink, fontSize: 14, fontWeight: '800', fontVariant: ['tabular-nums'] }, match: { color: colors.accentDark, fontSize: 12, lineHeight: 18 },
   checkButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, check: { width: 24, height: 24, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }, ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  help: { gap: 12, paddingTop: 8 },
+  landing: { gap: 8 }, smallLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 4 }, linkText: { color: colors.primary, fontSize: 13, fontWeight: '700' },
+  optionsToggle: { minHeight: 44, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 4 },
   historyRow: { gap: 5, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 },
   credit: { color: colors.primary }, debit: { color: colors.danger }, balanceQuestion: { gap: 14 }, balanceAmount: { color: colors.ink, fontSize: 32, fontWeight: '800', fontVariant: ['tabular-nums'] },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 }, scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 }, modal: { maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 12, padding: 15 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between' }, option: { minHeight: 48, padding: 13, borderBottomWidth: 1, borderBottomColor: colors.line },

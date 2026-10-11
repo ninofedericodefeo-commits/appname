@@ -5,15 +5,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { LogPurchase } from '@/features/pocket/LogPurchase';
 import { TransactionRow } from '@/features/pocket/TransactionRow';
+import { TransactionRemovalNotice } from '@/features/pocket/TransactionRemovalNotice';
+import { useTransactionRemoval } from '@/features/pocket/useTransactionRemoval';
 import { filterTransactions, pocketTransactions } from '@/features/pocket/transactions';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 
 export default function AccountTransactionsScreen() {
-  const { accountTransactions, purchases, entries } = usePocketStore();
+  const { accountTransactions, purchases, entries, hiddenTransactionIds } = usePocketStore();
+  const removal = useTransactionRemoval();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'out' | 'in' | 'pending' | 'savings'>('all');
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries), [accountTransactions, purchases, entries]);
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds), [accountTransactions, purchases, entries, hiddenTransactionIds]);
   const filtered = useMemo(() => filterTransactions(transactions, query, filter), [transactions, query, filter]);
   const filters = [{ value: 'all', label: 'All' }, { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }, { value: 'pending', label: 'Pending' }, { value: 'savings', label: 'Savings' }] as const;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
@@ -27,10 +30,11 @@ export default function AccountTransactionsScreen() {
           <View style={styles.filters}>{filters.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: filter === item.value }} style={[styles.filter, filter === item.value && styles.selected]} onPress={() => setFilter(item.value)}><Text style={[styles.filterLabel, filter === item.value && styles.selectedLabel]}>{item.label}</Text></Pressable>)}</View>
           <Text style={styles.note}>{filtered.length} transaction{filtered.length === 1 ? '' : 's'} · bank history, purchases and savings</Text>
         </View>}
-        renderItem={({ item }) => <View style={styles.item}><TransactionRow transaction={item} /></View>}
+        renderItem={({ item }) => <View style={styles.item}><TransactionRow transaction={item} onRemove={removal.remove} /></View>}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={<Text style={styles.empty}>{transactions.length ? 'No transactions match this search or filter.' : 'Import a statement or log a purchase to start your history.'}</Text>}
       />
+      {removal.hasRemoved && <TransactionRemovalNotice onUndo={removal.undo} />}
     </KeyboardAvoidingView>
   </SafeAreaView>;
 }
