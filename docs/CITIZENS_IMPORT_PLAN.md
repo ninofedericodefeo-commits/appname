@@ -10,7 +10,7 @@
 6. Eligible shared PDFs archive their original first, then add the full readable bank history, new purchases and statement closing balance. Existing records and identical archived files remain deduplicated. Set-asides are not applied automatically. Charges supply subscription suggestions; adding subscriptions still requires review.
 7. The app checks current settings/purchases/balance again after the archive write. Storage errors, canceled/expired jobs and changes requiring review cannot apply an automatic import. A receipt in setup records an actual saved statement, never just returning from Shortcuts. File-picker selections, reopened archives, pasted CSV and shared CSV remain manual.
 
-The signed shortcut is packaged and its source/action destination verified. **Physical iPhone installation and Citizens → Shortcuts → GasFinder cold/warm launch remain unverified.** Test on the installed build that already includes PDF document registration; Expo Go cannot receive files for GasFinder. The original page 2 layout also remains unverified without the real redacted PDF.
+The signed shortcut is packaged and its source/action destination verified. The updated free-team GasFinder native build was installed and launched on the connected iPhone after regenerating missing PDF document registration. **Shortcut installation/execution and Citizens → Shortcuts → GasFinder cold/warm PDF handoff still need phone confirmation.** Use `npm run ios -- --device` to regenerate native configuration before future builds; a Metro reload cannot add document registration. Expo Go cannot receive files for GasFinder. The original page 2 layout also remains unverified without the real redacted PDF.
 
 ## Manual flow
 

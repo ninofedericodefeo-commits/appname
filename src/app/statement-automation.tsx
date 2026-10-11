@@ -94,9 +94,11 @@ export default function StatementAutomationScreen() {
         <Button label="Open saved imports" secondary onPress={() => router.push('/bank-imports')} />
       </View>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: help }} onPress={() => setHelp(!help)} style={styles.helpButton}>
-        <Text style={styles.link}>{help ? 'Hide setup help −' : 'Shortcut missing from Share? +'}</Text>
+        <Text style={styles.link}>{help ? 'Hide setup help −' : 'Shortcut or file-opening help +'}</Text>
       </Pressable>
       {help && <View style={styles.card}>
+        <Text style={styles.section}>GasFinder can’t open the PDF?</Text>
+        <Text style={styles.body}>If Shortcuts says GasFinder isn’t installed or can’t open the file, update GasFinder and open it once, then share the PDF again. The app needs PDF opening support for this shortcut to work.</Text>
         <Text style={styles.section}>Keep it near the top</Text>
         <Text style={styles.body}>In the PDF’s Share sheet, scroll to Edit Actions. Add “{STATEMENT_SHORTCUT_NAME}” to Favorites and move it up.</Text>
         <Text style={styles.body}>If it is missing, open the shortcut’s Details in Shortcuts and turn on Show in Share Sheet. Check that it receives PDFs and its Open File action uses GasFinder.</Text>

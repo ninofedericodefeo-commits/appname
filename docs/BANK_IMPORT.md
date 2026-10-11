@@ -58,7 +58,13 @@ Confirmed bank imports feed **Subs → From bank history** automatically, includ
 
 ## Development build
 
-`expo-document-picker` is an SDK-compatible native dependency. Rebuild the phone app once with `npx expo run:ios --device` (or the Android equivalent) to enable file selection. Loading it is deferred so older development builds can open the screen and use **Or paste CSV**. PDF support adds a JavaScript dependency only and reuses the existing WebView. No iCloud storage, App Group, push or bank API capability is added.
+`expo-document-picker` is an SDK-compatible native dependency. Rebuild the phone app with `npm run ios -- --device` (or the Android equivalent) to enable file selection and PDF opening. The npm command runs Expo Prebuild first so native document registration is refreshed even when an ignored `ios/` directory already exists. `npx expo run:ios` alone skips that step for an existing native project. Loading the picker is deferred so older development builds can open the screen and use **Or paste CSV**. PDF extraction adds a JavaScript dependency only and reuses the existing WebView; PDF handoff also needs the native document registration. No iCloud storage, App Group, push or bank API capability is added.
+
+### Shortcuts says GasFinder isn’t installed or cannot open the file
+
+An older GasFinder native build can have the correct bundle identifier (`com.anonymous.gasfinder`) and URL scheme but lack `CFBundleDocumentTypes`. Metro refreshes cannot register it as a PDF-opening app. Generate and install the updated build with `npm run ios -- --device`, open GasFinder once, then retry the existing shortcut. Updating the same app preserves its local data; do not uninstall it to fix registration.
+
+For a running Metro server on 8081, use `npm run ios -- --device <device-UDID> --no-bundler`. Expo CLI does not allow combining `--port` with `--no-bundler`. Verify the generated and compiled app’s Info.plist declares `com.adobe.pdf`, `public.comma-separated-values-text`, and `LSSupportsOpeningDocumentsInPlace = false`.
 
 ## Verification
 
