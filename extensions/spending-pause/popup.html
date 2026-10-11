@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Spending Pause</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <main>
+    <p class="eyebrow">GASFINDER</p><h1>Spending pause</h1>
+    <section class="summary" aria-live="polite"><h2 id="status">Loading…</h2><p id="detail"></p></section>
+    <p id="error" role="alert" hidden></p>
+    <form id="settings">
+      <fieldset id="choices"><legend>Pause checkout at these shops</legend><div id="shops"></div>
+        <label class="custom-label" for="domain">Another shopping website</label>
+        <div class="custom"><input id="domain" placeholder="store.com" inputmode="url" autocomplete="off" maxlength="2048"><button id="add" type="button">Add</button></div>
+        <label class="custom-label" for="delay">Cooling-off period</label><select id="delay"><option value="24">24 hours</option><option value="48">2 days</option><option value="168">7 days</option></select>
+      </fieldset>
+      <button id="start" class="primary" type="submit" disabled>Pause checkout</button>
+    </form>
+    <button id="resume" class="primary" type="button" hidden disabled>Resume shopping</button>
+    <p class="note">Browse products and carts as usual. Recognized checkout/payment URLs are blocked at the shops you choose, including their subdomains.</p>
+    <p class="note">Payments completed inside other pages, shopping apps, other browsers or external payment services can bypass this pause. This does not freeze your bank card.</p>
+    <p class="note">After the wait, choose Resume shopping here. Closing this panel or GasFinder keeps checkout paused in this browser.</p>
+    <a href="gasfinder://spending">Open GasFinder</a>
+  </main>
+  <script src="pause.js"></script><script src="popup.js"></script>
+</body>
+</html>

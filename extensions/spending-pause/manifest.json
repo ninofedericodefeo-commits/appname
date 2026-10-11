@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "GasFinder Spending Pause",
+  "version": "1.0.0",
+  "description": "Browse shops while recognized checkout pages take a cooling-off break.",
+  "permissions": [
+    "declarativeNetRequest",
+    "storage"
+  ],
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Spending Pause"
+  },
+  "icons": {
+    "128": "icon128.png"
+  },
+  "browser_specific_settings": {
+    "safari": {
+      "strict_min_version": "16.4"
+    }
+  }
+}

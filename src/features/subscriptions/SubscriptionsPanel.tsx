@@ -18,7 +18,7 @@ const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep
 function nextLeapYear(start: number) { let year = start; while (new Date(year, 1, 29).getMonth() !== 1) year++; return year; }
 
 export default function SubscriptionsPanel() {
-  const { subscriptions, remindersEnabled, setRemindersEnabled, saveSubscription, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions } = useSubscriptionStore();
+  const { subscriptions, remindersEnabled, setRemindersEnabled, saveSubscription, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, resetSamples, removeSamples } = useSubscriptionStore();
   const purchases = usePocketStore((state) => state.purchases);
   const pocketReady = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const subsReady = useSyncExternalStore(useSubscriptionStore.persist.onFinishHydration, useSubscriptionStore.persist.hasHydrated, () => false);
@@ -130,6 +130,7 @@ export default function SubscriptionsPanel() {
           <Text style={styles.subscriptionName}>{subscription.name}</Text>
           <Text style={styles.subscriptionAmount}>{formatMoney(subscription.amountCents)}</Text>
         </View>
+        {subscription.isSample && <Text style={styles.meta}>SAMPLE · invented service and price</Text>}
         <Text style={styles.meta}>
           {subscription.cadence === 'monthly' ? 'Monthly' : 'Yearly'} · next renewal {renewal.toLocaleDateString()}
         </Text>
@@ -176,6 +177,13 @@ export default function SubscriptionsPanel() {
     <View style={styles.content}>
       <Text style={styles.title}>Subscriptions & pause</Text>
       <Text style={styles.intro}>Review renewals and give new purchases time before you buy.</Text>
+      <View style={styles.card}>
+        <Text style={styles.sectionTitle}>Test subscriptions</Text>
+        <Text style={styles.bodyText}>Invented subscriptions let you test review, cancellation and reminders. Music Plus renews tomorrow after resetting samples. These do not represent real charges or affect your balance.</Text>
+        <View style={styles.actions}><Pressable accessibilityRole="button" style={styles.textButton} onPress={resetSamples}><Text style={styles.textButtonLabel}>{subscriptions.some(item => item.isSample) ? 'Reset samples' : 'Add sample subscriptions'}</Text></Pressable>
+          {subscriptions.some(item => item.isSample) && <Pressable accessibilityRole="button" style={styles.textButton} onPress={removeSamples}><Text style={styles.removeLabel}>Remove samples</Text></Pressable>}
+        </View>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>From bank history ({suggestions.length})</Text>
@@ -208,7 +216,7 @@ export default function SubscriptionsPanel() {
           {due.map(({ subscription, renewal }) => (
             <View key={subscription.id} style={styles.reviewRow}>
               <View style={styles.rowBetween}>
-                <Text style={styles.subscriptionName}>{subscription.name}</Text>
+                <Text style={styles.subscriptionName}>{subscription.name}{subscription.isSample ? ' · sample' : ''}</Text>
                 <Text style={styles.subscriptionAmount}>{formatMoney(subscription.amountCents)}</Text>
               </View>
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>

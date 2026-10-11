@@ -4,10 +4,12 @@ import type { ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
+import { PageToolbar } from '@/components/SettingsButton';
 import { colors } from '@/theme';
 
 export function MoneyPage({ children, scrollRef }: PropsWithChildren<{ scrollRef?: RefObject<ScrollView | null> }>) {
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+    <PageToolbar />
     <FormScrollView scrollRef={scrollRef} contentContainerStyle={styles.content}>{children}</FormScrollView>
   </SafeAreaView>;
 }

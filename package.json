@@ -49,7 +49,8 @@
     "web": "expo start --web",
     "lint": "expo lint",
     "stations:dev": "node --env-file=.env.local server/index.mjs",
-    "test:logic": "node --experimental-strip-types --test tests/*.test.mjs"
+    "test:logic": "node --experimental-strip-types --test tests/*.test.mjs",
+    "build:chrome-extension": "node scripts/build-chrome-extension.mjs"
   },
   "private": true
 }

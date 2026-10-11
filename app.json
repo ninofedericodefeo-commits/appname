@@ -38,6 +38,7 @@
     },
     "plugins": [
       "./plugins/withIosBuildScriptAccess",
+      "./plugins/withSpendingPauseExtension",
       "expo-router",
       "expo-notifications",
       [
@@ -70,6 +71,12 @@
         "expo-widgets",
         {
           "widgets": [
+            {
+              "name": "AccountWidget",
+              "displayName": "GasFinder account",
+              "description": "Your saved available balance and purchase waiting list.",
+              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"] }
+            },
             {
               "name": "GoalProgressWidget",
               "displayName": "Savings goal",

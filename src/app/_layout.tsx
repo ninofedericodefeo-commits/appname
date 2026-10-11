@@ -10,6 +10,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { localDateKey, subscriptionsToReviewTomorrow } from '@/features/subscriptions/logic';
 import { syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { syncGoalWidget } from '@/features/goals/widget';
+import { SettingsButton } from '@/components/SettingsButton';
+import { syncAccountWidget, syncPauseActivities } from '@/features/spending/widgets';
+import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
+import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
 import { queryClient } from '@/lib/queryClient';
 import { usePocketStore } from '@/stores/pocketStore';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
@@ -96,7 +100,7 @@ function SubscriptionReviewPrompt() {
           {due.map(({ subscription, renewal }) => (
             <View key={subscription.id} style={styles.card}>
               <View style={styles.cardHeading}>
-                <Text style={styles.name}>{subscription.name}</Text>
+                <Text style={styles.name}>{subscription.name}{subscription.isSample ? ' · sample' : ''}</Text>
                 <Text style={styles.amount}>{formatMoney(subscription.amountCents)}</Text>
               </View>
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
@@ -131,6 +135,24 @@ function SubscriptionReviewPrompt() {
 export default function RootLayout() {
   useEffect(() => {
     const refresh = () => {
+      void syncAccountWidget().catch(error => console.warn('Could not update account widget', error));
+      void syncPauseActivities().catch(error => console.warn('Could not update purchase Live Activity', error));
+    };
+    const unsubscribers = [usePocketStore.subscribe(refresh), usePurchasePauseStore.subscribe(refresh), useWidgetSettingsStore.subscribe(refresh),
+      usePocketStore.persist.onFinishHydration(refresh), usePurchasePauseStore.persist.onFinishHydration(refresh), useWidgetSettingsStore.persist.onFinishHydration(refresh)];
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
+    const timer = setInterval(() => { void syncPauseActivities().catch(error => console.warn('Could not update purchase Live Activity', error)); }, 60_000);
+    refresh();
+    return () => { unsubscribers.forEach(unsubscribe => unsubscribe()); foreground.remove(); clearInterval(timer); };
+  }, []);
+  useEffect(() => {
+    const initialize = () => useSubscriptionStore.getState().initializeSamples();
+    const hydration = useSubscriptionStore.persist.onFinishHydration(initialize);
+    if (useSubscriptionStore.persist.hasHydrated()) initialize();
+    return hydration;
+  }, []);
+  useEffect(() => {
+    const refresh = () => {
       const state = usePocketStore.getState();
       void syncGoalWidget(state.activeGoal, state.goalSettings).catch((error) => console.warn('Could not refresh goal widget', error));
     };
@@ -146,6 +168,7 @@ export default function RootLayout() {
       <View style={styles.appShell}>
         <Stack screenOptions={{
           headerTitle: '',
+          headerRight: () => <SettingsButton />,
           headerTintColor: colors.ink,
           headerStyle: { backgroundColor: colors.paper },
           headerShadowVisible: false,
@@ -154,6 +177,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="spending" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="activity" options={{ headerShown: false, animation: 'none' }} />
+          <Stack.Screen name="settings" options={{ headerRight: () => null }} />
         </Stack>
       </View>
       <SubscriptionReviewPrompt />

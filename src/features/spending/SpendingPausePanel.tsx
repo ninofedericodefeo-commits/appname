@@ -10,6 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
 import { usePocketStore } from '@/stores/pocketStore';
 import type { PurchasePauseDelayHours } from '@/stores/purchasePauseStore';
+import { accountWidgetsAvailable, trackPurchasePause } from './widgets';
 
 const delays: { hours: PurchasePauseDelayHours; label: string }[] = [
   { hours: 24, label: '24 hours' },
@@ -53,6 +54,7 @@ export default function SpendingPausePanel() {
   const [purchaseName, setPurchaseName] = useState('');
   const [purchaseAmount, setPurchaseAmount] = useState('');
   const [error, setError] = useState('');
+  const [activityMessage, setActivityMessage] = useState('');
   const [showPurchaseForm, setShowPurchaseForm] = useState(false);
   const [pendingRemovalId, setPendingRemovalId] = useState<string | null>(null);
   const [pendingBought, setPendingBought] = useState<{ id: string; name: string; amount: number; waiting: boolean } | null>(null);
@@ -119,8 +121,15 @@ export default function SpendingPausePanel() {
       <Text accessibilityRole="header" style={styles.sectionTitle}>Spending pause</Text>
 
       <View style={styles.card}>
+        <Text style={styles.cardTitle}>Pause checkout</Text>
+        <Text style={styles.description}>Browse shops such as Amazon and eBay while recognized checkout pages are paused. Available in Safari and desktop Chrome.</Text>
+        <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => router.push('/spending-blocker')}><Text style={styles.primaryButtonText}>Set up website blocking</Text></Pressable>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Purchase waiting list</Text>
         <Text style={styles.description}>
-          Give a purchase time before deciding. This optional planner uses your own entries; it does not monitor accounts, block checkout, or send notifications.
+          Save individual purchases you’re considering and review them after a wait. Website blocking is set up separately above.
         </Text>
         <Pressable
           accessibilityRole="switch"
@@ -129,7 +138,7 @@ export default function SpendingPausePanel() {
           onPress={() => setEnabled(!enabled)}
         >
           <Text style={[styles.toggleText, enabled && styles.toggleTextEnabled]}>
-            {enabled ? 'Pause planner on' : 'Turn on pause planner'}
+            {enabled ? 'Waiting list on' : 'Turn on purchase waiting list'}
           </Text>
         </Pressable>
         {enabled && (
@@ -206,6 +215,9 @@ export default function SpendingPausePanel() {
                 <Text style={styles.dateText}>
                   Review after {new Date(item.reviewAt).toLocaleString()}
                 </Text>
+                {accountWidgetsAvailable && !ready && <Pressable accessibilityRole="button" style={styles.removeButton} onPress={() => {
+                  void trackPurchasePause(item.id).then(() => setActivityMessage('Live Activity started. It can stay active for up to 8 hours.'), cause => setActivityMessage(cause instanceof Error ? cause.message : 'Could not start Live Activity. Check iPhone settings.'));
+                }}><Text style={styles.removeText}>Track on Lock Screen</Text></Pressable>}
                 <View style={styles.row}>
                   <Pressable
                     accessibilityRole="button"
@@ -230,6 +242,7 @@ export default function SpendingPausePanel() {
           })}
         </View>
       )}
+      {!!activityMessage && <Text accessibilityLiveRegion="polite" style={styles.description}>{activityMessage}</Text>}
 
       {items.some((item) => item.status !== 'waiting') && (
         <View style={styles.card}>

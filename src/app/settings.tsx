@@ -6,6 +6,7 @@ import { FormScrollView } from '@/components/FormScrollView';
 import { preferredMapsApp } from '@/features/stations/preferences';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { colors } from '@/theme';
+import WidgetSettingsPanel from '@/features/spending/WidgetSettingsPanel';
 
 export default function SettingsScreen() {
   const { mapsPreference, refillPercent, selectedFuelType, setMapsPreference, setRefillPercent, setSelectedFuelType } = useSettingsStore();
@@ -22,6 +23,11 @@ export default function SettingsScreen() {
       <Link href="/statement-automation" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up quick statement import ›</Text></Pressable></Link>
       <Text style={styles.note}>Add the shortcut and see how to share a PDF from Citizens.</Text>
     </View>
+    <View style={styles.card}><Text style={styles.heading}>Spending pause</Text>
+      <Link href="/spending-blocker" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up website blocking ›</Text></Pressable></Link>
+      <Text style={styles.note}>Browse shops while recognized checkout pages are paused in Safari or desktop Chrome.</Text>
+    </View>
+    <WidgetSettingsPanel />
     <View style={styles.card}><Text style={styles.heading}>Which Maps do you use?</Text>
       <View style={styles.row}>{(['apple', 'google'] as const).map((app) => <Pressable key={app} accessibilityRole="button" accessibilityState={{ selected: maps === app, disabled: app === 'apple' && Platform.OS !== 'ios' }} disabled={app === 'apple' && Platform.OS !== 'ios'} onPress={() => setMapsPreference(app)} style={[styles.choice, maps === app && styles.selected, app === 'apple' && Platform.OS !== 'ios' && styles.disabled]}><Text style={[styles.choiceText, maps === app && styles.selectedText]}>{app === 'apple' ? 'Apple Maps' : 'Google Maps'}</Text></Pressable>)}</View>
       <Text style={styles.note}>Station directions and planned trips open in your preferred Maps app. Apple Maps is available on iPhone.</Text>

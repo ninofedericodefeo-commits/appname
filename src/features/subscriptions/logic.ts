@@ -6,6 +6,7 @@ export type Subscription = {
   day: number;
   month: number;
   active: boolean;
+  isSample?: boolean;
   bankMerchantKey?: string;
   lastReview?: {
     renewalDate: string;

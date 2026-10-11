@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { FormScrollView } from '@/components/FormScrollView';
+import { PageToolbar } from '@/components/SettingsButton';
 import { availableCents, parseDollars } from '@/features/pocket/logic';
 import { PocketTransactions } from '@/features/pocket/PocketTransactions';
 import { pocketTransactions } from '@/features/pocket/transactions';
@@ -50,6 +51,7 @@ export default function PocketScreen() {
   }
 
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
+    <PageToolbar />
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
       <View style={styles.balanceCard}>
@@ -87,7 +89,6 @@ export default function PocketScreen() {
       </View>}
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
-      <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/settings')}><Text style={styles.link}>Settings ›</Text></Pressable>
     </FormScrollView>
   </SafeAreaView>;
 }

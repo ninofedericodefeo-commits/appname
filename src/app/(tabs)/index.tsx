@@ -6,6 +6,8 @@ import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GasStationCard } from '@/components/GasStationCard';
+import { PageToolbar } from '@/components/SettingsButton';
+import MyCarsSection from '@/features/vehicles/MyCarsSection';
 import StationMap from '@/components/StationMap';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { stationApiBaseUrl } from '@/features/stations/data';
@@ -95,9 +97,9 @@ export default function GasScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      <PageToolbar />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <View style={styles.pillRow}><Text style={styles.brand}>GASFINDER</Text><Link href="/settings" asChild><Pressable accessibilityRole="button" style={styles.filterToggle}><Text style={styles.sourceText}>Settings ›</Text></Pressable></Link></View>
           <Text style={styles.title}>Gas stations</Text>
           <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
         </View>
@@ -125,6 +127,7 @@ export default function GasScreen() {
           <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report a price</Text></Pressable></Link>
           <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
         </View>
+        <MyCarsSection />
 
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>

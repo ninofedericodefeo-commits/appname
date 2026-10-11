@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import { replaceSampleSubscriptions } from '@/features/subscriptions/samples';
 
 import { bankMerchant } from '@/features/subscriptions/bankSuggestions';
 import type { Subscription } from '@/features/subscriptions/logic';
@@ -10,6 +11,10 @@ type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' |
 type SubscriptionState = {
   subscriptions: Subscription[];
   remindersEnabled: boolean;
+  samplesInitialized: boolean;
+  initializeSamples: () => void;
+  resetSamples: () => void;
+  removeSamples: () => void;
   dismissedBankSuggestions: string[];
   dismissBankSuggestion: (key: string) => void;
   restoreBankSuggestions: () => void;
@@ -25,6 +30,10 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     (set) => ({
       subscriptions: [],
       remindersEnabled: false,
+      samplesInitialized: false,
+      initializeSamples: () => set(state => state.samplesInitialized ? state : { subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true }),
+      resetSamples: () => set(state => ({ subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true })),
+      removeSamples: () => set(state => ({ subscriptions: state.subscriptions.filter(subscription => !subscription.isSample), samplesInitialized: true })),
       dismissedBankSuggestions: [],
       dismissBankSuggestion: (key) => set((state) => ({ dismissedBankSuggestions: [...new Set([...state.dismissedBankSuggestions, key])] })),
       restoreBankSuggestions: () => set({ dismissedBankSuggestions: [] }),
@@ -64,8 +73,11 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     {
       name: 'gasfinder-subscriptions',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
-      migrate: (persisted) => ({ ...(persisted as SubscriptionState), dismissedBankSuggestions: [] }),
+      version: 3,
+      migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
+        dismissedBankSuggestions: version < 2 ? [] : (persisted as SubscriptionState).dismissedBankSuggestions ?? [],
+        samplesInitialized: (persisted as SubscriptionState).samplesInitialized ?? false,
+      }),
     },
   ),
 );
