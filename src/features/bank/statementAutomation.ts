@@ -15,6 +15,7 @@ export type AutomaticStatementPlan = {
   balance: StatementBalance; transactionCount: number; purchaseCount: number;
 };
 type Review = { status: 'review'; reason: string };
+export type StatementBalanceChoice = 'statement' | 'current';
 
 export function prepareAutomaticStatement(settings: StatementAutomationSettings, sharedPDF: boolean, statement: CitizensStatement,
   state: AccountImportState, now = new Date()): AutomaticStatementPlan | Review {
@@ -43,17 +44,19 @@ export function prepareAutomaticStatement(settings: StatementAutomationSettings,
 // Re-check the live account/settings after file storage: a Wallet purchase or a
 // newer balance can arrive while the archive is being written. No retry loop.
 export async function importSharedStatement<Result>(options: {
+  balanceChoice: StatementBalanceChoice;
   prepare: () => AutomaticStatementPlan | Review;
   archive: (plan: AutomaticStatementPlan) => Promise<unknown>;
   isCurrent: () => boolean;
-  commit: (plan: AutomaticStatementPlan) => Result;
+  commit: (plan: AutomaticStatementPlan, balance: StatementBalance | null) => Result;
 }): Promise<Review | { status: 'canceled' } | { status: 'saved'; result: Result }> {
   if (!options.isCurrent()) return { status: 'canceled' };
+  if (options.balanceChoice !== 'statement' && options.balanceChoice !== 'current') return { status: 'review', reason: 'Choose whether to use the statement balance or keep your current balance.' };
   const first = options.prepare();
   if (first.status === 'review') return first;
   await options.archive(first);
   if (!options.isCurrent()) return { status: 'canceled' };
   const current = options.prepare();
   if (current.status === 'review') return current;
-  return { status: 'saved', result: options.commit(current) };
+  return { status: 'saved', result: options.commit(current, options.balanceChoice === 'statement' ? current.balance : null) };
 }

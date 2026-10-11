@@ -74,8 +74,8 @@ export default function StatementAutomationScreen() {
             <View style={[styles.check, enabled && styles.checked]}><Text style={styles.checkText}>{enabled ? '✓' : ''}</Text></View>
             <Text style={styles.checkLabel}>Automatically import PDFs I share</Text>
           </Pressable>
-          <Text style={styles.body}>Updates the closing balance, saves the PDF in Imports and adds spending to Transactions and subscription suggestions.</Text>
-          <Text style={styles.hint}>Review the first PDF once to confirm the account. Later matching PDFs save automatically when they read cleanly. Reading warnings, possible duplicate matches and older balances need a review. Your set-aside amount stays as entered.</Text>
+          <Text style={styles.body}>Saves the PDF in Imports and adds spending to Transactions and subscription suggestions. Each PDF asks whether to use its closing balance or keep your saved balance.</Text>
+          <Text style={styles.hint}>Review the first PDF once to confirm the account. Later matching PDFs save after your balance choice when they read cleanly. Reading warnings, possible duplicate matches and older balances need a review. Your set-aside amount stays as entered.</Text>
           <Button label="Save import preferences" onPress={saveSettings} disabled={!account.trim()} />
           {saved && <Text accessibilityRole="alert" style={styles.saved}>{settings.enabled ? 'Automatic import enabled for shared PDFs.' : 'Shared PDFs will open for review.'}</Text>}
           {settings.enabled && <Text style={styles.hint}>{settings.confirmedAccountIdentifier ? `Account confirmed for ${settings.accountLabel}.` : 'Waiting for your first confirmed statement.'}</Text>}
@@ -88,7 +88,7 @@ export default function StatementAutomationScreen() {
         {settings.lastImport && <View style={styles.receipt}>
           <Text style={styles.label}>{settings.lastImport.automatic ? 'Last automatic import' : 'Last confirmed statement'}</Text>
           <Text style={styles.body}>{settings.lastImport.name}</Text>
-          <Text style={styles.hint}>Received {new Date(settings.lastImport.importedAt).toLocaleString()} · balance as of {settings.lastImport.balanceAsOf}</Text>
+          <Text style={styles.hint}>Received {new Date(settings.lastImport.importedAt).toLocaleString()} · statement closes {settings.lastImport.balanceAsOf}</Text>
           <Button label="Open Account" secondary onPress={() => router.navigate('/pocket')} />
         </View>}
         <Button label="Open saved imports" secondary onPress={() => router.push('/bank-imports')} />

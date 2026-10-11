@@ -1,4 +1,5 @@
 import type { LoggedPurchase } from '../goals/logic.ts';
+import { bankTransactionName } from '../bank/merchantName.ts';
 
 export type AccountTransaction = {
   id: string;
@@ -82,6 +83,10 @@ export function linkAccountTransactions<T extends AccountTransaction & { rowNumb
 
 export function filterTransactions(rows: PocketTransaction[], query: string, filter: 'all' | 'out' | 'in' | 'pending' | 'savings') {
   const search = query.trim().toLowerCase();
-  return rows.filter((item) => (!search || `${item.title} ${item.accountLabel}`.toLowerCase().includes(search)) &&
+  return rows.filter((item) => (!search || `${transactionDisplayName(item)} ${item.title} ${item.accountLabel}`.toLowerCase().includes(search)) &&
     (filter === 'all' || filter === 'savings' && item.source === 'savings' || filter === 'in' && item.source !== 'savings' && item.amountCents > 0 || filter === 'out' && item.source !== 'savings' && item.amountCents < 0 || filter === 'pending' && item.status === 'pending'));
+}
+
+export function transactionDisplayName(transaction: Pick<PocketTransaction, 'title' | 'source'>) {
+  return transaction.source === 'citizens-pdf' || transaction.source === 'csv' ? bankTransactionName(transaction.title) : transaction.title;
 }

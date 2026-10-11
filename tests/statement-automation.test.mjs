@@ -28,11 +28,12 @@ test('A shared PDF saves its original before updating balance, full spending his
   let state = initial();
   const archive = memoryArchive();
   const run = () => importSharedStatement({
+    balanceChoice: 'statement',
     prepare: () => prepare(state), isCurrent: () => true,
     archive: (plan) => saveImportToArchive(archive.storage, file, { accountLabel: plan.accountLabel, transactionCount: plan.transactionCount, purchaseCount: plan.purchaseCount }, now),
-    commit: (plan) => {
+    commit: (plan, balance) => {
       assert.equal(archive.files.size, 1);
-      const result = applyAccountImport(state, plan.purchases, false, plan.accountLabel, plan.history, { balance: plan.balance }, now);
+      const result = applyAccountImport(state, plan.purchases, false, plan.accountLabel, plan.history, { balance }, now);
       state = result.state; return result;
     },
   });
@@ -45,6 +46,39 @@ test('A shared PDF saves its original before updating balance, full spending his
   const repeated = await run();
   assert.equal(repeated.status, 'saved'); assert.equal(repeated.result.imported, 0); assert.equal(repeated.result.transactionsAdded, 0);
   assert.equal(repeated.result.balanceUpdated, false); assert.equal(archive.files.size, 1); assert.equal(state.purchases.length, 9);
+});
+
+test('A PDF requires a balance answer; keeping the balance still saves history and later choosing the PDF amount adds no duplicates', async () => {
+  let state = { ...initial(), balanceAsOf: '2026-09-01', balanceSource: 'manual', balanceUpdatedAt: '2026-09-01T12:00:00Z' };
+  const before = state;
+  const archive = memoryArchive();
+  let commits = 0;
+  const run = (balanceChoice) => importSharedStatement({
+    balanceChoice, prepare: () => prepare(state), isCurrent: () => true,
+    archive: (plan) => saveImportToArchive(archive.storage, file, { accountLabel: plan.accountLabel, transactionCount: plan.transactionCount, purchaseCount: plan.purchaseCount }, now),
+    commit: (plan, balance) => {
+      commits++;
+      const result = applyAccountImport(state, plan.purchases, false, plan.accountLabel, plan.history, { balance }, now);
+      state = result.state; return result;
+    },
+  });
+  for (const choice of [undefined, 'unanswered']) {
+    const waiting = await run(choice);
+    assert.equal(waiting.status, 'review'); assert.match(waiting.reason, /Choose/);
+    assert.equal(archive.files.size, 0); assert.equal(commits, 0); assert.equal(state, before);
+  }
+  const kept = await run('current');
+  assert.equal(kept.status, 'saved'); assert.equal(kept.result.balanceUpdated, false);
+  assert.equal(kept.result.imported, 9); assert.equal(kept.result.transactionsAdded, 21); assert.equal(archive.files.size, 1);
+  assert.equal(state.reportedBalanceCents, before.reportedBalanceCents); assert.equal(state.balanceAsOf, before.balanceAsOf);
+  assert.equal(state.balanceSource, before.balanceSource); assert.equal(state.balanceUpdatedAt, before.balanceUpdatedAt);
+  assert.equal(state.reservedCents, before.reservedCents);
+  assert.equal(suggestBankSubscriptions(state.purchases, [], [], now).find((item) => item.name === 'Netflix').evidence.length, 3);
+  const updated = await run('statement');
+  assert.equal(updated.status, 'saved'); assert.equal(updated.result.balanceUpdated, true);
+  assert.equal(updated.result.imported, 0); assert.equal(updated.result.transactionsAdded, 0); assert.equal(archive.files.size, 1);
+  assert.equal(state.reportedBalanceCents, statement.balance.amountCents); assert.equal(state.balanceAsOf, statement.balance.asOf);
+  assert.equal(state.reservedCents, before.reservedCents);
 });
 
 test('Automatic import needs explicit opt-in, shared input and one confirmed matching bank account', () => {
@@ -85,23 +119,23 @@ test('Two equal PDF purchases remain distinct, while an app purchase match pause
 
 test('Storage failure, canceled handoffs and live changes never commit an automatic import', async () => {
   let commits = 0;
-  await assert.rejects(importSharedStatement({ prepare: () => prepare(), isCurrent: () => true,
+  await assert.rejects(importSharedStatement({ balanceChoice: 'statement', prepare: () => prepare(), isCurrent: () => true,
     archive: async () => { throw new Error('Storage full'); }, commit: () => commits++ }), /Storage full/);
   assert.equal(commits, 0);
   let current = true;
-  const canceled = await importSharedStatement({ prepare: () => prepare(), isCurrent: () => current,
+  const canceled = await importSharedStatement({ balanceChoice: 'statement', prepare: () => prepare(), isCurrent: () => current,
     archive: async () => { current = false; }, commit: () => commits++ });
   assert.equal(canceled.status, 'canceled'); assert.equal(commits, 0);
   let state = initial();
-  const changed = await importSharedStatement({ prepare: () => prepare(state), isCurrent: () => true,
+  const changed = await importSharedStatement({ balanceChoice: 'statement', prepare: () => prepare(state), isCurrent: () => true,
     archive: async () => { state = { ...state, balanceAsOf: '2026-10-10' }; }, commit: () => commits++ });
   assert.equal(changed.status, 'review'); assert.match(changed.reason, /saved balance/); assert.equal(commits, 0);
   let setup = settings;
-  const disabled = await importSharedStatement({ prepare: () => prepare(state = initial(), setup), isCurrent: () => true,
+  const disabled = await importSharedStatement({ balanceChoice: 'statement', prepare: () => prepare(state = initial(), setup), isCurrent: () => true,
     archive: async () => { setup = { ...settings, enabled: false }; }, commit: () => commits++ });
   assert.equal(disabled.status, 'review'); assert.equal(commits, 0);
   let walletState = initial();
-  const walletArrived = await importSharedStatement({ prepare: () => prepare(walletState), isCurrent: () => true,
+  const walletArrived = await importSharedStatement({ balanceChoice: 'statement', prepare: () => prepare(walletState), isCurrent: () => true,
     archive: async () => { walletState = { ...walletState, purchases: [{ id: 'late-wallet', title: 'Netflix', amountCents: 1699,
       purchasedAt: new Date(2026, 8, 5, 12).toISOString(), source: 'shortcut', decision: 'saved', savedCents: 22 }] }; }, commit: () => commits++ });
   assert.equal(walletArrived.status, 'review'); assert.match(walletArrived.reason, /already logged/); assert.equal(commits, 0);

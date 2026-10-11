@@ -14,6 +14,8 @@ import { readBankImport, saveBankImport } from '@/features/bank/importArchive';
 import { takeBankFile } from '@/features/bank/incomingBankFile';
 import { applyAccountImport, statementBalanceStatus } from '@/features/bank/accountImport';
 import { importSharedStatement, prepareAutomaticStatement } from '@/features/bank/statementAutomation';
+import type { StatementBalanceChoice } from '@/features/bank/statementAutomation';
+import { bankTransactionName } from '@/features/bank/merchantName';
 import PDFStatementReader from '@/features/bank/PDFStatementReader';
 import { parseCitizensStatement } from '@/features/bank/citizensStatement';
 import type { CitizensStatement } from '@/features/bank/citizensStatement';
@@ -32,8 +34,8 @@ function Button({ label, onPress, secondary = false, disabled = false }: { label
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text>
   </Pressable>;
 }
-function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.choice, selected && styles.selected]}>
+function Choice({ label, selected, onPress, disabled = false }: { label: string; selected: boolean; onPress: () => void; disabled?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={[styles.choice, selected && styles.selected, disabled && styles.disabled]}>
     <Text style={[styles.choiceText, selected && styles.selectedText]}>{label}</Text>
   </Pressable>;
 }
@@ -63,6 +65,7 @@ export default function BankImportScreen() {
   const [showPaste, setShowPaste] = useState(false);
   const [busy, setBusy] = useState(false);
   const [automaticSaving, setAutomaticSaving] = useState(false);
+  const [pendingAutomatic, setPendingAutomatic] = useState<{ id: number; statement: CitizensStatement; file: BankFile; accountLabel: string } | null>(null);
   const [error, setError] = useState('');
   const [automaticReview, setAutomaticReview] = useState('');
   const [column, setColumn] = useState<Column | null>(null);
@@ -107,11 +110,14 @@ export default function BankImportScreen() {
   const historyPlan = useMemo(() => mergeAccountTransactions(pocket.accountTransactions, saveHistory ? history : []), [pocket.accountTransactions, history, saveHistory]);
   const matchedRows = useMemo(() => review.rows.filter((row) => row.duplicate === 'possible' && !selectedIds.has(row.id)), [review.rows, selectedIds]);
   const balanceStatus = statement?.balance ? statementBalanceStatus(pocket, statement.balance, account) : 'invalid';
-  const updateBalance = !!statement?.balance && !['invalid', 'applied'].includes(balanceStatus) && (balanceOverride ?? true);
+  const needsBalanceChoice = !!statement?.balance && balanceStatus !== 'invalid';
+  const updateBalance = needsBalanceChoice && balanceStatus !== 'applied' && balanceOverride === true;
   const importOptions = useMemo(() => ({ matches: matchedRows, balance: updateBalance ? statement?.balance : null }), [matchedRows, updateBalance, statement?.balance]);
   const plan = useMemo(() => applyAccountImport(pocket, selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions), [pocket, selected, applyRule, account, saveHistory, history, importOptions]);
   const canImport = sourceFile !== null || selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0 || plan.matched > 0 || plan.balanceUpdated;
   const total = selected.reduce((sum, row) => sum + row.amountCents, 0);
+  const purchaseRows = useMemo(() => [...review.rows].sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt)), [review.rows]);
+  const historyRows = useMemo(() => [...historyReview.rows].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [historyReview.rows]);
 
   const load = useCallback((text: string, filename: string) => {
     const parsed = parseBankCSV(text);
@@ -119,12 +125,12 @@ export default function BankImportScreen() {
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setPaste(''); setShowPaste(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
-    setAutomaticReview('');
+    setAutomaticReview(''); setPendingAutomatic(null);
     Keyboard.dismiss();
   }, []);
   const openFile = useCallback((file: BankFile, current: number, shared = false) => {
     setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setDone(null);
-    setAutomaticReview('');
+    setAutomaticReview(''); setPendingAutomatic(null);
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
     else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
   }, [load]);
@@ -135,7 +141,7 @@ export default function BankImportScreen() {
       if (current !== request.current) return;
       consumedToken.current = bankFileToken;
       const incoming = takeBankFile(bankFileToken);
-      setError(''); setDone(null); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setBusy(true);
+      setError(''); setDone(null); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setPendingAutomatic(null); setBusy(true);
       let readingPDF = false;
       try {
         if (!incoming) throw new Error('This file handoff expired. Choose the statement from Files.');
@@ -155,7 +161,7 @@ export default function BankImportScreen() {
     let readingPDF = false;
     void Promise.resolve().then(async () => {
       if (current !== request.current) return;
-      consumedArchive.current = archiveId; setBusy(true); setError(''); setCSV(null); setMapping(null); setSourceFile(null);
+      consumedArchive.current = archiveId; setBusy(true); setError(''); setCSV(null); setMapping(null); setSourceFile(null); setPendingAutomatic(null);
       try {
         const { file, entry } = await readBankImport(archiveId);
         if (current !== request.current) return;
@@ -166,7 +172,40 @@ export default function BankImportScreen() {
       } finally { if (current === request.current && !readingPDF) setBusy(false); }
     });
   }, [archiveId, hydrated, openFile]);
-  function cancelReading() { request.current++; setPDFJob(null); setBusy(false); setAutomaticSaving(false); setAutomaticReview(''); }
+  function cancelReading() { request.current++; setPDFJob(null); setPendingAutomatic(null); setBusy(false); setAutomaticSaving(false); setAutomaticReview(''); }
+
+  function prepareSharedStatement(parsed: CitizensStatement, nickname: string) {
+    const setup = useStatementAutomationStore.getState();
+    return setup.accountLabel.toLowerCase() !== nickname.trim().toLowerCase()
+      ? { status: 'review' as const, reason: 'Your import account changed while this PDF was being read. Review the account nickname before saving.' }
+      : prepareAutomaticStatement(setup, true, parsed, usePocketStore.getState());
+  }
+
+  async function saveSharedStatement(balanceChoice: StatementBalanceChoice) {
+    if (!pendingAutomatic || busy || request.current !== pendingAutomatic.id) return;
+    const pending = pendingAutomatic;
+    const current = ++request.current;
+    setPendingAutomatic(null); setBusy(true); setAutomaticSaving(true); setError('');
+    try {
+      const result = await importSharedStatement({
+        balanceChoice,
+        prepare: () => prepareSharedStatement(pending.statement, pending.accountLabel),
+        isCurrent: () => request.current === current,
+        archive: (automatic) => saveBankImport(pending.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
+          purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf }),
+        commit: (automatic, balance) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.accountLabel, automatic.history, { balance }),
+      });
+      if (request.current !== current || result.status === 'canceled') return;
+      if (result.status === 'review') setAutomaticReview(result.reason);
+      else {
+        useStatementAutomationStore.getState().confirmImport(pending.accountLabel, pending.statement.accountIdentifier,
+          { name: pending.file.name, importedAt: new Date().toISOString(), balanceAsOf: pending.statement.balance!.asOf, automatic: true });
+        setDone({ ...result.result, automatic: true }); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null);
+      }
+    } catch (cause) {
+      if (request.current === current) setError(cause instanceof Error ? cause.message : 'Could not save this statement. Review it and try again.');
+    } finally { if (request.current === current) { setBusy(false); setAutomaticSaving(false); } }
+  }
   async function chooseFile() {
     const current = ++request.current;
     setBusy(true); setError('');
@@ -185,7 +224,7 @@ export default function BankImportScreen() {
   }
   function toggle(id: string) { setSelectionOverrides((previous) => new Map(previous).set(id, !selectedIds.has(id))); }
   async function importSelected() {
-    if (!hydrated || review.error || !canImport || busy) return;
+    if (!hydrated || review.error || !canImport || busy || pendingAutomatic || (needsBalanceChoice && balanceOverride === null)) return;
     const current = ++request.current;
     setBusy(true); setError('');
     try {
@@ -214,7 +253,7 @@ export default function BankImportScreen() {
       <Text style={styles.title}>Import bank log</Text>
       <Text style={styles.body}>Import a Citizens checking/savings PDF or bank CSV. Files are saved in Imports; spending also helps find subscriptions.</Text>
       {done ? <View style={styles.card}>
-        <Text style={styles.section}>{done.automatic ? 'Statement imported automatically' : 'Bank log saved'}</Text>
+        <Text style={styles.section}>{done.automatic ? 'Statement imported' : 'Bank log saved'}</Text>
         <Text style={styles.body}>{done.transactionsAdded.toLocaleString()} new bank transactions · {done.imported.toLocaleString()} purchases added for goals and subscriptions.</Text>
         <Text style={styles.hint}>Your file is saved in Imports.</Text>
         {done.balanceUpdated && <Text style={styles.body}>Account balance updated from the statement’s closing balance.</Text>}
@@ -243,7 +282,7 @@ export default function BankImportScreen() {
             <Button label="Open Citizens website" secondary onPress={() => { void Linking.openURL('https://www.citizensbank.com/mobile-and-online-banking/online-banking.aspx').catch(() => setError('Could not open Citizens. Sign in through your browser and open Document Center.')); }} />
             <Text style={styles.body}>1. Open your checking or savings statement PDF in the Citizens app. You can also use Document Center in Citizens online banking.</Text>
             <Text style={styles.body}>2. Tap Share, then GasFinder Import Statement (after adding the shortcut above), or Open in GasFinder.</Text>
-            <Text style={styles.body}>3. With automatic import enabled, matching PDFs that read cleanly are saved for you. Otherwise check this review and save.</Text>
+            <Text style={styles.body}>3. Choose whether to use the PDF’s closing balance or keep your saved balance. With quick import enabled, clean matching PDFs then save for you. Otherwise check this review and save.</Text>
             <Text style={styles.hint}>If GasFinder isn’t listed, use Save to Files, then choose the PDF here. Opening PDFs in GasFinder requires the latest app build.</Text>
             <Text style={styles.hint}>Citizens requires your sign-in to download statements. This handoff automates reading the downloaded PDF; it does not sign in to your bank.</Text>
             <Text style={styles.hint}>Enable Citizens’ e-statement alerts to know when your next statement is ready. Each confirmed import is kept here so you won’t need to download it again.</Text>
@@ -259,7 +298,6 @@ export default function BankImportScreen() {
             <TextInput value={account} onChangeText={setAccountDraft} editable={!busy} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
             <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
             {statement && <><Text style={styles.body}>{statement.pages} pages · {statement.periods.join(' · ')}</Text><Text style={styles.hint}>Check every amount against your statement. Credits, transfers, checks and fees are excluded from purchase totals. Spending is included in Account history.</Text>
-              {statement.balance && <Text style={styles.transactionTitle}>Account balance {formatMoney(statement.balance.amountCents)} · closes {new Date(`${statement.balance.asOf}T12:00:00`).toLocaleDateString()}</Text>}
               {statement.pageCounts.map((page) => <Text key={page.page} style={styles.hint}>Page {page.page}: {page.spending} spending · {page.credits} credits</Text>)}
               {statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} reading warnings. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
             </>}
@@ -277,12 +315,26 @@ export default function BankImportScreen() {
             {advanced && <>{columnField('currency')}{columnField('type')}{columnField('status')}{columnField('transactionId')}</>}
             <Text style={styles.hint}>USD only. Check the spending direction and exclude transfers or card payments before importing.</Text></>}
           </View>
+          {statement && <View style={styles.card}>
+            <Text style={styles.section}>Use the PDF’s balance?</Text>
+            {statement.balance ? <>
+              <Text style={styles.transactionTitle}>{formatMoney(statement.balance.amountCents)} · {new Date(`${statement.balance.asOf}T12:00:00`).toLocaleDateString()}</Text>
+              <Text style={styles.hint}>Closing balance · PDF page {statement.balance.page}{pocket.reportedBalanceCents !== null ? ` · Saved balance ${formatMoney(pocket.reportedBalanceCents)}` : ''}</Text>
+              {needsBalanceChoice && <View style={styles.row}>
+                <Choice label="Use PDF balance" selected={balanceOverride === true} disabled={busy} onPress={() => setBalanceOverride(true)} />
+                <Choice label="Keep current balance" selected={balanceOverride === false} disabled={busy} onPress={() => setBalanceOverride(false)} />
+              </View>}
+              <Text style={styles.hint}>{balanceStatus === 'applied' ? 'Account already has this statement’s closing balance.' : balanceStatus === 'invalid' ? 'This balance cannot be applied. Your saved balance will stay as entered.' : balanceStatus === 'older' ? 'This statement is older than your saved balance. Choose whether to replace it.' : balanceOverride === null ? 'Choose a balance option before saving this PDF.' : updateBalance ? 'Your Account balance will be set to the PDF amount.' : 'Your saved Account balance will stay as entered.'}</Text>
+              <Text style={styles.hint}>Your money set aside stays the same.</Text>
+              <Text style={styles.hint}>A statement shows the balance on its closing date. Later purchases and deposits may have changed it.</Text>
+            </> : <Text style={styles.hint}>No clear closing balance was found. Update your balance manually in Account.</Text>}
+          </View>}
           {review.error ? <Text accessibilityRole="alert" style={styles.error}>{review.error}</Text> : <View style={styles.card}>
             <Text style={styles.section}>Review purchases</Text>
             <Text style={styles.hint}>Possible matches start unchecked and will link to the existing app purchase. Select a match only if it is a different purchase. One app purchase can match only one statement row.</Text>
             <View style={styles.row}><Button label="Select new rows" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, !row.duplicate])))} /><Button label="Clear selection" secondary onPress={() => setSelectionOverrides(new Map(review.rows.map((row) => [row.id, false])))} /></View>
             {review.rows.length === 0 && <Text style={styles.body}>No new spending rows found. Check the statement or selected columns above.</Text>}
-            {review.rows.slice(0, limit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.transaction}>
+            {purchaseRows.slice(0, limit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.transaction}>
               <Check checked={row.duplicate !== 'known' && selectedIds.has(row.id)} disabled={row.duplicate === 'known'} label={`Import ${row.title}, ${formatMoney(row.amountCents)}, ${row.pageNumber ? `PDF page ${row.pageNumber}, line ${row.lineNumber}` : `row ${row.rowNumber}`}`} onPress={() => toggle(row.id)} />
               <View style={styles.transactionMain}><View style={styles.rowBetween}><Text style={styles.transactionTitle}>{row.title}</Text><Text style={styles.amount}>{formatMoney(row.amountCents)}</Text></View>
                 <Text style={styles.hint}>{new Date(row.purchasedAt).toLocaleDateString()} · {row.pageNumber ? `PDF page ${row.pageNumber}, line ${row.lineNumber}` : `row ${row.rowNumber}`}</Text>
@@ -297,22 +349,14 @@ export default function BankImportScreen() {
           </View>}
           {!review.error && <View style={styles.card}>
             <View style={styles.ruleRow}><Check checked={saveHistory} label="Save bank history to Account" onPress={() => setSaveHistory(!saveHistory)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>Save bank history to Account</Text><Text style={styles.hint}>{historyReview.rows.length.toLocaleString()} readable transactions, including spending, deposits, transfers and fees.</Text></View></View>
-            <Text style={styles.hint}>Bank history is separate from the purchases selected above. Deposits, transfers and fees won’t trigger a savings rule. The balance update is reviewed below.</Text>
+            <Text style={styles.hint}>Bank history is separate from the purchases selected above. Deposits, transfers and fees won’t trigger a savings rule.{statement ? ' Your balance choice above controls the update.' : ''}</Text>
             <Button label={`${showHistory ? 'Hide' : 'Review'} bank history`} secondary onPress={() => setShowHistory(!showHistory)} />
-            {showHistory && <>{historyReview.rows.slice(0, historyLimit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.historyRow}>
-              <View style={styles.rowBetween}><Text style={styles.transactionTitle}>{row.title}</Text><Text style={styles.amount}>{row.amountCents > 0 ? '+' : '−'}{formatMoney(Math.abs(row.amountCents))}</Text></View>
+            {showHistory && <>{historyRows.slice(0, historyLimit).map((row) => <View key={`${row.id}-${row.rowNumber}`} style={styles.historyRow}>
+              <View style={styles.rowBetween}><Text style={styles.transactionTitle}>{bankTransactionName(row.title)}</Text><Text style={[styles.amount, row.amountCents > 0 ? styles.credit : styles.debit]}>{row.amountCents > 0 ? '+' : '−'}{formatMoney(Math.abs(row.amountCents))}</Text></View>
               <Text style={styles.hint}>{new Date(row.occurredAt).toLocaleDateString()} · {row.status === 'recorded' ? 'Posting status not supplied' : row.status === 'pending' ? 'Pending' : 'Posted'} · {csv.locations?.[row.rowNumber - 2] ? `PDF page ${csv.locations[row.rowNumber - 2].page}` : `row ${row.rowNumber}`}</Text>
             </View>)}{historyLimit < historyReview.rows.length && <Button label="Show more bank history" secondary onPress={() => setHistoryLimit(historyLimit + 30)} />}</>}
             {historyReview.excluded.length > 0 && <Text style={styles.hint}>{historyReview.excluded.length.toLocaleString()} invalid, non-USD or empty rows won’t be saved to bank history.</Text>}
             {saveHistory && <Text style={styles.body}>{historyPlan.added} new · {historyPlan.updated} updated bank transactions</Text>}
-          </View>}
-          {statement && <View style={styles.card}>
-            <Text style={styles.section}>Statement balance</Text>
-            {statement.balance ? <>
-              <View style={styles.ruleRow}><Check checked={updateBalance || balanceStatus === 'applied'} disabled={balanceStatus === 'applied' || balanceStatus === 'invalid' || busy} label="Update Account with statement closing balance" onPress={() => setBalanceOverride(!updateBalance)} /><View style={styles.transactionMain}><Text style={styles.transactionTitle}>{formatMoney(statement.balance.amountCents)} · {new Date(`${statement.balance.asOf}T12:00:00`).toLocaleDateString()}</Text><Text style={styles.hint}>Closing balance · PDF page {statement.balance.page}</Text></View></View>
-              <Text style={styles.hint}>{balanceStatus === 'applied' ? 'Account already has this statement’s closing balance.' : balanceStatus === 'older' ? 'This closing date is earlier than your saved balance. Import will replace it with the amount above; uncheck to keep your saved balance.' : 'Import will set your Account balance to this amount. Your money set aside stays the same.'}</Text>
-              <Text style={styles.hint}>A statement shows the balance on its closing date. Later purchases and deposits may have changed it.</Text>
-            </> : <Text style={styles.hint}>No clear closing balance was found. Update your balance manually in Account.</Text>}
           </View>}
           <View style={styles.card}>
             <Text style={styles.section}>{selected.length.toLocaleString()} selected · {formatMoney(total)}</Text>
@@ -323,7 +367,7 @@ export default function BankImportScreen() {
             <Text style={styles.body}>{formatMoney(plan.savedCents)} will be added to the set-aside estimate{applyRule ? ', capped by your goal and entered balance' : ''}.</Text>
             <Text style={styles.hint}>{updateBalance ? 'Your Account balance will be updated to the closing balance above. Transactions won’t be subtracted a second time.' : 'Your saved Account balance will stay as entered.'} Money stays in your bank account.</Text>
             <Text style={styles.hint}>The original file will be saved in Imports. Saving the same file again keeps one copy.</Text>
-            <Button label={busy ? 'Saving import…' : selected.length ? `Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}` : 'Save statement'} disabled={!canImport || !!review.error || !hydrated || busy} onPress={() => void importSelected()} />
+            <Button label={busy ? 'Saving import…' : selected.length ? `Import ${selected.length.toLocaleString()} purchase${selected.length === 1 ? '' : 's'}` : 'Save statement'} disabled={!canImport || !!review.error || !hydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
           </View>
         </>}
       </>}
@@ -340,31 +384,25 @@ export default function BankImportScreen() {
         setPaste(''); setShowPaste(false); setLimit(20); setShowExcluded(false); setExcludedLimit(20);
         setDone(null); setError(''); setApplyRule(false); setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20); Keyboard.dismiss();
         if (pdfJob.shared && useStatementAutomationStore.getState().enabled) {
-          setAutomaticSaving(true);
-          const result = await importSharedStatement({
-            prepare: () => {
-              const setup = useStatementAutomationStore.getState();
-              // The nickname shown in this draft must still be the configured one.
-              return setup.accountLabel.toLowerCase() !== account.trim().toLowerCase()
-                ? { status: 'review', reason: 'Your import account changed while this PDF was being read. Review the account nickname before saving.' }
-                : prepareAutomaticStatement(setup, true, parsed, usePocketStore.getState());
-            },
-            isCurrent: () => request.current === pdfJob.id,
-            archive: (automatic) => saveBankImport(pdfJob.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
-              purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf }),
-            commit: (automatic) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.accountLabel, automatic.history, { balance: automatic.balance }),
-          });
-          if (request.current !== pdfJob.id || result.status === 'canceled') return;
+          const result = prepareSharedStatement(parsed, account);
           if (result.status === 'review') setAutomaticReview(result.reason);
-          else {
-            useStatementAutomationStore.getState().confirmImport(account, parsed.accountIdentifier,
-              { name: pdfJob.name, importedAt: new Date().toISOString(), balanceAsOf: parsed.balance!.asOf, automatic: true });
-            setDone({ ...result.result, automatic: true }); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null);
-          }
+          else setPendingAutomatic({ id: pdfJob.id, statement: parsed, file: pdfJob.file, accountLabel: result.accountLabel });
         }
       } catch (cause) { if (request.current === pdfJob.id) setError(cause instanceof Error ? cause.message : 'Could not read or save this Citizens statement. Review it and try again.'); }
       finally { if (request.current === pdfJob.id) { setBusy(false); setAutomaticSaving(false); } }
     }} onError={async (message) => { if (request.current === pdfJob.id && processedPDF.current !== pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
+    <Modal visible={pendingAutomatic !== null} transparent animationType="fade" onRequestClose={() => { setPendingAutomatic(null); setAutomaticReview('Review this statement before saving.'); }}>
+      <View style={styles.scrim}><SafeAreaView style={styles.modal}><ScrollView contentContainerStyle={styles.balanceQuestion}>
+        <Text accessibilityRole="header" style={styles.section}>Update your balance?</Text>
+        <Text style={styles.body}>Use the PDF’s closing balance for your Account?</Text>
+        <Text style={styles.balanceAmount}>{pendingAutomatic?.statement.balance ? formatMoney(pendingAutomatic.statement.balance.amountCents) : ''}</Text>
+        <Text style={styles.hint}>{pendingAutomatic?.statement.balance ? `As of ${new Date(`${pendingAutomatic.statement.balance.asOf}T12:00:00`).toLocaleDateString()}` : ''}{pocket.reportedBalanceCents !== null ? ` · Saved balance ${formatMoney(pocket.reportedBalanceCents)}` : ''}</Text>
+        <Text style={styles.body}>Either option saves the PDF and imports its transactions. Your money set aside stays the same.</Text>
+        <Button label="Use PDF balance" disabled={busy} onPress={() => void saveSharedStatement('statement')} />
+        <Button label="Keep current balance" secondary disabled={busy} onPress={() => void saveSharedStatement('current')} />
+        <Button label="Review before saving" secondary onPress={() => { setPendingAutomatic(null); setAutomaticReview('Review this statement before saving.'); }} />
+      </ScrollView></SafeAreaView></View>
+    </Modal>
     <Modal visible={column !== null} transparent animationType="fade" onRequestClose={() => setColumn(null)}>
       <View style={styles.scrim}><SafeAreaView style={styles.modal}>
         <View style={styles.modalHeader}><Text style={styles.section}>Choose {column ? columnNames[column].toLowerCase() : 'column'}</Text><IconButton icon="close" label="Close column selection" onPress={() => setColumn(null)} /></View>
@@ -395,5 +433,6 @@ const styles = StyleSheet.create({
   checkButton: { width: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }, check: { width: 24, height: 24, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 5, alignItems: 'center', justifyContent: 'center' }, ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   help: { gap: 12, paddingTop: 8 },
   historyRow: { gap: 5, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 },
+  credit: { color: colors.primary }, debit: { color: colors.danger }, balanceQuestion: { gap: 14 }, balanceAmount: { color: colors.ink, fontSize: 32, fontWeight: '800', fontVariant: ['tabular-nums'] },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 }, scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 }, modal: { maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 12, padding: 15 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between' }, option: { minHeight: 48, padding: 13, borderBottomWidth: 1, borderBottomColor: colors.line },
 });

@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { applyBankImport, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '../src/features/bank/importLogic.ts';
-import { filterTransactions, linkAccountTransactions, mergeAccountTransactions, pocketTransactions } from '../src/features/pocket/transactions.ts';
+import { filterTransactions, linkAccountTransactions, mergeAccountTransactions, pocketTransactions, transactionDisplayName } from '../src/features/pocket/transactions.ts';
+import { bankTransactionName } from '../src/features/bank/merchantName.ts';
 import { availableCents } from '../src/features/pocket/logic.ts';
 
 const now = new Date('2026-10-10T12:00:00');
@@ -143,4 +144,42 @@ test('History filters distinguish bank credits/debits/pending from internal savi
   assert.equal(filterTransactions(history, '', 'savings').length, 2);
   assert.equal(filterTransactions(history, ' checking ', 'all').length, 2);
   assert.equal(filterTransactions(history, ' LUNCH ', 'out')[0].purchase, logged);
+});
+
+test('Unsorted bank statements, app purchases and adjustments are shown newest first, including across months and time zones', () => {
+  const bank = read('Date,Description,Amount\n09/30/2026,Older deposit,200\n10/02/2026,Recent purchase,-5\n08/31/2026,Oldest purchase,-20').rows;
+  const purchases = [purchase({ id: 'manual-old', purchasedAt: '2026-09-01T23:00:00-04:00' }),
+    purchase({ id: 'shortcut-new', source: 'shortcut', purchasedAt: '2026-10-02T23:00:00-04:00' })];
+  const adjustments = [{ id: 'latest', amountCents: 100, createdAt: '2026-10-03T03:01:00Z', kind: 'reserve' }];
+  const original = structuredClone({ bank, purchases, adjustments });
+  const history = pocketTransactions(bank, purchases, adjustments);
+  assert.deepEqual(history.map((row) => row.id), ['savings-latest', 'shortcut-new', bank[1].id, bank[0].id, 'manual-old', bank[2].id]);
+  assert.deepEqual(filterTransactions(history, '', 'out').map((row) => row.id), ['shortcut-new', bank[1].id, 'manual-old', bank[2].id]);
+  assert.deepEqual({ bank, purchases, adjustments }, original);
+});
+
+test('Merchant names hide bank codes without changing originals, identities, real repeated purchases or search', () => {
+  for (const [raw, expected] of [
+    ['0029 DBT PURCHASE - 9999999 eBay SAN JOSE CA', 'eBay'],
+    ['0030 DBT PURCHASE - 8888888 WAWA #0293 PA', 'Wawa'],
+    ['DBT PURCHASE DUNKIN 123456 NY', "Dunkin'"],
+    ['POS AMZN.COM*ABCDEFG SEATTLE WA', 'Amazon'],
+    ['0029 DBT PURCHASE - 9999999 Corner Cafe REF 123456', 'Corner Cafe'],
+    ['CARD PURCHASE SQ * Studio 54 09/08/2026', 'Studio 54'],
+    ['Post Office', 'Post Office'],
+    ['365 Market', '365 Market'],
+    ['ATM Exchange Fee', 'ATM Exchange Fee'],
+    ['Payroll deposit', 'Payroll deposit'],
+    ['Transfer to savings', 'Transfer to savings'],
+    ['DBT PURCHASE - 9999999', 'DBT PURCHASE - 9999999'],
+  ]) assert.equal(bankTransactionName(raw), expected);
+  const raw = '0029 DBT PURCHASE - 9999999 eBay SAN JOSE CA';
+  const bank = read(`Date,Description,Amount\n10/08/2026,${raw},-10\n10/08/2026,${raw},-10\n10/09/2026,POS AMZN.COM ABC,-20`).rows;
+  const history = pocketTransactions(bank, []);
+  assert.equal(history.length, 3); assert.notEqual(bank[0].id, bank[1].id);
+  assert.equal(transactionDisplayName(history[1]), 'eBay'); assert.equal(history[1].title, raw);
+  assert.equal(filterTransactions(history, 'Amazon', 'out').length, 1);
+  assert.equal(filterTransactions(history, '9999999', 'out').length, 2);
+  assert.equal(mergeAccountTransactions(bank, read(`Date,Description,Amount\n10/08/2026,${raw},-10\n10/08/2026,${raw},-10`).rows, now).added, 0);
+  assert.equal(transactionDisplayName({ source: 'manual', title: 'My eBay refund note' }), 'My eBay refund note');
 });
