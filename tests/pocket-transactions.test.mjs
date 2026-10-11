@@ -66,6 +66,29 @@ test('Account storage validates rows and keeps only transaction metadata', () =>
   assert.equal(mergeAccountTransactions([], bad, now).transactions.length, 0);
 });
 
+test('Reimport repairs unique Citizens deposit-direction errors and confirmed purchase identities without double history rows', () => {
+  const csv = parseBankCSV('Date,Description,Debit,Credit\n10/08/2026,ONLINE TRANSFER FROM CHECKING SAMPLE,,100\n10/08/2026,VENMO CASHOUT SAMPLE,,10\n10/08/2026,Coffee,5,\n10/08/2026,VENMO PAYMENT SAMPLE,20,');
+  csv.source = 'citizens-pdf';
+  const corrected = previewAccountTransactions(csv, guessMapping(csv), 'Checking', now).rows.map(row => row.title === 'Coffee' ? { ...row, linkedPurchaseId: 'manual-1' } : row);
+  const old = corrected.map((row,index) => ({ ...row, id: `account-${String(index+1).padStart(16,'a')}`, amountCents: -Math.abs(row.amountCents), ...(row.title === 'Coffee' ? { title: 'Coffee with accidental sidebar total' } : row.title === 'VENMO PAYMENT SAMPLE' ? { title: 'VENMO PAYMENT SAMPLE Deposits & Credits Total Deposits & Credits' } : {}) }));
+  const before = structuredClone(old);
+  const result = mergeAccountTransactions(old, corrected, now);
+  assert.equal(result.added,0); assert.equal(result.updated,4); assert.equal(result.transactions.length,4);
+  assert.deepEqual(result.transactions.map(row=>row.amountCents),[10000,1000,-500,-2000]);
+  assert.deepEqual(old,before);
+  const repeated = mergeAccountTransactions(result.transactions,corrected,now);
+  assert.equal(repeated.added,0); assert.equal(repeated.updated,0); assert.equal(repeated.transactions.length,4);
+  // Preserve both movements when the PDF really contains the debit and credit.
+  const legitimate = mergeAccountTransactions([old[0]],[old[0],corrected[0]],now);
+  assert.equal(legitimate.transactions.length,2);
+  const ambiguous = mergeAccountTransactions([old[0],{...old[0],id:'account-bbbbbbbbbbbbbbbb'}],[corrected[0]],now);
+  assert.equal(ambiguous.transactions.length,3);
+  const anotherAccount = mergeAccountTransactions([{...old[0],accountLabel:'Savings'}],[corrected[0]],now);
+  assert.equal(anotherAccount.transactions.length,2);
+  const anotherBank = mergeAccountTransactions([{...old[0],source:'csv'}],[corrected[0]],now);
+  assert.equal(anotherBank.transactions.length,2);
+});
+
 test('Bank and savings records show once, explicit different purchases survive, savings decisions do not become pending bank charges', () => {
   const existing = purchase({ source: 'shortcut' });
   const { csv, mapping, rows } = read('Date,Description,Amount\n10/08/2026,CAFE 123,-5');

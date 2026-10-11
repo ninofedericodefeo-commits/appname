@@ -24,13 +24,37 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
   const transactions = new Map(existing.map((item) => [item.id, item]));
   const latest = new Date(now); latest.setHours(23, 59, 59, 999);
   const rank = { recorded: 0, pending: 1, posted: 2 };
+  const incomingIds = new Set(incoming.map((item) => item.id));
+  const legacyByDate = new Map<string, AccountTransaction[]>();
+  const dateKey = (item: AccountTransaction) => JSON.stringify([item.accountLabel.trim().toLowerCase(), item.occurredAt]);
+  for (const item of existing) {
+    if (item.source !== 'citizens-pdf') continue;
+    const key = dateKey(item);
+    const rows = legacyByDate.get(key) ?? [];
+    rows.push(item); legacyByDate.set(key, rows);
+  }
   let added = 0, updated = 0;
   for (const item of incoming) {
     if (!/^account-[a-f0-9]{16}$/.test(item.id) || !item.title.trim() || item.title.length > 80 ||
       !Number.isSafeInteger(item.amountCents) || item.amountCents === 0 || Math.abs(item.amountCents) > 100_000_000 ||
       !Number.isFinite(Date.parse(item.occurredAt)) || Date.parse(item.occurredAt) > latest.getTime() ||
       !['csv', 'citizens-pdf'].includes(item.source) || !['pending', 'recorded', 'posted'].includes(item.status) || !item.accountLabel.trim() || item.accountLabel.length > 60) continue;
-    const old = transactions.get(item.id);
+    let old = transactions.get(item.id);
+    if (!old && item.source === 'citizens-pdf') {
+      // Earlier Citizens parsing could append sidebar totals to a purchase,
+      // changing its identity, or label transfer-from/cashout deposits as debits.
+      // Repair only a unique orphan from that parser: a confirmed purchase link,
+      // an exact incoming-transfer description/date/amount, or a recognizable
+      // section/total suffix appended to a transfer. A debit actually
+      // present in this PDF stays distinct, as do ambiguous equal purchases.
+      const depositCorrection = item.amountCents > 0 && /^(?:online transfer from checking\b|venmo cashout\b)/i.test(item.title);
+      const matches = (legacyByDate.get(dateKey(item)) ?? []).filter((candidate) => transactions.has(candidate.id) && !incomingIds.has(candidate.id) &&
+        (item.linkedPurchaseId && candidate.linkedPurchaseId === item.linkedPurchaseId && candidate.amountCents === item.amountCents ||
+          depositCorrection && !candidate.linkedPurchaseId && candidate.amountCents === -item.amountCents && candidate.title === item.title ||
+          !candidate.linkedPurchaseId && candidate.amountCents === item.amountCents && candidate.title.startsWith(item.title) &&
+            /^ (?:Deposits & Credits|Withdrawals & Debits) Total /i.test(candidate.title.slice(item.title.length))));
+      if (matches.length === 1) old = matches[0];
+    }
     // A less specific or older export cannot undo a supplied bank status.
     if (old && rank[old.status] > rank[item.status]) continue;
     const next: AccountTransaction = { id: item.id, title: item.title.trim(), amountCents: item.amountCents, occurredAt: item.occurredAt,
@@ -38,6 +62,7 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
       ...(item.linkedPurchaseId || old?.linkedPurchaseId ? { linkedPurchaseId: item.linkedPurchaseId ?? old?.linkedPurchaseId } : {}) };
     if (!old) added++;
     else if (JSON.stringify(old) !== JSON.stringify(next)) updated++;
+    if (old && old.id !== item.id) transactions.delete(old.id);
     transactions.set(item.id, next);
   }
   return { transactions: [...transactions.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated };

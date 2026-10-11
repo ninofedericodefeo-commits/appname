@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import { extractPDFText } from '../src/features/bank/extractPDFText.ts';
-import { parseCitizensStatement } from '../src/features/bank/citizensStatement.ts';
+import { parseCitizensStatement, pdfLines } from '../src/features/bank/citizensStatement.ts';
 import { applyBankImport, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '../src/features/bank/importLogic.ts';
 import { linkAccountTransactions, mergeAccountTransactions, pocketTransactions } from '../src/features/pocket/transactions.ts';
 import { suggestBankSubscriptions } from '../src/features/subscriptions/bankSuggestions.ts';
+import { applyAccountImport } from '../src/features/bank/accountImport.ts';
 
 const now = new Date('2026-10-10T12:00:00');
 const item = (text, x, y) => ({ text, x, y, width: text.length * 5, height: 10 });
@@ -153,4 +154,132 @@ test('Unknown spending on a later page warns instead of silently carrying an acc
   const third = page([[['09/09', 40], ['Payroll', 110], ['100.00', 400]]], { number: 3, section: 'Deposits' });
   const parsed = parseCitizensStatement([first, second, third], now);
   assert.equal(parsed.warnings[0].page, 2); assert.equal(parsed.pageCounts[1].spending, 0);
+});
+
+test('Thru and shared-year date ranges, standalone Debits/Credits and colon balances do not reject readable PDFs', () => {
+  for (const period of ['09/01/26 thru 09/30/26', 'September 1 - September 30, 2026']) {
+    const parsed = parseCitizensStatement([
+      page([], { period, section: 'Account summary', extra: line(60, ['Ending account balance:$1,234.56', 40]) }),
+      page([[['09/08', 40], ['0029 DBT PURCHASE - 9999999 eBay', 110], ['10.71', 400]]], { number: 2, period, section: 'Debits' }),
+      page([[['09/10', 40], ['Payroll', 110], ['100.00', 400]]], { number: 3, period, section: 'Credits' }),
+    ], now);
+    assert.equal(parsed.balance.amountCents, 123456);
+    assert.equal(parsed.balance.asOf, '2026-09-30');
+    assert.deepEqual(parsed.pageCounts, [{ page: 1, spending: 0, credits: 0 }, { page: 2, spending: 1, credits: 0 }, { page: 3, spending: 0, credits: 1 }]);
+    assert.deepEqual(parsed.warnings, []);
+  }
+  const rollover = parseCitizensStatement([page([[['12/22', 40], ['Shop', 110], ['5.50', 400]]], { period: 'Dec 15 - Jan 14, 2026' })], now);
+  assert.equal(rollover.csv.rows[0][0], '12/22/2025');
+});
+
+test('Split PDF glyph runs reconstruct dates, headers and amounts without joining columns or mutating input', () => {
+  const original = page([
+    [['09/08', 40], ['Shop', 110], ['10.71', 400]],
+    [['09/08', 40], ['Shop', 110], ['10.71', 400]],
+  ], { extra: line(60, ['Closing balance: $1,234.56', 40]) });
+  const fragmented = { ...original, items: original.items.flatMap((cell) => [...cell.text].map((character, i) => ({ ...cell, text: character, x: cell.x + i * 5, width: 5 }))) };
+  const before = structuredClone(fragmented);
+  assert.equal(pdfLines(fragmented.items)[4].text, 'Date Description Amount');
+  const parsed = parseCitizensStatement([fragmented], now);
+  assert.deepEqual(parsed.csv.rows, parseCitizensStatement([original], now).csv.rows);
+  assert.equal(parsed.balance.amountCents, 123456);
+  assert.equal(parsed.csv.rows.length, 2);
+  assert.notEqual(review(parsed).rows[0].id, review(parsed).rows[1].id);
+  assert.deepEqual(fragmented, before);
+});
+
+test('Additions/subtractions columns and two-line headers identify direction without inventing it', () => {
+  const single = parseCitizensStatement([page([
+    [['09/08', 40], ['Shop', 110], ['10.00', 350], ['0.00', 450]],
+    [['09/09', 40], ['Payroll', 110], ['0.00', 350], ['100.00', 450]],
+  ], { section: 'Transaction details', headers: [['Date', 40], ['Description', 110], ['Subtractions', 350], ['Additions', 450]] })], now);
+  assert.equal(single.csv.rows[0][2], '10.00'); assert.equal(single.csv.rows[1][3], '100.00');
+  const split = page([[['09/08', 40], ['Shop', 110], ['10.00', 350]], [['09/09', 40], ['Payroll', 110], ['100.00', 450]]], {
+    section: 'Account summary', headers: [['Date', 40], ['Transaction', 110]], extra: line(112, ['Debit amount', 350], ['Credit amount', 450]),
+  });
+  const parsed = parseCitizensStatement([split], now);
+  assert.equal(parsed.csv.rows.length, 2);
+  assert.equal(parsed.csv.rows[0][2], '10.00'); assert.equal(parsed.csv.rows[1][3], '100.00');
+  assert.deepEqual(parsed.warnings, []);
+});
+
+test('Unsupported layouts report fixed diagnostic counts/reasons without exposing extracted bank data', () => {
+  const unsupported = page([[['09/08', 40], ['PRIVATE MERCHANT', 110], ['123.45', 400]]], { section: 'Unrecognized transactions', extra: line(60, ['Account number 12345678', 40]) });
+  assert.throws(() => parseCitizensStatement([unsupported], now), (error) => {
+    assert.match(error.message, /Read 1 page and 1 dated row/);
+    assert.match(error.message, /spending or a credit/);
+    assert.doesNotMatch(error.message, /PRIVATE|12345678|123\.45/);
+    return true;
+  });
+  assert.throws(() => parseCitizensStatement([page([], { period: 'missing dates', section: 'Account summary' })], now), /date range was not recognized/);
+});
+
+test('Citizens Current Balance in Balance Calculation supports an explicit no-activity statement', () => {
+  const noActivity = page([], { period: 'July 1, 2026 through August 7, 2026', section: 'Account summary', extra: [
+    ...line(50, ['Balance Calculation', 40]),
+    ...line(60, ['Previous Balance', 40], ['900.00', 260]),
+    ...line(70, ['Current Balance', 40], ['=', 195], ['900.00', 260]),
+    ...line(140, ['TRANSACTION\u0010DETAILS FOR CHECKING ACCOUNT ENDING 000-0', 40]),
+    ...line(160, ['No activity this statement period.', 40]),
+    ...line(180, ['Current Balance', 495]),
+    ...line(198, ['=', 450], ['900.00', 535]),
+  ] });
+  const worksheet = page([], { number: 2, section: 'Checking Account Balance Worksheet', extra: [
+    ...line(130, ['Current Balance', 40]), ...line(145, ['9,999.99', 40]),
+  ] });
+  const parsed = parseCitizensStatement([noActivity, worksheet], now);
+  assert.equal(parsed.balance.amountCents, 90000);
+  assert.equal(parsed.balance.asOf, '2026-08-07');
+  assert.equal(parsed.accountIdentifier, 'ending-0000');
+  assert.equal(parsed.csv.rows.length, 0);
+  assert.deepEqual(parsed.warnings, []);
+  const zero = structuredClone(noActivity);
+  zero.items = zero.items.map(cell => cell.text === '900.00' ? { ...cell, text: '.00' } : cell);
+  assert.equal(parseCitizensStatement([zero], now).balance.amountCents, 0);
+  const conflicting = structuredClone(noActivity);
+  conflicting.items = conflicting.items.map(cell => cell.text === '900.00' && cell.x > 500 ? { ...cell, text: '800.00' } : cell);
+  assert.throws(() => parseCitizensStatement([conflicting], now), /Conflicting closing balances/);
+  const otherAccount = structuredClone(noActivity);
+  otherAccount.items = otherAccount.items.map(cell => cell.text.includes('ENDING 000-0') ? { ...cell, text: cell.text.replace('000-0', '111-1') } : cell);
+  assert.throws(() => parseCitizensStatement([noActivity, otherAccount], now), /multiple accounts/);
+});
+
+test('Real PDF sidebar layout separates page 2 purchases, page 3 deposits, cents-only fees, summaries and worksheet', async () => {
+  const bytes = await readFile(new URL('./fixtures/citizens-sidebar-synthetic.pdf', import.meta.url));
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = () => { throw new Error('Unexpected network request during local PDF extraction'); };
+  let pages;
+  try { pages = await extractPDFText(bytes.toString('base64')); } finally { globalThis.fetch = originalFetch; }
+  const parsed = parseCitizensStatement(pages, now);
+  assert.deepEqual(parsed.warnings, []);
+  assert.equal(parsed.balance.amountCents, 105508);
+  assert.equal(parsed.balance.asOf, '2026-09-30');
+  assert.equal(parsed.accountIdentifier, 'ending-0000');
+  assert.deepEqual(parsed.pageCounts, [{ page: 1, spending: 0, credits: 0 }, { page: 2, spending: 2, credits: 0 }, { page: 3, spending: 3, credits: 2 }, { page: 4, spending: 0, credits: 0 }]);
+  const preview = review(parsed);
+  assert.equal(preview.rows.length, 3);
+  assert.notEqual(preview.rows[0].id, preview.rows[1].id);
+  assert.ok(preview.rows.slice(0,2).every(row => row.title.endsWith('DOWNTOWN LOCATION')));
+  assert.ok(parsed.csv.rows.every(row => !/Balance|Total|ATM\/Purchases|Continued|Please See|May include/.test(row[1])));
+  const movements = previewAccountTransactions(parsed.csv, guessMapping(parsed.csv), 'Main checking', now);
+  assert.equal(movements.excluded.length, 0);
+  assert.equal(movements.rows.filter(row => row.amountCents < 0).reduce((sum,row) => sum-row.amountCents,0), 5492);
+  assert.equal(movements.rows.filter(row => row.amountCents > 0).reduce((sum,row) => sum+row.amountCents,0), 11000);
+  assert.equal(movements.rows.find(row => /FEE/.test(row.title)).amountCents, -45);
+  const ledger = linkAccountTransactions(movements.rows, preview.rows, new Set(preview.rows.map(row => row.id)));
+  const initial = { ...state(), accountTransactions: [] };
+  const keep = applyAccountImport(initial, preview.rows, false, 'Main checking', ledger, { balance: null }, now);
+  assert.equal(keep.state.reportedBalanceCents, initial.reportedBalanceCents);
+  const imported = applyAccountImport(initial, preview.rows, false, 'Main checking', ledger, { balance: parsed.balance }, now);
+  assert.equal(imported.state.reportedBalanceCents, 105508);
+  assert.equal(pocketTransactions(imported.state.accountTransactions, imported.state.purchases).length, 7);
+  const repeated = applyAccountImport(imported.state, preview.rows, false, 'Main checking', ledger, { balance: parsed.balance }, now);
+  assert.equal(repeated.imported, 0); assert.equal(repeated.transactionsAdded, 0); assert.equal(repeated.balanceUpdated, false);
+  // Read the sidebar footer on its own; the summary page isn't required for it.
+  const withoutSummaryBalance = structuredClone(pages);
+  withoutSummaryBalance[0].items = withoutSummaryBalance[0].items.filter(cell => !cell.text.includes('Current Balance'));
+  assert.equal(parseCitizensStatement(withoutSummaryBalance, now).balance.amountCents, 105508);
+  const conflict = structuredClone(pages);
+  conflict[2].items = conflict[2].items.map(cell => cell.text === '1,055.08' && cell.x > 500 ? { ...cell, text: '1,111.11' } : cell);
+  assert.equal(parseCitizensStatement(conflict, now).balance, null);
 });
