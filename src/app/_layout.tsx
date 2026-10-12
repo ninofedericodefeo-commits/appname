@@ -1,7 +1,7 @@
 import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { AppState, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { AppState, Modal, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack, router } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -11,9 +11,9 @@ import { localDateKey, subscriptionsToReviewTomorrow } from '@/features/subscrip
 import { syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { syncGoalWidget } from '@/features/goals/widget';
 import { SettingsButton } from '@/components/SettingsButton';
+import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import CancelSubscriptionButton, { SubscriptionCancellationNotice } from '@/features/subscriptions/CancelSubscriptionButton';
-import { syncAccountWidget, syncPauseActivities } from '@/features/spending/widgets';
-import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
+import { syncAccountWidget, endRetiredPurchaseActivities } from '@/features/spending/widgets';
 import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
 import { queryClient } from '@/lib/queryClient';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -106,21 +106,13 @@ function SubscriptionReviewPrompt() {
               </View>
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
               <View style={styles.actions}>
-                <Pressable
-                  accessibilityRole="button"
-                  style={styles.keepButton}
-                  onPress={() => review(subscription.id, localDateKey(renewal), 'keep')}
-                >
-                  <Text style={styles.keepText}>Keep it</Text>
-                </Pressable>
-                <CancelSubscriptionButton subscription={subscription} renewalDate={localDateKey(renewal)} />
+                <SubscriptionButton label="Keep it" grow onPress={() => review(subscription.id, localDateKey(renewal), 'keep')} />
+                <CancelSubscriptionButton subscription={subscription} renewalDate={localDateKey(renewal)} grow />
               </View>
             </View>
           ))}
           <Text style={styles.note}>Planning to cancel is a note to yourself. You still need to cancel with the subscription provider before its deadline.</Text>
-          <Pressable accessibilityRole="button" style={styles.laterButton} onPress={() => setDismissedDay(todayKey)}>
-            <Text style={styles.laterText}>Review later</Text>
-          </Pressable>
+          <SubscriptionButton label="Review later" onPress={() => setDismissedDay(todayKey)} />
         </ScrollView>
       </SafeAreaView>
     </Modal>
@@ -129,16 +121,13 @@ function SubscriptionReviewPrompt() {
 
 export default function RootLayout() {
   useEffect(() => {
-    const refresh = () => {
-      void syncAccountWidget().catch(error => console.warn('Could not update account widget', error));
-      void syncPauseActivities().catch(error => console.warn('Could not update purchase Live Activity', error));
-    };
-    const unsubscribers = [usePocketStore.subscribe(refresh), usePurchasePauseStore.subscribe(refresh), useWidgetSettingsStore.subscribe(refresh),
-      usePocketStore.persist.onFinishHydration(refresh), usePurchasePauseStore.persist.onFinishHydration(refresh), useWidgetSettingsStore.persist.onFinishHydration(refresh)];
-    const foreground = AppState.addEventListener('change', state => { if (state === 'active') refresh(); });
-    const timer = setInterval(() => { void syncPauseActivities().catch(error => console.warn('Could not update purchase Live Activity', error)); }, 60_000);
-    refresh();
-    return () => { unsubscribers.forEach(unsubscribe => unsubscribe()); foreground.remove(); clearInterval(timer); };
+    const refresh = () => { void syncAccountWidget().catch(error => console.warn('Could not update account widget', error)); };
+    const retire = () => { void endRetiredPurchaseActivities().catch(error => console.warn('Could not dismiss retired purchase activity', error)); };
+    const unsubscribers = [usePocketStore.subscribe(refresh), useWidgetSettingsStore.subscribe(refresh),
+      usePocketStore.persist.onFinishHydration(refresh), useWidgetSettingsStore.persist.onFinishHydration(() => { refresh(); retire(); })];
+    const foreground = AppState.addEventListener('change', state => { if (state === 'active') { refresh(); retire(); } });
+    refresh(); retire();
+    return () => { unsubscribers.forEach(unsubscribe => unsubscribe()); foreground.remove(); };
   }, []);
   useEffect(() => {
     const initialize = () => useSubscriptionStore.getState().initializeSamples();
@@ -197,11 +186,7 @@ const styles = StyleSheet.create({
   amount: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   meta: { color: colors.muted, fontSize: 13, marginTop: 5 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 16 },
-  keepButton: { backgroundColor: colors.accentDark, borderRadius: 6, padding: 12, flex: 1, alignItems: 'center' },
-  keepText: { color: colors.surface, fontWeight: '700' },
   cancelButton: { backgroundColor: colors.paleGreen, borderRadius: 7, padding: 12, flex: 1, alignItems: 'center' },
   cancelText: { color: colors.inkSoft, fontWeight: '700' },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-  laterButton: { alignSelf: 'center', padding: 12 },
-  laterText: { color: colors.inkSoft, fontWeight: '700' },
 });

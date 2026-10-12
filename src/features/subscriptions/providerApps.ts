@@ -1,10 +1,9 @@
+import appCatalog from './appCatalog.json' with { type: 'json' };
 export type SubscriptionApp = { name: string; url: string; fallbackUrl?: string };
 
-export const SUBSCRIPTION_APPS: SubscriptionApp[] = [
-  { name: 'Spotify', url: 'spotify:', fallbackUrl: 'https://www.spotify.com/account/' },
-  { name: 'YouTube', url: 'https://www.youtube.com/paid_memberships' },
-  { name: 'Apple subscriptions', url: 'https://apps.apple.com/account/subscriptions' },
-];
+// Shared with the native configuration; HTTPS links cannot detect installation.
+export const SUBSCRIPTION_APPS: SubscriptionApp[] = appCatalog;
+export const APPLE_SUBSCRIPTIONS: SubscriptionApp = { name: 'Apple subscriptions', url: 'https://apps.apple.com/account/subscriptions' };
 
 export function subscriptionAppURL(input: string, websiteOnly = false): string {
   const value = input.trim();
@@ -30,10 +29,10 @@ export async function openSubscriptionApp(input: SubscriptionApp | undefined, op
   if (!input) return { opened: false, message: 'Cancellation plan saved. Cancel with the provider to stop the charge.' };
   let app: SubscriptionApp;
   try { app = subscriptionApp(input); }
-  catch { return { opened: false, message: 'Cancellation plan saved. Edit this subscription to fix its app link.' }; }
+  catch { return { opened: false, message: 'Cancellation plan saved. Edit this subscription to choose its app again.' }; }
   const website = app.url.startsWith('https:');
   const target = platform === 'web' && !website ? app.fallbackUrl : app.url;
-  if (!target) return { opened: false, message: 'Cancellation plan saved. Open the app on your phone, or add its HTTPS website as a fallback.' };
+  if (!target) return { opened: false, message: 'Cancellation plan saved. Open the associated app on your phone to cancel.' };
   try {
     if (await openURL(target) === false) throw Error('Unavailable');
     return { opened: true, message: `Opened ${app.name}. Complete cancellation there; the subscription is still active in GasFinder.` };
@@ -44,6 +43,6 @@ export async function openSubscriptionApp(input: SubscriptionApp | undefined, op
         return { opened: true, message: `Opened ${app.name}’s website because its app could not open. Complete cancellation there.` };
       } catch { /* Report a recoverable error without exposing the private link. */ }
     }
-    return { opened: false, message: `Cancellation plan saved. Could not open ${app.name}. Open it manually or edit the saved link.` };
+    return { opened: false, message: `Cancellation plan saved. Could not open ${app.name}. Open it manually or choose another app.` };
   }
 }

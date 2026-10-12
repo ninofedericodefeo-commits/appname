@@ -7,6 +7,7 @@ import { preferredMapsApp } from '@/features/stations/preferences';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { colors } from '@/theme';
 import WidgetSettingsPanel from '@/features/spending/WidgetSettingsPanel';
+import SubscriptionSettingsPanel from '@/features/subscriptions/SubscriptionSettingsPanel';
 
 export default function SettingsScreen() {
   const { mapsPreference, refillPercent, selectedFuelType, setMapsPreference, setRefillPercent, setSelectedFuelType } = useSettingsStore();
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
       <Link href="/spending-blocker" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up website blocking ›</Text></Pressable></Link>
       <Text style={styles.note}>Browse shops while recognized checkout pages are paused in Safari or desktop Chrome.</Text>
     </View>
+    <SubscriptionSettingsPanel />
     <WidgetSettingsPanel />
     <View style={styles.card}><Text style={styles.heading}>Which Maps do you use?</Text>
       <View style={styles.row}>{(['apple', 'google'] as const).map((app) => <Pressable key={app} accessibilityRole="button" accessibilityState={{ selected: maps === app, disabled: app === 'apple' && Platform.OS !== 'ios' }} disabled={app === 'apple' && Platform.OS !== 'ios'} onPress={() => setMapsPreference(app)} style={[styles.choice, maps === app && styles.selected, app === 'apple' && Platform.OS !== 'ios' && styles.disabled]}><Text style={[styles.choiceText, maps === app && styles.selectedText]}>{app === 'apple' ? 'Apple Maps' : 'Google Maps'}</Text></Pressable>)}</View>

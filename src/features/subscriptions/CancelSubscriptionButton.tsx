@@ -6,6 +6,7 @@ import type { Subscription } from './logic';
 import { openSubscriptionApp } from './providerApps';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { colors } from '@/theme';
+import SubscriptionButton from './SubscriptionButton';
 
 const useCancellationNotice = create<{ message: string; setMessage: (message: string) => void }>(set => ({ message: '', setMessage: message => set({ message }) }));
 
@@ -15,7 +16,7 @@ export function SubscriptionCancellationNotice() {
   return <View style={styles.notice}><Text accessibilityLiveRegion="polite" style={styles.message}>{message}</Text><Pressable accessibilityRole="button" accessibilityLabel="Dismiss subscription cancellation message" style={styles.dismiss} onPress={() => setMessage('')}><Text style={styles.label}>Dismiss</Text></Pressable></View>;
 }
 
-export default function CancelSubscriptionButton({ subscription, renewalDate, label = 'Plan to cancel' }: { subscription: Subscription; renewalDate: string; label?: string }) {
+export default function CancelSubscriptionButton({ subscription, renewalDate, label = 'Plan to cancel', grow = false }: { subscription: Subscription; renewalDate: string; label?: string; grow?: boolean }) {
   const [busy, setBusy] = useState(false);
   const opening = useRef(false);
   async function plan() {
@@ -30,12 +31,10 @@ export default function CancelSubscriptionButton({ subscription, renewalDate, la
       useCancellationNotice.getState().setMessage(result.message);
     } finally { opening.current = false; setBusy(false); }
   }
-  return <View style={styles.container}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${label} ${subscription.name}`} disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void plan()}><Text style={styles.label}>{busy ? 'Opening…' : label}</Text></Pressable>
-  </View>;
+  return <SubscriptionButton label={busy ? 'Opening…' : label} accessibilityLabel={`${label} ${subscription.name}`}
+    tone="primary" disabled={busy} grow={grow} onPress={() => void plan()} />;
 }
 const styles = StyleSheet.create({
-  container: { flexShrink: 1, maxWidth: '100%' }, button: { minHeight: 44, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, padding: 12, justifyContent: 'center', alignItems: 'center' },
-  label: { color: colors.ink, fontSize: 13, fontWeight: '700' }, disabled: { opacity: .5 }, message: { color: colors.ink, fontSize: 12, lineHeight: 18, flexShrink: 1 },
+  label: { color: colors.ink, fontSize: 13, fontWeight: '700' }, message: { color: colors.ink, fontSize: 12, lineHeight: 18, flexShrink: 1 },
   notice: { position: 'absolute', bottom: 88, left: 12, right: 12, padding: 12, backgroundColor: colors.paleGreen, borderWidth: 1, borderColor: colors.line, borderRadius: 10, flexDirection: 'row', gap: 10, alignItems: 'center' }, dismiss: { minHeight: 44, justifyContent: 'center' },
 });

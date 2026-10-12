@@ -1,0 +1,5 @@
+{
+  "platforms": ["apple", "android"],
+  "apple": { "modules": ["SubscriptionAppsModule"] },
+  "android": { "modules": ["expo.modules.subscriptionapps.SubscriptionAppsModule"] }
+}

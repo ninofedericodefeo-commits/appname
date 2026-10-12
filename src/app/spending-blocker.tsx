@@ -38,7 +38,7 @@ export default function SpendingBlockerScreen() {
       <Text accessibilityLiveRegion="polite" style={styles.status}>{Platform.OS !== 'ios' ? 'Available on iPhone' : !status ? 'Checking this build…' : !status.bundled ? 'An updated iPhone build is needed' : status.enabled === true ? 'Extension enabled in Safari' : status.enabled === false ? 'Enable the extension in Safari' : 'Check the extension in Safari settings'}</Text>
       {Platform.OS === 'ios' && status?.bundled && status.settingsSupported && <Pressable accessibilityRole="button" disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void openSettings()}><Text style={styles.buttonText}>{busy ? 'Opening…' : 'Open Safari extension settings'}</Text></Pressable>}
       {status?.bundled && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void refresh()}><Text style={styles.link}>Check extension status</Text></Pressable>}
-      {!status?.bundled && <Text style={styles.note}>{Platform.OS === 'ios' ? 'The extension comes with the new GasFinder app build. A Metro reload or Expo Go cannot add it.' : 'Use the GasFinder iPhone build and Safari for website blocking. The purchase waiting list works on this device.'}</Text>}
+      {!status?.bundled && <Text style={styles.note}>{Platform.OS === 'ios' ? 'The extension comes with the new GasFinder app build. A Metro reload or Expo Go cannot add it.' : 'Use the GasFinder iPhone build for Safari, or set up the extension in desktop Chrome.'}</Text>}
       <Text style={styles.note}>Choose shops and start the checkout pause from Safari’s Spending Pause controls. Enabling the extension alone does not start blocking.</Text>
     </View>
     <View style={styles.card}>

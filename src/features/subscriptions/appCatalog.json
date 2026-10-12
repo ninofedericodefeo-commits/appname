@@ -1,0 +1,16 @@
+[
+  { "name": "Spotify", "url": "spotify:", "fallbackUrl": "https://www.spotify.com/account/" },
+  { "name": "YouTube", "url": "youtube://", "fallbackUrl": "https://www.youtube.com/paid_memberships" },
+  { "name": "Netflix", "url": "nflx://", "fallbackUrl": "https://www.netflix.com/youraccount" },
+  { "name": "Disney+", "url": "disneyplus://", "fallbackUrl": "https://www.disneyplus.com/account" },
+  { "name": "Hulu", "url": "hulu://", "fallbackUrl": "https://secure.hulu.com/account" },
+  { "name": "Prime Video", "url": "aiv://", "fallbackUrl": "https://www.primevideo.com/settings" },
+  { "name": "Twitch", "url": "twitch://open", "fallbackUrl": "https://www.twitch.tv/subscriptions" },
+  { "name": "Telegram", "url": "tg://settings", "fallbackUrl": "https://telegram.org/faq_premium" },
+  { "name": "Slack", "url": "slack://open", "fallbackUrl": "https://slack.com/signin" },
+  { "name": "Todoist", "url": "todoist://", "fallbackUrl": "https://todoist.com/app/settings/subscription" },
+  { "name": "Dropbox", "url": "dbapi-2://", "fallbackUrl": "https://www.dropbox.com/account/billing" },
+  { "name": "Notion", "url": "notion://", "fallbackUrl": "https://www.notion.so/" },
+  { "name": "Zoom", "url": "zoomus://", "fallbackUrl": "https://zoom.us/billing" },
+  { "name": "Evernote", "url": "evernote://", "fallbackUrl": "https://www.evernote.com/Settings.action" }
+]

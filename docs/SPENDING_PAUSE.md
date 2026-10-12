@@ -20,17 +20,17 @@ Run `npm run build:chrome-extension`. Load `dist/chrome-extension` in desktop Ch
 
 Chrome on iPhone does not load these browser extensions. Its mobile Add to Desktop flow installs on a computer. The Chrome build has not been published to the Web Store or installed in the user's browser.
 
-## Account widget and waiting-list Live Activity
+## Account widget
 
-The Account widget shows the saved available balance (bank balance minus set-aside) and manual waiting-list count. Enable it in universal Settings, then add GasFinder account from the iPhone widget gallery. Amounts are hidden by default and are omitted from widget payloads unless enabled. The medium size identifies the saved balance date; it is not a live bank feed.
+The Account widget shows the saved available balance (bank balance minus set-aside) and the set-aside amount. Enable it in universal Settings, then add GasFinder account from the iPhone widget gallery. Amounts are hidden by default and omitted from widget payloads unless enabled. The medium size identifies the saved balance date; it is not a live bank feed.
 
-Track on Lock Screen in Subs starts a Live Activity for one manual waiting-list purchase. It displays a native countdown and captured review date, with a generic title and no purchase name/amount. Relaunch updates an existing activity; removing/deciding a purchase or reaching its deadline ends it while the app runs. Settings can stop it. ActivityKit may end it after 8 hours even when the waiting period is longer. This activity does not report the Safari/Chrome blocker state.
+The manual purchase waiting list and its Live Activity have been removed. Widget-enabled builds dismiss activities created by earlier versions at launch/foreground; the old runtime factory remains only for that compatibility cleanup. No new waiting-list activity is started. Existing logged purchases and legacy local storage are retained.
 
-Both use the existing `expo-widgets` integration. The repository's Personal Team build disables App Groups, so these controls are unavailable there. An enrolled Apple developer team and a newly signed build with `EXPO_ENABLE_IOS_CAPABILITIES=1` are required. Preserve this capability gate until signing is available. Live Activities register at runtime; only the Account and Goal widgets belong in the `widgets[]` config.
+The Account/Goal widgets use the existing `expo-widgets` integration. The Personal Team build disables App Groups, so widget controls are unavailable there. An enrolled Apple developer team and a newly signed build with `EXPO_ENABLE_IOS_CAPABILITIES=1` are required. The checkout blocker and subscription app picker do not require those capabilities.
 
 ## Verification and remaining device checks
 
-Logic tests cover safe domains, browsing versus checkout URLs, locked deadlines, concurrent taps, rule/storage failures with rollback, real worker callback messaging, sample subscription month/year boundaries, and activity lifecycle/privacy. Required lint and TypeScript checks pass. iOS/Android/web exports and the widget-enabled iOS export pass. Isolated CNG checks generate the Safari, widget and sharing targets; the Safari extension and native Expo setup module compile unsigned for the simulator.
+Logic tests cover safe domains, browsing versus checkout URLs, locked deadlines, concurrent taps, rule/storage failures with rollback, real worker callback messaging, sample subscription month/year boundaries, and dismissal of retired activities. Required lint and TypeScript checks pass. iOS/Android/web exports and the widget-enabled iOS export pass. Isolated CNG checks generate the Safari, widget and sharing targets; the Safari extension and native Expo setup module compile unsigned for the simulator.
 
 Mobile browser previews check sample review/removal/reset, Settings positioning/touch area, saved-car appearance and popup start/reload/deadline/resume behavior. The popup's network API was simulated; these checks do not prove Safari/Chrome interception or ActivityKit rendering on a physical phone. Complete the phone checklist before treating those native integrations as device-verified. No actual payment is needed for that check.
 
