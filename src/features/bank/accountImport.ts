@@ -1,12 +1,13 @@
 import { applyBankImport, parseBankDate } from './importLogic.ts';
 import type { BankImportState, BankPreviewRow, BankPurchase } from './importLogic.ts';
 import { mergeAccountTransactions } from '../pocket/transactions.ts';
-import type { AccountTransaction } from '../pocket/transactions.ts';
+import type { AccountTransaction, TransactionDirections } from '../pocket/transactions.ts';
 
 export type StatementBalance = { amountCents: number; asOf: string; page: number; line: number };
 export type AccountImportState = BankImportState & {
   accountTransactions: AccountTransaction[];
   hiddenTransactionIds?: string[];
+  transactionDirections?: TransactionDirections;
   balanceUpdatedAt?: string | null;
   balanceAsOf?: string | null;
   balanceSource?: 'manual' | 'citizens-pdf' | null;
@@ -50,9 +51,14 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
   });
   const movements = mergeAccountTransactions(state.accountTransactions, history, now);
   const hidden = new Set(state.hiddenTransactionIds ?? []);
+  const directions = { ...(state.transactionDirections ?? {}) };
   for (const replacement of movements.replacedIds) if (hidden.has(replacement.from)) hidden.add(replacement.to);
+  for (const replacement of movements.replacedIds) if (directions[replacement.from]) {
+    directions[replacement.to] = directions[replacement.from]; delete directions[replacement.from];
+  }
   return { state: { ...withBalance, ...result.state, purchases, bankImportKeys: [...keys], accountTransactions: movements.transactions,
-    ...(state.hiddenTransactionIds ? { hiddenTransactionIds: [...hidden] } : {}) },
+    ...(state.hiddenTransactionIds ? { hiddenTransactionIds: [...hidden] } : {}),
+    ...(state.transactionDirections ? { transactionDirections: directions } : {}) },
     imported: result.imported, skipped: result.skipped, savedCents: result.savedCents,
     matched: matched.size, balanceUpdated, transactionsAdded: movements.added, transactionsUpdated: movements.updated };
 }

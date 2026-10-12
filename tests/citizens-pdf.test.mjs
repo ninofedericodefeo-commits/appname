@@ -18,6 +18,21 @@ const page = (rows, { number = 1, period = '09/01/2026 - 09/30/2026', bank = 'Ci
 const state = () => ({ activeGoal: null, reservedCents: 0, reportedBalanceCents: 250000, purchases: [], entries: [], bankImportKeys: [] });
 const review = (statement, history = [], keys = []) => previewBankCSV(statement.csv, guessMapping(statement.csv), 'Main checking', history, keys, now);
 
+test('Deposit heading variants cannot inherit a preceding withdrawal section or become purchases', () => {
+  for (const heading of ['Deposits / Credits', 'Deposits/Credits (Continued)', 'Credits & Deposits', 'Electronic Deposits & Credits', 'Other Deposits and Credits', 'Deposits and other additions']) {
+    const input = page([[['09/08', 40], ['Shop', 110], ['5.00', 400]]]);
+    input.items.push(...line(140, [heading, 40]), ...line(160, ['Date', 40], ['Description', 110], ['Amount', 400]),
+      ...line(180, ['09/09', 40], ['Payroll', 110], ['100.00', 400]));
+    const parsed = parseCitizensStatement([input], now);
+    assert.equal(parsed.warnings.length, 0, heading);
+    assert.equal(parsed.csv.rows[0][1], 'Shop');
+    assert.equal(parsed.csv.rows[1][2], ''); assert.equal(parsed.csv.rows[1][3], '100.00');
+    assert.equal(review(parsed).rows.length, 1);
+    const history = previewAccountTransactions(parsed.csv, guessMapping(parsed.csv), 'Checking', now).rows;
+    assert.deepEqual(history.map(row => row.amountCents), [-500, 10000]);
+  }
+});
+
 test('A statement with no readable transactions can still supply a clear closing balance', () => {
   const parsed = parseCitizensStatement([page([], { section: 'Account summary', extra: line(60, ['Ending balance $2,456.42', 40]) })], now);
   assert.equal(parsed.csv.rows.length, 0); assert.equal(parsed.balance.amountCents, 245642);

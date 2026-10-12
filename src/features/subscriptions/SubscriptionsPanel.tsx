@@ -13,6 +13,8 @@ import { localDateKey, nextRenewal, subscriptionsToReviewTomorrow } from '@/feat
 import type { Subscription } from '@/features/subscriptions/logic';
 import { requestSubscriptionReminderPermission, syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
+import { SUBSCRIPTION_APPS, subscriptionApp } from './providerApps';
+import CancelSubscriptionButton from './CancelSubscriptionButton';
 
 const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function nextLeapYear(start: number) { let year = start; while (new Date(year, 1, 29).getMonth() !== 1) year++; return year; }
@@ -28,6 +30,10 @@ export default function SubscriptionsPanel() {
   const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(purchases, subscriptions, dismissedBankSuggestions, today) : [], [purchases, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
   const [name, setName] = useState('');
   const [amount, setAmount] = useState('');
+  const [hasApp, setHasApp] = useState(false);
+  const [appName, setAppName] = useState('');
+  const [appURL, setAppURL] = useState('');
+  const [fallbackURL, setFallbackURL] = useState('');
   const [cadence, setCadence] = useState<Subscription['cadence']>('monthly');
   const [day, setDay] = useState('1');
   const [month, setMonth] = useState(1);
@@ -60,6 +66,7 @@ export default function SubscriptionsPanel() {
   function resetForm() {
     setName('');
     setAmount('');
+    setHasApp(false); setAppName(''); setAppURL(''); setFallbackURL('');
     setCadence('monthly');
     setDay('1');
     setMonth(1);
@@ -81,7 +88,10 @@ export default function SubscriptionsPanel() {
     if (!/^\d+$/.test(day.trim()) || !Number.isInteger(billingDay) || billingDay < 1 || billingDay > 31) {
       return setError('Enter a renewal day from 1 to 31.');
     }
-    saveSubscription({ name: trimmedName, amountCents, cadence, day: billingDay, month, ...(bankSuggestion ? { bankMerchantKey: bankSuggestion.merchantKey } : {}) }, editingId ?? undefined);
+    let associatedApp;
+    try { associatedApp = hasApp ? subscriptionApp({ name: appName, url: appURL, fallbackUrl: fallbackURL }) : undefined; }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Check the app link.'); return; }
+    saveSubscription({ name: trimmedName, amountCents, cadence, day: billingDay, month, associatedApp, ...(bankSuggestion ? { bankMerchantKey: bankSuggestion.merchantKey } : {}) }, editingId ?? undefined);
     resetForm();
   }
 
@@ -91,6 +101,8 @@ export default function SubscriptionsPanel() {
     setBankSuggestion(null);
     setName(subscription.name);
     setAmount(formatAmount(subscription.amountCents));
+    setHasApp(!!subscription.associatedApp); setAppName(subscription.associatedApp?.name ?? '');
+    setAppURL(subscription.associatedApp?.url ?? ''); setFallbackURL(subscription.associatedApp?.fallbackUrl ?? '');
     setCadence(subscription.cadence);
     setDay(String(subscription.day));
     setMonth(subscription.month);
@@ -131,6 +143,7 @@ export default function SubscriptionsPanel() {
           <Text style={styles.subscriptionAmount}>{formatMoney(subscription.amountCents)}</Text>
         </View>
         {subscription.isSample && <Text style={styles.meta}>SAMPLE · invented service and price</Text>}
+        {subscription.associatedApp && <Text style={styles.meta}>Associated app: {subscription.associatedApp.name}</Text>}
         <Text style={styles.meta}>
           {subscription.cadence === 'monthly' ? 'Monthly' : 'Yearly'} · next renewal {renewal.toLocaleDateString()}
         </Text>
@@ -145,7 +158,11 @@ export default function SubscriptionsPanel() {
           <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => setActive(subscription.id, !subscription.active)}>
             <Text style={styles.textButtonLabel}>{subscription.active ? 'I canceled it' : 'Reactivate'}</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => setRemoveId(subscription.id)}><Text style={styles.removeLabel}>Delete</Text></Pressable>
+          {subscription.active && <CancelSubscriptionButton subscription={subscription} renewalDate={renewalKey} label={decision === 'plan-to-cancel' && subscription.associatedApp ? 'Open app to cancel' : 'Plan to cancel'} />}
+          {removeId === subscription.id ? <View style={styles.inlineConfirmation}>
+            <Text accessibilityLiveRegion="polite" style={styles.bodyText}>Delete this subscription?</Text>
+            <View style={styles.actions}><Pressable accessibilityRole="button" accessibilityLabel={`Confirm delete ${subscription.name}`} style={styles.textButton} onPress={() => { removeSubscription(subscription.id); if (editingId === subscription.id) resetForm(); setRemoveId(null); }}><Text style={styles.removeLabel}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" accessibilityLabel={`Keep ${subscription.name}`} style={styles.textButton} onPress={() => setRemoveId(null)}><Text style={styles.textButtonLabel}>Keep it</Text></Pressable></View>
+          </View> : <Pressable accessibilityRole="button" accessibilityLabel={`Delete ${subscription.name}`} style={styles.textButton} onPress={() => setRemoveId(subscription.id)}><Text style={styles.removeLabel}>Delete</Text></Pressable>}
         </View>
       </View>
     );
@@ -167,6 +184,15 @@ export default function SubscriptionsPanel() {
       </View>
       <CalendarDateField key={`${editingId ?? 'new'}-${cadence}-${recurrenceDate}`} label="Renewal date" value={recurrenceDate} displayValue={cadence === 'monthly' ? `Day ${day} of each month` : `${monthNames[month - 1]} ${day} each year`} onChange={(date) => { const [, selectedMonth, selectedDate] = date.split('-').map(Number); setDay(String(selectedDate)); setMonth(selectedMonth); }} />
       <Text style={styles.smallNote}>For months without that day, the renewal is shown on the last day of the month.</Text>
+      <Text style={styles.fieldLabel}>Is there an app associated with this subscription?</Text>
+      <View style={styles.actions}>{[false, true].map(value => <Pressable key={String(value)} accessibilityRole="button" accessibilityState={{ selected: hasApp === value }} style={[styles.choice, hasApp === value && styles.choiceActive]} onPress={() => setHasApp(value)}><Text style={[styles.choiceLabel, hasApp === value && styles.choiceActiveLabel]}>{value ? 'Yes' : 'No'}</Text></Pressable>)}</View>
+      {hasApp && <>
+        <View style={styles.actions}>{SUBSCRIPTION_APPS.map(app => <Pressable key={app.name} accessibilityRole="button" style={styles.choice} onPress={() => { setAppName(app.name); setAppURL(app.url); setFallbackURL(app.fallbackUrl ?? ''); }}><Text style={styles.choiceLabel}>{app.name}</Text></Pressable>)}</View>
+        <TextInput value={appName} onChangeText={setAppName} accessibilityLabel="Associated app name" placeholder="App name, or another provider" maxLength={80} style={styles.input} />
+        <TextInput value={appURL} onChangeText={setAppURL} accessibilityLabel="Associated app link" placeholder="App link or full HTTPS website" maxLength={2048} autoCapitalize="none" autoCorrect={false} keyboardType="url" style={styles.input} />
+        <TextInput value={fallbackURL} onChangeText={setFallbackURL} accessibilityLabel="Provider fallback website" placeholder="HTTPS website if app cannot open · optional" maxLength={2048} autoCapitalize="none" autoCorrect={false} keyboardType="url" style={styles.input} />
+        <Text style={styles.smallNote}>Plan to cancel opens this link. Supported links open the installed app; others open its website. You still complete cancellation with the provider.</Text>
+      </>}
       {error ? <Text style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" style={styles.saveButton} onPress={save}><Text style={styles.saveLabel}>{editingId ? 'Save changes' : 'Add subscription'}</Text></Pressable>
       {(editingId || bankSuggestion) && <Pressable accessibilityRole="button" style={styles.cancelEdit} onPress={resetForm}><Text style={styles.textButtonLabel}>Cancel</Text></Pressable>}
@@ -222,7 +248,7 @@ export default function SubscriptionsPanel() {
               <Text style={styles.meta}>Renews {renewal.toLocaleDateString()}</Text>
               <View style={styles.actions}>
                 <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'keep')}><Text style={styles.primaryLabel}>Keep it</Text></Pressable>
-                <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => review(subscription.id, localDateKey(renewal), 'plan-to-cancel')}><Text style={styles.secondaryLabel}>Plan to cancel</Text></Pressable>
+                <CancelSubscriptionButton subscription={subscription} renewalDate={localDateKey(renewal)} />
               </View>
             </View>
           ))}
@@ -259,22 +285,13 @@ export default function SubscriptionsPanel() {
       {!bankSuggestion && form}
 
       <Text style={styles.footer}>Saved only on this device. GasFinder does not connect to subscription accounts or stop charges.</Text>
-      {removeId && (
-        <View style={styles.confirmCard}>
-          <Text style={styles.sectionTitle}>Delete this subscription?</Text>
-          <Text style={styles.bodyText}>Its local reminder and review record will be removed.</Text>
-          <View style={styles.actions}>
-            <Pressable accessibilityRole="button" style={styles.primaryButton} onPress={() => { removeSubscription(removeId); if (editingId === removeId) resetForm(); setRemoveId(null); }}><Text style={styles.primaryLabel}>Delete</Text></Pressable>
-            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={() => setRemoveId(null)}><Text style={styles.secondaryLabel}>Keep it</Text></Pressable>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   content: { gap: 14 },
+  inlineConfirmation: { borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 8, paddingHorizontal: 12, paddingBottom: 4, flexShrink: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
   title: { color: colors.ink, fontSize: 30, fontWeight: '800', lineHeight: 35, letterSpacing: -1, flexShrink: 1 },
   homeButton: { backgroundColor: colors.ink, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 6, minHeight: 44, justifyContent: 'center' },

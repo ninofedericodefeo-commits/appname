@@ -1,3 +1,5 @@
+import type { SubscriptionApp } from './providerApps.ts';
+
 export type Subscription = {
   id: string;
   name: string;
@@ -7,6 +9,7 @@ export type Subscription = {
   month: number;
   active: boolean;
   isSample?: boolean;
+  associatedApp?: SubscriptionApp;
   bankMerchantKey?: string;
   lastReview?: {
     renewalDate: string;

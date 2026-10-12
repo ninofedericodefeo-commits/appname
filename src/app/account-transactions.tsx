@@ -12,11 +12,11 @@ import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 
 export default function AccountTransactionsScreen() {
-  const { accountTransactions, purchases, entries, hiddenTransactionIds } = usePocketStore();
+  const { accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections } = usePocketStore();
   const removal = useTransactionRemoval();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'out' | 'in' | 'pending' | 'savings'>('all');
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds), [accountTransactions, purchases, entries, hiddenTransactionIds]);
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections]);
   const filtered = useMemo(() => filterTransactions(transactions, query, filter), [transactions, query, filter]);
   const filters = [{ value: 'all', label: 'All' }, { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }, { value: 'pending', label: 'Pending' }, { value: 'savings', label: 'Savings' }] as const;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>

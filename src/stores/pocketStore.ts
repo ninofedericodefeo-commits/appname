@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
-import type { AccountTransaction } from '@/features/pocket/transactions';
-import { hideTransactionFromHistory, pocketTransactions } from '@/features/pocket/transactions';
+import type { AccountTransaction, TransactionDirections } from '@/features/pocket/transactions';
+import { hideTransactionFromHistory, pocketTransactions, setTransactionDirection } from '@/features/pocket/transactions';
 import { canReserve } from '@/features/pocket/logic';
 import { applyAccountImport } from '@/features/bank/accountImport';
 import type { AccountImportOptions } from '@/features/bank/accountImport';
@@ -33,6 +33,8 @@ type PocketState = {
   purchases: LoggedPurchase[];
   accountTransactions: AccountTransaction[];
   hiddenTransactionIds: string[];
+  transactionDirections: TransactionDirections;
+  correctTransactionDirection: (id: string, direction: 'in' | 'out' | null) => void;
   removeTransactionFromHistory: (id: string) => string[];
   restoreTransactionsToHistory: (ids: string[]) => void;
   bankImportKeys: string[];
@@ -74,6 +76,10 @@ export const usePocketStore = create<PocketState>()(
       purchases: [],
       accountTransactions: [],
       hiddenTransactionIds: [],
+      transactionDirections: {},
+      correctTransactionDirection: (id, direction) => set(state => ({ transactionDirections: setTransactionDirection(
+        pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, id, direction,
+      ) })),
       removeTransactionFromHistory: (id) => {
         const state = get();
         const result = hideTransactionFromHistory(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.hiddenTransactionIds, id);
@@ -195,7 +201,7 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }),
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 7,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 8,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
@@ -207,6 +213,7 @@ export const usePocketStore = create<PocketState>()(
           bankImportKeys: previous.bankImportKeys ?? [],
           accountTransactions: previous.accountTransactions ?? [],
           hiddenTransactionIds: previous.hiddenTransactionIds ?? [],
+          transactionDirections: previous.transactionDirections ?? {},
           bankImportAccountLabel: previous.bankImportAccountLabel ?? 'Main account',
           activeGoal: previous.activeGoal ? { ...previous.activeGoal, setAsideRule: previous.activeGoal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE } : null,
           archivedGoals: (previous.archivedGoals ?? []).map((goal) => ({ ...goal, setAsideRule: goal.setAsideRule ?? DEFAULT_SET_ASIDE_RULE })),

@@ -6,7 +6,7 @@ import { replaceSampleSubscriptions } from '@/features/subscriptions/samples';
 import { bankMerchant } from '@/features/subscriptions/bankSuggestions';
 import type { Subscription } from '@/features/subscriptions/logic';
 
-type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' | 'day' | 'month' | 'bankMerchantKey'>;
+type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' | 'day' | 'month' | 'bankMerchantKey' | 'associatedApp'>;
 
 type SubscriptionState = {
   subscriptions: Subscription[];
@@ -41,9 +41,12 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       saveSubscription: (input, id) => set((state) => {
         if (id) {
           return {
-            subscriptions: state.subscriptions.map((subscription) =>
-              subscription.id === id ? { ...subscription, ...input, lastReview: undefined } : subscription,
-            ),
+            subscriptions: state.subscriptions.map((subscription) => {
+              if (subscription.id !== id) return subscription;
+              const reviewChanged = subscription.name !== input.name || subscription.amountCents !== input.amountCents ||
+                subscription.cadence !== input.cadence || subscription.day !== input.day || subscription.month !== input.month;
+              return { ...subscription, ...input, lastReview: reviewChanged ? undefined : subscription.lastReview };
+            }),
           };
         }
         if (input.bankMerchantKey && state.subscriptions.some((subscription) => subscription.bankMerchantKey === input.bankMerchantKey || bankMerchant(subscription.name).key === input.bankMerchantKey)) return state;

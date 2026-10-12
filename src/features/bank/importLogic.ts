@@ -21,6 +21,12 @@ export type BankImportState = {
 
 const headerKey = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+function statedDirection(type: string): 'credit' | 'debit' | null {
+  const label = normalize(type).replace(/[_-]+/g, ' ').replace(/\s+/g, ' ');
+  if (/^(?:credit|deposit|direct deposit|ach credit|payment received|refund)$/.test(label)) return 'credit';
+  if (/^(?:debit|withdrawal|ach debit)$/.test(label)) return 'debit';
+  return null;
+}
 const aliases = {
   date: ['transactiondate', 'date', 'posteddate', 'postingdate', 'postdate'],
   description: ['description', 'transactiondescription', 'merchant', 'payee', 'memo', 'name'],
@@ -150,7 +156,7 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
     if (get(mapping.status).toLowerCase().includes('pending')) { exclude('Pending transaction'); return; }
     if (mapping.currency >= 0 && !['USD', 'US DOLLAR', 'US DOLLARS'].includes(get(mapping.currency).toUpperCase())) { exclude('Currency is not USD'); return; }
     const type = normalize(get(mapping.type));
-    if (/^(credit|deposit|refund|transfer|payment|payment received|credit card payment|card payment|balance payment|fee)$/.test(type)) { exclude('Credit, refund, payment, transfer or fee'); return; }
+    if (statedDirection(type) === 'credit' || /^(transfer|payment|credit card payment|card payment|balance payment|fee)$/.test(type)) { exclude('Credit, refund, payment, transfer or fee'); return; }
     let amountCents: number | null;
     if (mapping.mode === 'debit-credit') {
       const raw = get(mapping.debit);
@@ -162,7 +168,7 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
       if (amountCents !== null) amountCents = Math.abs(amountCents);
     } else {
       const signed = parseBankAmount(get(mapping.amount));
-      amountCents = signed === null ? null : mapping.spendingSign === 'negative' ? -signed : signed;
+      amountCents = signed === null ? null : statedDirection(type) === 'debit' ? Math.abs(signed) : mapping.spendingSign === 'negative' ? -signed : signed;
     }
     if (amountCents === null) { exclude('Invalid amount'); return; }
     if (amountCents <= 0) { exclude('Credit or zero amount'); return; }
@@ -265,7 +271,8 @@ export function previewAccountTransactions(csv: BankCSV, mapping: BankMapping, a
     } else {
       const amount = parseBankAmount(get(mapping.amount));
       delta = amount === null ? null : mapping.spendingSign === 'negative' ? amount : -amount;
-      if (delta !== null && /^(?:credit|deposit|refund|payment received)$/.test(normalize(get(mapping.type)))) delta = Math.abs(delta);
+      const direction = statedDirection(get(mapping.type));
+      if (delta !== null && direction) delta = Math.abs(delta) * (direction === 'credit' ? 1 : -1);
     }
     const occurredAt = parseBankDate(get(mapping.date), mapping.dateOrder, now);
     const description = get(mapping.description).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();

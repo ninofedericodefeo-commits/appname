@@ -14,6 +14,7 @@ const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported'
 export function TransactionRow({ transaction, onRemove }: { transaction: PocketTransaction; onRemove: (transaction: PocketTransaction) => void }) {
   const purchases = usePocketStore((state) => state.purchases);
   const activeGoal = usePocketStore((state) => state.activeGoal);
+  const correctDirection = usePocketStore(state => state.correctTransactionDirection);
   const adjustment = transaction.source === 'savings';
   const [expanded, setExpanded] = useState(false);
   const incoming = !adjustment && transaction.amountCents > 0;
@@ -39,8 +40,15 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
       <Text style={styles.detailText}>{transaction.title}</Text>
       {adjustment && <Text style={styles.detailText}>Changes what is set aside. Money stays in your bank account.</Text>}
       {transaction.purchase && (transaction.purchase.title !== transaction.title || transaction.purchase.amountCents !== Math.abs(transaction.amountCents)) && <Text style={styles.detailText}>Savings record: {transaction.purchase.title} · {formatMoney(transaction.purchase.amountCents)}</Text>}
-      {transaction.purchase && <PurchaseCard purchase={transaction.purchase} history={purchases} goal={activeGoal} compact />}
+      {transaction.purchase && !incoming && <PurchaseCard purchase={transaction.purchase} history={purchases} goal={activeGoal} compact />}
       {transaction.status === 'recorded' && <Text style={styles.detailText}>Posting status wasn’t included in the export.</Text>}
+      {['csv', 'citizens-pdf'].includes(transaction.source) && <>
+        <Text style={styles.detailText}>{transaction.directionCorrected ? 'Direction corrected on this device' : 'Wrong direction?'}</Text>
+        <View style={styles.corrections}><Pressable accessibilityRole="button" accessibilityLabel={`Mark ${title} as ${incoming ? 'withdrawal' : 'deposit'}`} style={styles.directionButton} onPress={() => correctDirection(transaction.id, incoming ? 'out' : 'in')}><Text style={styles.directionText}>{incoming ? 'Mark as withdrawal' : 'Mark as deposit'}</Text></Pressable>
+          {transaction.directionCorrected && <Pressable accessibilityRole="button" style={styles.directionButton} onPress={() => correctDirection(transaction.id, null)}><Text style={styles.directionText}>Use imported direction</Text></Pressable>}
+        </View>
+        <Text style={styles.detailText}>Corrects this history row. Your saved balance, set-asides and original import stay unchanged.</Text>
+      </>}
       <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${title} from history`} onPress={() => onRemove(transaction)} style={styles.removeButton}><Text style={styles.removeText}>Remove from history</Text></Pressable>
     </View>}
   </View>;
@@ -57,5 +65,6 @@ const styles = StyleSheet.create({
   credit: { color: colors.primary }, debit: { color: colors.danger }, chevron: { color: colors.primary, fontSize: 23 }, pressed: { opacity: 0.65 },
   details: { backgroundColor: colors.paper, borderRadius: 8, padding: 12, gap: 5, marginBottom: 12 },
   detailText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
+  corrections: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, directionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }, directionText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
   removeButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 8 }, removeText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
 });

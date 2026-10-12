@@ -14,6 +14,7 @@ export type AccountTransaction = {
 };
 
 export type PocketTransaction = Omit<AccountTransaction, 'source' | 'status'> & {
+  directionCorrected?: boolean;
   source: AccountTransaction['source'] | 'manual' | 'shortcut' | 'savings';
   status: AccountTransaction['status'] | 'logged' | 'adjustment';
   purchase?: LoggedPurchase;
@@ -71,7 +72,8 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
 
 export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 
-export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = [], hiddenIds: string[] = []): PocketTransaction[] {
+export type TransactionDirections = Record<string, 'in' | 'out'>;
+export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = [], hiddenIds: string[] = [], directions: TransactionDirections = {}): PocketTransaction[] {
   const linked = new Set(bank.map((item) => item.linkedPurchaseId).filter(Boolean));
   const seen = new Set(bank.map((item) => item.id));
   const byPurchase = new Map(purchases.map((item) => [item.id, item]));
@@ -93,11 +95,25 @@ export function pocketTransactions(bank: AccountTransaction[], purchases: Logged
       amountCents: item.kind === 'release' ? -item.amountCents : item.amountCents, occurredAt: item.createdAt, source: 'savings', status: 'adjustment', accountLabel: '', adjustmentKind: item.kind });
   }
   const hidden = new Set(hiddenIds);
-  return rows.filter((row) => !hidden.has(row.id) && !hidden.has(row.linkedPurchaseId ?? row.purchase?.id ?? '') &&
+  return rows.map(row => {
+    const direction = directions[row.id] ?? directions[row.linkedPurchaseId ?? row.purchase?.id ?? ''];
+    if (!['csv', 'citizens-pdf'].includes(row.source) || !['in', 'out'].includes(direction)) return row;
+    return { ...row, amountCents: Math.abs(row.amountCents) * (direction === 'in' ? 1 : -1), directionCorrected: true };
+  }).filter((row) => !hidden.has(row.id) && !hidden.has(row.linkedPurchaseId ?? row.purchase?.id ?? '') &&
     // A deleted purchase can leave its savings entry visible. Keep that entry
     // hidden too when the user removed the purchase from history.
     !(row.source === 'savings' && hidden.has(adjustmentPurchases.get(row.id) ?? '')))
     .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+}
+
+export function setTransactionDirection(rows: PocketTransaction[], directions: TransactionDirections, id: string, direction: 'in' | 'out' | null) {
+  const row = rows.find(row => row.id === id && ['csv', 'citizens-pdf'].includes(row.source));
+  if (!row || direction !== null && !['in', 'out'].includes(direction)) return directions;
+  const next = { ...directions };
+  for (const key of [row.id, row.linkedPurchaseId ?? row.purchase?.id].filter((key): key is string => !!key)) {
+    if (direction === null) delete next[key]; else next[key] = direction;
+  }
+  return next;
 }
 
 // Keep the original records for duplicate matching, balances and subscriptions.

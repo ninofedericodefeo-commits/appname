@@ -21,7 +21,7 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 }
 
 export default function PocketScreen() {
-  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, setReportedBalance, reserve, release } = usePocketStore();
+  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance, reserve, release } = usePocketStore();
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
@@ -34,7 +34,7 @@ export default function PocketScreen() {
   const balanceFontSize = availableLabel.length > 9 ? Math.max(28, Math.floor(414 / availableLabel.length)) : 46;
   const unassigned = reservedCents - (activeGoal?.savedCents ?? 0);
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds), [accountTransactions, purchases, entries, hiddenTransactionIds]);
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections]);
 
   function updateBalance() {
     const cents = parseDollars(balanceInput);

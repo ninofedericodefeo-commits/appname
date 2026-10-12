@@ -11,6 +11,7 @@ import { localDateKey, subscriptionsToReviewTomorrow } from '@/features/subscrip
 import { syncSubscriptionReminders } from '@/features/subscriptions/reminders';
 import { syncGoalWidget } from '@/features/goals/widget';
 import { SettingsButton } from '@/components/SettingsButton';
+import CancelSubscriptionButton, { SubscriptionCancellationNotice } from '@/features/subscriptions/CancelSubscriptionButton';
 import { syncAccountWidget, syncPauseActivities } from '@/features/spending/widgets';
 import { usePurchasePauseStore } from '@/stores/purchasePauseStore';
 import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
@@ -112,13 +113,7 @@ function SubscriptionReviewPrompt() {
                 >
                   <Text style={styles.keepText}>Keep it</Text>
                 </Pressable>
-                <Pressable
-                  accessibilityRole="button"
-                  style={styles.cancelButton}
-                  onPress={() => review(subscription.id, localDateKey(renewal), 'plan-to-cancel')}
-                >
-                  <Text style={styles.cancelText}>Plan to cancel</Text>
-                </Pressable>
+                <CancelSubscriptionButton subscription={subscription} renewalDate={localDateKey(renewal)} />
               </View>
             </View>
           ))}
@@ -179,6 +174,7 @@ export default function RootLayout() {
           <Stack.Screen name="activity" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="settings" options={{ headerRight: () => null }} />
         </Stack>
+        <SubscriptionCancellationNotice />
       </View>
       <SubscriptionReviewPrompt />
     </QueryClientProvider>
