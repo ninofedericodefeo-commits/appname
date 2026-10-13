@@ -23,13 +23,24 @@ export function filterPricedStations(stations: GasStation[], fuelType: FuelType,
   }) : stations;
 }
 
-export function prepareStations(stations: GasStation[], search: StationSearch) {
+export function isRecentPrice(price: GasPrice | undefined, now = Date.now()) {
+  if (!price || price.source === 'sample' || !Number.isFinite(price.price) || price.price <= 0) return false;
+  const age = now - Date.parse(price.reportedAt);
+  return Number.isFinite(age) && age >= -5 * 60_000 && age < 24 * 60 * 60_000;
+}
+
+export function recentStationPrice(station: GasStation, fuelType: FuelType, now = Date.now()) {
+  const price = station.prices.find(price => price.fuelType === fuelType);
+  return isRecentPrice(price, now) ? price!.price : Infinity;
+}
+
+export function prepareStations(stations: GasStation[], search: StationSearch, now = Date.now()) {
   return stations
     .map((station) => ({ ...station, distanceMiles: milesBetween(search, station) }))
     .filter((station) => station.distanceMiles <= search.radius)
     .sort((a, b) => search.sortOrder === 'distance'
       ? a.distanceMiles - b.distanceMiles
-      : selectedPrice(a, search.fuelType) - selectedPrice(b, search.fuelType) || a.distanceMiles - b.distanceMiles);
+      : recentStationPrice(a, search.fuelType, now) - recentStationPrice(b, search.fuelType, now) || a.distanceMiles - b.distanceMiles);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -5,12 +5,15 @@ import { guessMapping, previewAccountTransactions, previewBankCSV } from './impo
 import type { BankPreviewRow } from './importLogic.ts';
 import { linkAccountTransactions } from '../pocket/transactions.ts';
 import type { AccountTransaction } from '../pocket/transactions.ts';
+import { resolveLinkedAccount, sameStatementAccount } from './accountIdentity.ts';
+import type { LinkedBankAccount } from './accountIdentity.ts';
 
 export const STATEMENT_SHORTCUT_NAME = 'GasFinder Import Statement';
 export const statementShortcutURL = `shortcuts://open-shortcut?name=${encodeURIComponent(STATEMENT_SHORTCUT_NAME)}`;
 
 export type StatementAutomationSettings = { enabled: boolean; accountLabel: string; confirmedAccountIdentifier: string | null };
 export type AutomaticStatementPlan = {
+  account: LinkedBankAccount;
   status: 'ready'; accountLabel: string; purchases: BankPreviewRow[]; history: AccountTransaction[];
   balance: StatementBalance; transactionCount: number; purchaseCount: number;
 };
@@ -24,19 +27,22 @@ export function prepareAutomaticStatement(settings: StatementAutomationSettings,
   if (!settings.accountLabel.trim()) return review('Choose an account nickname in Quick statement import first.');
   if (!statement.accountIdentifier) return review('The account number could not be identified. Confirm this statement manually.');
   if (!settings.confirmedAccountIdentifier) return review('Review your first statement once to confirm the account. Future matching PDFs can import automatically.');
-  if (settings.confirmedAccountIdentifier !== statement.accountIdentifier) return review('This PDF is for a different account. Review it and choose the correct account nickname.');
+  if (!sameStatementAccount(settings.confirmedAccountIdentifier, statement.accountIdentifier)) return review('This PDF is for a different account. Choose a statement for your linked account.');
+  let account: LinkedBankAccount;
+  try { account = resolveLinkedAccount(state, settings.accountLabel, statement.accountIdentifier); }
+  catch (error) { return review(error instanceof Error ? error.message : 'Check the bank account.'); }
   if (statement.warnings.length) return review('This PDF has reading warnings. Check them against your statement before saving.');
   if (!statement.balance) return review('A clear closing balance is needed for automatic import. Review this PDF.');
-  const balanceStatus = statementBalanceStatus(state, statement.balance, settings.accountLabel, now);
+  const balanceStatus = statementBalanceStatus(state, statement.balance, account, now);
   if (balanceStatus === 'invalid') return review('The closing balance or date needs review.');
   if (balanceStatus === 'older') return review('This statement closes before your saved balance. Review it before replacing that balance.');
   const mapping = guessMapping(statement.csv);
-  const purchases = previewBankCSV(statement.csv, mapping, settings.accountLabel, state.purchases, state.bankImportKeys, now);
-  const transactions = previewAccountTransactions(statement.csv, mapping, settings.accountLabel, now);
+  const purchases = previewBankCSV(statement.csv, mapping, account, state.purchases, state.bankImportKeys, now);
+  const transactions = previewAccountTransactions(statement.csv, mapping, account, now);
   if (!transactions.rows.length || transactions.excluded.length) return review('Some transactions could not be imported. Check this statement before saving.');
   if (purchases.rows.some((row) => row.duplicate === 'possible')) return review('Some charges may match purchases already logged in the app. Review the matches before saving.');
   const selected = purchases.rows.filter((row) => row.duplicate !== 'known');
-  return { status: 'ready', accountLabel: settings.accountLabel.trim(), purchases: selected,
+  return { status: 'ready', account, accountLabel: settings.accountLabel.trim(), purchases: selected,
     history: linkAccountTransactions(transactions.rows, purchases.rows, new Set(selected.map((row) => row.id))),
     balance: statement.balance, transactionCount: transactions.rows.length, purchaseCount: purchases.rows.length };
 }

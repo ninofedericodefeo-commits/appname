@@ -10,6 +10,9 @@ export type AccountTransaction = {
   source: 'csv' | 'citizens-pdf';
   status: 'posted' | 'pending' | 'recorded';
   accountLabel: string;
+  accountId?: string;
+  recurringHint?: boolean;
+  transactionType?: string;
   linkedPurchaseId?: string;
 };
 
@@ -27,7 +30,7 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
   const rank = { recorded: 0, pending: 1, posted: 2 };
   const incomingIds = new Set(incoming.map((item) => item.id));
   const legacyByDate = new Map<string, AccountTransaction[]>();
-  const dateKey = (item: AccountTransaction) => JSON.stringify([item.accountLabel.trim().toLowerCase(), item.occurredAt]);
+  const dateKey = (item: AccountTransaction) => JSON.stringify([item.accountId ?? item.accountLabel.trim().toLowerCase(), item.occurredAt]);
   for (const item of existing) {
     if (item.source !== 'citizens-pdf') continue;
     const key = dateKey(item);
@@ -61,6 +64,9 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
     if (old && rank[old.status] > rank[item.status]) continue;
     const next: AccountTransaction = { id: item.id, title: item.title.trim(), amountCents: item.amountCents, occurredAt: item.occurredAt,
       source: item.source, status: item.status, accountLabel: item.accountLabel.trim(),
+      ...(item.accountId ?? old?.accountId ? { accountId: item.accountId ?? old?.accountId } : {}),
+      ...(item.recurringHint || old?.recurringHint ? { recurringHint: true } : {}),
+      ...(item.transactionType ?? old?.transactionType ? { transactionType: item.transactionType ?? old?.transactionType } : {}),
       ...(item.linkedPurchaseId || old?.linkedPurchaseId ? { linkedPurchaseId: item.linkedPurchaseId ?? old?.linkedPurchaseId } : {}) };
     if (!old) added++;
     else if (JSON.stringify(old) !== JSON.stringify(next)) updated++;
@@ -85,7 +91,7 @@ export function pocketTransactions(bank: AccountTransaction[], purchases: Logged
     rows.push({ id: purchase.id, title: purchase.title, amountCents: -purchase.amountCents, occurredAt: purchase.purchasedAt,
       source: purchase.source === 'bank-import' ? purchase.bankSource ?? 'csv' : purchase.source === 'shortcut' ? 'shortcut' : 'manual',
       status: purchase.bankSource === 'citizens-pdf' ? 'posted' : purchase.source === 'bank-import' ? 'recorded' : 'logged',
-      accountLabel: purchase.bankAccountLabel ?? '', purchase });
+      accountLabel: purchase.bankAccountLabel ?? '', ...(purchase.bankAccountId ? { accountId: purchase.bankAccountId } : {}), purchase });
   }
   for (const item of adjustments) {
     // The purchase detail already shows the savings contribution for this entry.

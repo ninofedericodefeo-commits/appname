@@ -6,7 +6,7 @@ import './leaflet.css';
 import './station-map.css';
 
 type Point = { latitude: number; longitude: number };
-export type MapPin = Point & { id: string; name: string; price: number | null; sample: boolean; stopNumber?: number };
+export type MapPin = Point & { id: string; name: string; price: number | null; sample: boolean; stopNumber?: number; stale?: boolean };
 
 export default function StationMap({ pins, center, selectedId, route = [], onSelect }: {
   pins: MapPin[];
@@ -52,12 +52,12 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
     if (center) L.circleMarker([center.latitude, center.longitude], { radius: 7, color: '#FFFEF9', weight: 3, fillColor: '#2373CE', fillOpacity: 1 }).bindTooltip('Your location').addTo(group);
     for (const pin of pins) {
       const label = document.createElement('span');
-      label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}`;
-      label.textContent = `${pin.stopNumber ? `${pin.stopNumber} · ` : ''}${pin.price === null ? 'N/A' : `$${pin.price.toFixed(3)}`}${pin.sample && pin.price !== null ? '*' : ''}`;
-      const description = `${pin.name} · ${pin.price === null ? 'Price not reported' : `${pin.sample ? 'Sample price ' : 'Unverified price '}$${pin.price.toFixed(3)} per gallon`}`;
+      label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}${pin.stale ? ' stale' : ''}`;
+      label.textContent = `${pin.stopNumber ? `${pin.stopNumber} · ` : ''}${pin.price === null ? 'N/A' : `$${pin.price.toFixed(3)}`}${pin.sample && pin.price !== null ? '*' : ''}${pin.stale ? ' · Old' : ''}`;
+      const description = `${pin.name} · ${pin.price === null ? 'Price not reported' : `${pin.stale ? 'Old report ' : pin.sample ? 'Sample price ' : 'Unverified price '}$${pin.price.toFixed(3)} per gallon`}`;
       const tooltip = document.createElement('span');
       tooltip.textContent = description;
-      const width = pin.stopNumber ? 112 : 88;
+      const width = pin.stopNumber || pin.stale ? 124 : 88;
       const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: label, className: 'station-marker', iconSize: [width, 44], iconAnchor: [width / 2, 22] }), title: description, alt: description })
         .bindTooltip(tooltip).on('click', () => { void onSelect(pin.id); }).addTo(group);
       if (pin.id === selectedId) marker.setZIndexOffset(1000);
@@ -78,5 +78,6 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
     {!ready && !error && <div className="map-message">Opening map…</div>}
     {error && <div className="map-message" role="status">{error} <button onClick={() => { setError(''); tiles.current?.redraw(); }}>Retry</button></div>}
     {pins.some((pin) => pin.sample) && <div className="map-legend">* Sample price</div>}
+    {pins.some(pin => pin.stale) && <div className="map-legend">Old: over 24h or report time unavailable</div>}
   </div>;
 }

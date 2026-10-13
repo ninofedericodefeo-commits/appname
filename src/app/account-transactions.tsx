@@ -10,14 +10,17 @@ import { useTransactionRemoval } from '@/features/pocket/useTransactionRemoval';
 import { filterTransactions, pocketTransactions } from '@/features/pocket/transactions';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
+import { belongsToLinkedAccount } from '@/features/pocket/balanceEstimate';
 
 export default function AccountTransactionsScreen() {
-  const { accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections } = usePocketStore();
+  const { linkedBankAccount, accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections } = usePocketStore();
   const removal = useTransactionRemoval();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<'all' | 'out' | 'in' | 'pending' | 'savings'>('all');
+  const [showLegacyAccounts, setShowLegacyAccounts] = useState(false);
   const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections]);
-  const filtered = useMemo(() => filterTransactions(transactions, query, filter), [transactions, query, filter]);
+  const hasOtherAccounts = transactions.some(row => !belongsToLinkedAccount(row, linkedBankAccount));
+  const filtered = useMemo(() => filterTransactions(showLegacyAccounts ? transactions : transactions.filter(row => belongsToLinkedAccount(row, linkedBankAccount)), query, filter), [transactions, query, filter, linkedBankAccount, showLegacyAccounts]);
   const filters = [{ value: 'all', label: 'All' }, { value: 'out', label: 'Money out' }, { value: 'in', label: 'Money in' }, { value: 'pending', label: 'Pending' }, { value: 'savings', label: 'Savings' }] as const;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <Stack.Screen options={{ title: 'Transactions' }} />
@@ -26,6 +29,8 @@ export default function AccountTransactionsScreen() {
         ListHeaderComponent={<View style={styles.header}>
           <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>Transactions</Text><Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/bank-import')}><Text style={styles.link}>Import</Text></Pressable></View>
           <LogPurchase />
+          {linkedBankAccount && <Text style={styles.note}>{showLegacyAccounts ? 'All saved account histories' : linkedBankAccount.nickname}</Text>}
+          {hasOtherAccounts && <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => setShowLegacyAccounts(!showLegacyAccounts)}><Text style={styles.link}>{showLegacyAccounts ? 'Show linked account only' : 'Show older account histories'}</Text></Pressable>}
           <TextInput style={styles.search} placeholder="Search transactions" accessibilityLabel="Search transactions" value={query} onChangeText={setQuery} autoCorrect={false} returnKeyType="search" />
           <View style={styles.filters}>{filters.map((item) => <Pressable key={item.value} accessibilityRole="button" accessibilityState={{ selected: filter === item.value }} style={[styles.filter, filter === item.value && styles.selected]} onPress={() => setFilter(item.value)}><Text style={[styles.filterLabel, filter === item.value && styles.selectedLabel]}>{item.label}</Text></Pressable>)}</View>
           <Text style={styles.note}>{filtered.length} transaction{filtered.length === 1 ? '' : 's'} · bank history, purchases and savings</Text>

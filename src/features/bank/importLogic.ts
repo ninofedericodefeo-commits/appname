@@ -2,6 +2,8 @@ import { automaticSetAsideCents } from '../goals/logic.ts';
 import type { Goal, LoggedPurchase } from '../goals/logic.ts';
 import type { AccountTransaction } from '../pocket/transactions.ts';
 import { parseDollars } from '../pocket/logic.ts';
+import { accountContains, accountNamespace, accountNickname } from './accountIdentity.ts';
+import type { BankAccountInput } from './accountIdentity.ts';
 
 export const MAX_CSV_BYTES = 2_000_000;
 export const MAX_CSV_ROWS = 5000;
@@ -11,7 +13,7 @@ export type BankMapping = {
   currency: number; type: number; status: number; transactionId: number;
   mode: 'signed' | 'debit-credit'; spendingSign: 'negative' | 'positive'; dateOrder: 'mdy' | 'dmy';
 };
-export type BankPurchase = { id: string; title: string; amountCents: number; purchasedAt: string; bankSource?: 'csv' | 'citizens-pdf'; bankAccountLabel?: string; recurringHint?: boolean };
+export type BankPurchase = { id: string; title: string; amountCents: number; purchasedAt: string; bankSource?: 'csv' | 'citizens-pdf'; bankAccountLabel?: string; bankAccountId?: string; recurringHint?: boolean };
 export type BankPreviewRow = BankPurchase & { rowNumber: number; pageNumber?: number; lineNumber?: number; duplicate: 'known' | 'possible' | null; matchTitle?: string; matchId?: string };
 export type ImportEntry = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 export type BankImportState = {
@@ -138,13 +140,14 @@ function identity(value: string) {
 
 function validateBankMapping(csv: BankCSV, mapping: BankMapping, accountLabel: string) {
   const validColumn = (index: number) => Number.isInteger(index) && index >= 0 && index < csv.headers.length;
-  if (!accountLabel.trim() || accountLabel.trim().length > 60) throw new Error('Give this account a nickname up to 60 characters. Use the same nickname for later imports.');
+  if (!accountLabel.trim() || accountLabel.trim().length > 60) throw new Error('Give this account a nickname up to 60 characters.');
   const required = [mapping.date, mapping.description, mapping.mode === 'signed' ? mapping.amount : mapping.debit];
   if (!required.every(validColumn) || new Set(required).size !== required.length) throw new Error('Choose separate date, description and spending amount columns.');
   if (mapping.mode === 'debit-credit' && mapping.credit >= 0 && (mapping.credit === mapping.debit || required.includes(mapping.credit))) throw new Error('Debit and credit need separate columns.');
 }
 
-export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel: string, history: LoggedPurchase[], importedKeys: string[], now = new Date()) {
+export function previewBankCSV(csv: BankCSV, mapping: BankMapping, account: BankAccountInput, history: LoggedPurchase[], importedKeys: string[], now = new Date()) {
+  const accountLabel = accountNickname(account), namespace = accountNamespace(account);
   validateBankMapping(csv, mapping, accountLabel);
   const known = new Set([...importedKeys, ...history.map((purchase) => purchase.id)]);
   const occurrences = new Map<string, number>();
@@ -177,18 +180,19 @@ export function previewBankCSV(csv: BankCSV, mapping: BankMapping, accountLabel:
     const description = get(mapping.description).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
     if (!description) { exclude('Missing description'); return; }
     const sourceId = get(mapping.transactionId);
-    const base = JSON.stringify([normalize(accountLabel), dayKey(purchasedAt), amountCents, normalize(description)]);
+    const base = JSON.stringify([namespace, dayKey(purchasedAt), amountCents, normalize(description)]);
     const occurrence = (occurrences.get(base) ?? 0) + 1; occurrences.set(base, occurrence);
-    const id = identity(sourceId ? JSON.stringify([normalize(accountLabel), 'id', sourceId]) : `${base}|${occurrence}`);
+    const id = identity(sourceId ? JSON.stringify([namespace, 'id', sourceId]) : `${base}|${occurrence}`);
     const duplicate = known.has(id) ? 'known' : null;
     // Duplicate bank IDs in one file are never selected twice.
     known.add(id);
     rows.push({ id, title: description.slice(0, 80), amountCents, purchasedAt, rowNumber, duplicate,
-      bankSource: csv.source ?? 'csv', bankAccountLabel: accountLabel.trim(), recurringHint: /\brecurring\b/i.test(description),
+      bankSource: csv.source ?? 'csv', bankAccountLabel: accountLabel.trim(), recurringHint: /\brecurring\b/i.test(`${get(mapping.type)} ${description}`),
+      ...(typeof account !== 'string' ? { bankAccountId: account.id } : {}),
       ...(csv.locations?.[index] ? { pageNumber: csv.locations[index].page, lineNumber: csv.locations[index].line } : {}),
     });
   });
-  matchBankPurchases(rows, history, accountLabel);
+  matchBankPurchases(rows, history, account);
   return { rows, excluded };
 }
 
@@ -202,13 +206,14 @@ function merchantWords(title: string) {
 
 // Reserve known matches first, then pair the strongest merchant/date matches.
 // Every existing purchase can explain only one row in this statement.
-function matchBankPurchases(rows: BankPreviewRow[], history: LoggedPurchase[], account: string) {
+function matchBankPurchases(rows: BankPreviewRow[], history: LoggedPurchase[], account: BankAccountInput) {
   const byKey = new Map<string, LoggedPurchase>();
   const byAmountDay = new Map<string, LoggedPurchase[]>();
   for (const purchase of history) {
     byKey.set(purchase.id, purchase);
     for (const key of purchase.bankMatchKeys ?? []) byKey.set(key, purchase);
-    if (purchase.bankAccountLabel && normalize(purchase.bankAccountLabel) !== normalize(account)) continue;
+    if (typeof account === 'string' ? purchase.bankAccountLabel && normalize(purchase.bankAccountLabel) !== normalize(account)
+      : (purchase.bankAccountLabel || purchase.bankAccountId) && !accountContains(account, purchase.bankAccountLabel ?? '', purchase.bankAccountId)) continue;
     if (!Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
     const key = `${purchase.amountCents}|${calendarDay(purchase.purchasedAt)}`;
     const group = byAmountDay.get(key) ?? [];
@@ -252,7 +257,8 @@ function matchBankPurchases(rows: BankPreviewRow[], history: LoggedPurchase[], a
 
 // Keep account movements separately from savings purchases. This lets Pocket
 // show deposits/transfers/fees without applying the goal rule to those rows.
-export function previewAccountTransactions(csv: BankCSV, mapping: BankMapping, accountLabel: string, now = new Date()) {
+export function previewAccountTransactions(csv: BankCSV, mapping: BankMapping, account: BankAccountInput, now = new Date()) {
+  const accountLabel = accountNickname(account), namespace = accountNamespace(account);
   validateBankMapping(csv, mapping, accountLabel);
   const rows: (AccountTransaction & { rowNumber: number })[] = [];
   const excluded: { rowNumber: number; reason: string }[] = [];
@@ -278,19 +284,22 @@ export function previewAccountTransactions(csv: BankCSV, mapping: BankMapping, a
     const description = get(mapping.description).replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
     if (delta === null || delta === 0) { reject('Invalid or zero amount'); return; }
     if (!occurredAt || !description) { reject(!occurredAt ? 'Invalid or future date' : 'Missing description'); return; }
-    const base = JSON.stringify([normalize(accountLabel), dayKey(occurredAt), delta, normalize(description)]);
+    const base = JSON.stringify([namespace, dayKey(occurredAt), delta, normalize(description)]);
     const occurrence = (occurrences.get(base) ?? 0) + 1; occurrences.set(base, occurrence);
     const sourceId = get(mapping.transactionId);
-    const key = sourceId ? JSON.stringify([normalize(accountLabel), 'id', sourceId]) : `${base}|${occurrence}`;
+    const key = sourceId ? JSON.stringify([namespace, 'id', sourceId]) : `${base}|${occurrence}`;
     const statusText = normalize(get(mapping.status));
     rows.push({ id: `account-${identity(key).slice(5)}`, title: description.slice(0, 80), amountCents: delta, occurredAt,
       source: csv.source ?? 'csv', accountLabel: accountLabel.trim(), rowNumber,
+      ...(typeof account !== 'string' ? { accountId: account.id } : {}),
+      ...(/\brecurring\b/i.test(`${get(mapping.type)} ${description}`) ? { recurringHint: true } : {}),
+      ...(get(mapping.type) ? { transactionType: normalize(get(mapping.type)).slice(0, 60) } : {}),
       status: statusText.includes('pending') ? 'pending' : csv.source === 'citizens-pdf' || /^(?:posted|completed?|cleared|settled)$/.test(statusText) ? 'posted' : 'recorded' });
   });
   return { rows, excluded };
 }
 
-export function applyBankImport(state: BankImportState, candidates: BankPurchase[], applyRule: boolean, now = new Date()) {
+export function applyBankImport(state: BankImportState, candidates: BankPurchase[], applyRule: boolean, now = new Date(), balanceForRules?: number | null) {
   const next: BankImportState = { ...state, purchases: [...state.purchases], entries: [...state.entries], bankImportKeys: [...state.bankImportKeys] };
   const known = new Set([...state.bankImportKeys, ...state.purchases.map((purchase) => purchase.id)]);
   let imported = 0, skipped = 0, savedCents = 0;
@@ -301,7 +310,7 @@ export function applyBankImport(state: BankImportState, candidates: BankPurchase
     if (known.has(item.id) || !/^bank-[a-f0-9]{16}$/.test(item.id) || !item.title.trim() || item.title.trim().length > 80 ||
       !Number.isSafeInteger(item.amountCents) || item.amountCents <= 0 || item.amountCents > 100_000_000 ||
       !Number.isFinite(date.getTime()) || date > latest) { skipped++; continue; }
-    const reserve = applyRule ? automaticSetAsideCents(item.amountCents, next.activeGoal, next.reportedBalanceCents, next.reservedCents) : 0;
+    const reserve = applyRule ? automaticSetAsideCents(item.amountCents, next.activeGoal, balanceForRules === undefined ? next.reportedBalanceCents : balanceForRules, next.reservedCents) : 0;
     next.purchases.unshift({ ...item, title: item.title.trim(), source: 'bank-import',
       decision: reserve > 0 ? 'saved' : applyRule ? 'pending' : 'skipped', ...(reserve > 0 ? { savedCents: reserve } : {}) });
     if (reserve > 0 && next.activeGoal) {

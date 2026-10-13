@@ -43,8 +43,11 @@ export default function StatementAutomationScreen() {
     finally { setBusy(false); }
   }
   function saveSettings() {
-    settings.configure(enabled, account);
-    setAccountDraft(null); setEnabledDraft(null); setSaved(true);
+    try {
+      usePocketStore.getState().renameBankAccount(account);
+      settings.configure(enabled, account);
+      setAccountDraft(null); setEnabledDraft(null); setSaved(true); setError('');
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the account name.'); }
   }
 
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
@@ -73,7 +76,7 @@ export default function StatementAutomationScreen() {
           <Text style={styles.label}>Account nickname</Text>
           <TextInput accessibilityLabel="Quick import account nickname" value={account} onChangeText={(value) => { setAccountDraft(value); setSaved(false); }}
             maxLength={60} autoCorrect={false} style={styles.input} placeholder="Main checking" />
-          <Text style={styles.hint}>Use the same nickname as your previous imports. Changing it starts a separate transaction history.</Text>
+          <Text style={styles.hint}>Give your linked account a recognizable name. Renaming keeps the same linked account and transaction history.</Text>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Automatically import PDFs I share" accessibilityState={{ checked: enabled }} aria-checked={enabled}
             onPress={() => { setEnabledDraft(!enabled); setSaved(false); }} style={styles.checkRow}>
             <View style={[styles.check, enabled && styles.checked]}><Text style={styles.checkText}>{enabled ? '✓' : ''}</Text></View>
@@ -112,7 +115,7 @@ export default function StatementAutomationScreen() {
         }} />
         <Text style={styles.body}>If Shortcuts isn’t offered while adding the file, choose Save to Files, open “GasFinder Import Statement.shortcut” there, then Add Shortcut.</Text>
         <Text style={styles.hint}>Use the installed GasFinder build with PDF opening support. Expo Go cannot receive PDFs for GasFinder; a development build also needs its dev server running.</Text>
-        <Text style={styles.hint}>To switch bank accounts, change the nickname above and review the first PDF for that account. To stop automatic saving, uncheck the option and save.</Text>
+        <Text style={styles.hint}>This app tracks one linked bank account. Renaming it does not switch accounts. To stop automatic saving, uncheck the option and save.</Text>
       </View>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       <Text style={styles.hint}>You still sign in and open the statement in Citizens. The shortcut handles the PDF handoff; it cannot download new statements in the background. PDFs are read and saved on this device. The balance is dated to the statement’s closing date.</Text>

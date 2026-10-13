@@ -3,6 +3,8 @@ import type { BankCSV } from './importLogic.ts';
 import type { StatementBalance } from './accountImport.ts';
 import { MAX_PDF_PAGES, MAX_PDF_TEXT } from './pdfTypes.ts';
 import type { PDFTextItem, PDFTextPage } from './pdfTypes.ts';
+import { reconcileStatement } from './statementReconciliation.ts';
+import type { StatementReconciliation, SummaryPage } from './statementReconciliation.ts';
 
 type Line = { text: string; items: PDFTextItem[]; number: number };
 const closingLabel = /\b(?:(?:ending|closing|new)(?: account)? balance|balance at (?:the )?end of (?:the )?(?:statement )?period)\b/i;
@@ -27,7 +29,7 @@ function columnKind(text: string): 'credit' | 'debit' | null {
   return null;
 }
 export type StatementWarning = { page: number; line: number; reason: string };
-export type CitizensStatement = { csv: BankCSV; pages: number; periods: string[]; warnings: StatementWarning[]; balance: StatementBalance | null; accountIdentifier: string | null; pageCounts: { page: number; spending: number; credits: number }[] };
+export type CitizensStatement = { csv: BankCSV; pages: number; periods: string[]; warnings: StatementWarning[]; balance: StatementBalance | null; accountIdentifier: string | null; pageCounts: { page: number; spending: number; credits: number }[]; reconciliation?: StatementReconciliation };
 
 export function pdfLines(items: PDFTextItem[]): Line[] {
   const groups: { y: number; items: PDFTextItem[] }[] = [];
@@ -99,6 +101,7 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
   const warnings: StatementWarning[] = [];
   const periods: string[] = [];
   const balances: StatementBalance[] = [];
+  const summaryPages: SummaryPage[] = [];
   let period: { from: string; to: string } | null = null;
   let section: 'debit' | 'credit' | 'skip' | null = null;
   let amountX: number | null = null, amountRight = Infinity, nextX = Infinity;
@@ -125,10 +128,13 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
     inTable = false;
     if (section === 'skip') { section = null; columns = []; amountX = null; }
     const lines = pdfLines(page.items);
+    const found = periodIn(lines.slice(0, 25).map(line => line.text).join(' '));
+    const pagePeriod = found ?? period;
+    const day = (value: string) => { const parsed = parseBankDate(value, 'mdy', now); if (!parsed) return ''; const date = new Date(parsed); return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; };
+    summaryPages.push({ page: page.page, period: pagePeriod ? `${day(pagePeriod.from)}|${day(pagePeriod.to)}` : '', lines });
     const sidebarX = sidebarBoundary(lines);
     let currentBalanceAllowed = false;
     let worksheet = false;
-    const found = periodIn(lines.slice(0, 25).map((line) => line.text).join(' '));
     if (found && (!period || found.from !== period.from || found.to !== period.to)) {
       flush(); period = found; section = null; amountX = null; inTable = false;
       const label = `${found.from} – ${found.to}`;
@@ -261,5 +267,7 @@ export function parseCitizensStatement(pages: PDFTextPage[], now = new Date()): 
   }
   if (!csv.rows.length && !noActivity) warnings.push({ page: latest.page, line: latest.line, reason: 'No transactions could be read; this import updates only the closing balance' });
   const pageCounts = pages.map((page) => ({ page: page.page, spending: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[2]).length, credits: csv.rows.filter((row, i) => csv.locations![i].page === page.page && !!row[3]).length }));
-  return { csv, pages: pages.length, periods, warnings, balance: latest && !conflict ? latest : null, accountIdentifier: accountNumbers[0] ?? (accountEndings[0] ? `ending-${accountEndings[0]}` : null), pageCounts };
+  const reconciliation = reconcileStatement(summaryPages, csv, balances);
+  for (const check of reconciliation.checks.filter(check => !check.matched)) warnings.push({ page: check.page, line: check.line, reason: `${check.label} does not match the transactions read. Compare with the original statement before importing.` });
+  return { csv, pages: pages.length, periods, warnings, balance: latest && !conflict ? latest : null, accountIdentifier: accountNumbers[0] ?? (accountEndings[0] ? `ending-${accountEndings[0]}` : null), pageCounts, reconciliation };
 }

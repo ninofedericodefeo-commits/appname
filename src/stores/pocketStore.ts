@@ -8,6 +8,9 @@ import { canReserve } from '@/features/pocket/logic';
 import { applyAccountImport } from '@/features/bank/accountImport';
 import type { AccountImportOptions } from '@/features/bank/accountImport';
 import type { BankPurchase } from '@/features/bank/importLogic';
+import { inferLinkedAccount, renameLinkedAccount, resolveLinkedAccount } from '@/features/bank/accountIdentity';
+import type { BankAccountInput, LinkedBankAccount } from '@/features/bank/accountIdentity';
+import { accountBalanceEstimate, balanceSnapshotIds } from '@/features/pocket/balanceEstimate';
 import { DEFAULT_GOAL_SETTINGS, DEFAULT_SET_ASIDE_RULE, automaticSetAsideCents, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, createGoalFromInput, editGoalFromInput } from '@/features/goals/logic';
 import type { ArchivedGoal, Goal, GoalInput, GoalSettings, LoggedPurchase } from '@/features/goals/logic';
 
@@ -26,6 +29,9 @@ type PocketState = {
   balanceAsOf: string | null;
   balanceSource: 'manual' | 'citizens-pdf' | null;
   statementBalanceKeys: string[];
+  linkedBankAccount: LinkedBankAccount | null;
+  balanceIncludedTransactionIds: string[];
+  renameBankAccount: (nickname: string) => void;
   reservedCents: number;
   entries: PocketEntry[];
   activeGoal: Goal | null;
@@ -39,7 +45,7 @@ type PocketState = {
   restoreTransactionsToHistory: (ids: string[]) => void;
   bankImportKeys: string[];
   bankImportAccountLabel: string;
-  importBankPurchases: (purchases: BankPurchase[], applyRule: boolean, accountLabel: string, history?: AccountTransaction[], options?: AccountImportOptions) => { imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean };
+  importBankPurchases: (purchases: BankPurchase[], applyRule: boolean, account: BankAccountInput, history?: AccountTransaction[], options?: AccountImportOptions) => { imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean };
   goalSettings: GoalSettings;
   setReportedBalance: (cents: number) => void;
   reserve: (cents: number) => boolean;
@@ -69,6 +75,9 @@ export const usePocketStore = create<PocketState>()(
       balanceAsOf: null,
       balanceSource: null,
       statementBalanceKeys: [],
+      linkedBankAccount: null,
+      balanceIncludedTransactionIds: [],
+      renameBankAccount: (nickname) => set(state => renameLinkedAccount(state, resolveLinkedAccount(state, nickname))),
       reservedCents: 0,
       entries: [],
       activeGoal: null,
@@ -92,21 +101,24 @@ export const usePocketStore = create<PocketState>()(
       },
       bankImportKeys: [],
       bankImportAccountLabel: 'Main account',
-      importBankPurchases: (purchases, applyRule, accountLabel, history = [], options = {}) => {
-        const { state, ...result } = applyAccountImport(get(), purchases, applyRule, accountLabel, history, options);
-        if (result.imported > 0 || result.transactionsAdded > 0 || result.transactionsUpdated > 0 || result.matched > 0 || result.balanceUpdated) set({ ...state, bankImportAccountLabel: accountLabel.trim() });
+      importBankPurchases: (purchases, applyRule, account, history = [], options = {}) => {
+        const profile = resolveLinkedAccount(get(), typeof account === 'string' ? account : account.nickname, options.statementIdentifier ?? (typeof account === 'string' ? null : account.statementIdentifier));
+        const { state, ...result } = applyAccountImport(get(), purchases, applyRule, profile, history, options);
+        set({ ...state, bankImportAccountLabel: profile.nickname });
         return result;
       },
       goalSettings: DEFAULT_GOAL_SETTINGS,
       setReportedBalance: (cents) => {
         if (Number.isSafeInteger(cents) && cents >= 0) {
           const now = new Date();
-          set({ reportedBalanceCents: cents, balanceUpdatedAt: now.toISOString(), balanceSource: 'manual', balanceAsOf: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}` });
+          const state = get();
+          set({ reportedBalanceCents: cents, balanceUpdatedAt: now.toISOString(), balanceSource: 'manual', balanceAsOf: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
+            balanceIncludedTransactionIds: balanceSnapshotIds(state) });
         }
       },
       reserve: (cents) => {
         const state = get();
-        if (!canReserve(cents, state.reportedBalanceCents, state.reservedCents)) return false;
+        if (!canReserve(cents, accountBalanceEstimate(state).estimatedCents, state.reservedCents)) return false;
         set({ reservedCents: state.reservedCents + cents, entries: [entry('reserve', cents), ...state.entries] });
         return true;
       },
@@ -148,7 +160,7 @@ export const usePocketStore = create<PocketState>()(
       reserveForGoal: (cents, purchaseId) => {
         const state = get();
         const goal = state.activeGoal;
-        if (!goal || !canSetAsideForGoal(cents, goal, state.reportedBalanceCents, state.reservedCents)) return false;
+        if (!goal || !canSetAsideForGoal(cents, goal, accountBalanceEstimate(state).estimatedCents, state.reservedCents)) return false;
         const purchase = purchaseId ? state.purchases.find((item) => item.id === purchaseId) : undefined;
         if (purchaseId && (!purchase || purchase.decision !== 'pending')) return false;
         set({
@@ -170,10 +182,13 @@ export const usePocketStore = create<PocketState>()(
         const state = get();
         if (!canLogPurchase(id, title, amountCents, sourcePauseId, state.purchases)) return false;
         const goal = state.activeGoal;
-        const savedCents = automaticSetAsideCents(amountCents, goal, state.reportedBalanceCents, state.reservedCents);
         const purchasedAt = new Date().toISOString();
-        const purchase: LoggedPurchase = { id, title: title.trim(), amountCents, purchasedAt, sourcePauseId, source,
-          decision: savedCents > 0 ? 'saved' : 'pending', ...(savedCents > 0 ? { savedCents } : {}) };
+        const purchase: LoggedPurchase = { id, title: title.trim(), amountCents, purchasedAt, sourcePauseId, source, decision: 'pending',
+          ...(state.linkedBankAccount ? { bankAccountId: state.linkedBankAccount.id, bankAccountLabel: state.linkedBankAccount.nickname } : {}) };
+        const afterPurchase = accountBalanceEstimate({ ...state, purchases: [purchase, ...state.purchases] }).estimatedCents;
+        const savedCents = automaticSetAsideCents(amountCents, goal, afterPurchase, state.reservedCents);
+        purchase.decision = savedCents > 0 ? 'saved' : 'pending';
+        if (savedCents > 0) purchase.savedCents = savedCents;
         set({
           purchases: [purchase, ...state.purchases],
           ...(goal && savedCents > 0 ? {
@@ -201,12 +216,14 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }),
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 8,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 9,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
         return {
           ...previous,
+          linkedBankAccount: inferLinkedAccount({ ...previous, accountTransactions: previous.accountTransactions ?? [], purchases: previous.purchases ?? [] }),
+          balanceIncludedTransactionIds: previous.balanceIncludedTransactionIds ?? [],
           balanceAsOf: previous.balanceAsOf ?? null,
           balanceSource: previous.balanceSource ?? null,
           statementBalanceKeys: previous.statementBalanceKeys ?? [],

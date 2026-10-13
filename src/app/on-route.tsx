@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import StationMap from '@/components/StationMap';
 import { geocodeDestination, getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { priceDescription } from '@/features/stations/data';
-import { formatFuelPrice } from '@/features/stations/logic';
+import { formatFuelPrice, isRecentPrice } from '@/features/stations/logic';
 import { stationsFromSavedLocations, withLocalPrices } from '@/features/stations/localPrices';
 import { appleMapsDirections, appleMapsTrip, googleMapsDirections, googleMapsTripSegments } from '@/features/stations/maps';
 import { planDriveStops, safeRange } from '@/features/stations/multiStopLogic';
@@ -54,7 +54,9 @@ export default function OnRouteScreen() {
     try { return car && fuelRemaining.trim() ? fuelRange(car, Number(fuelRemaining), fuelUnit) : null; }
     catch { return null; }
   }, [car, fuelRemaining, fuelUnit]);
-  const mapPins = useMemo(() => stops.map(({ station }, index) => ({ id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude, price: station.prices.find((item) => item.fuelType === fuelType && item.source !== 'sample')?.price ?? null, sample: false, stopNumber: index + 1 })), [stops, fuelType]);
+  const [priceCheckedAt, setPriceCheckedAt] = useState(() => Date.now());
+  useEffect(() => { const timer = setInterval(() => setPriceCheckedAt(Date.now()), 60_000); return () => clearInterval(timer); }, []);
+  const mapPins = useMemo(() => stops.map(({ station }, index) => { const price = station.prices.find(item => item.fuelType === fuelType && item.source !== 'sample'); return { id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude, price: price?.price ?? null, sample: false, stopNumber: index + 1, stale: !!price && !isRecentPrice(price, priceCheckedAt) }; }), [stops, fuelType, priceCheckedAt]);
   const mapRoute = useMemo(() => route ? routeQueryPoints(route.points, 500) : [], [route]);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const selectPin = useCallback(async (id: string) => setSelectedStop(id), []);

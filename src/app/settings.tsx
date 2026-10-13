@@ -8,6 +8,7 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { colors } from '@/theme';
 import WidgetSettingsPanel from '@/features/spending/WidgetSettingsPanel';
 import SubscriptionSettingsPanel from '@/features/subscriptions/SubscriptionSettingsPanel';
+import AccountSettingsPanel from '@/features/bank/AccountSettingsPanel';
 
 export default function SettingsScreen() {
   const { mapsPreference, refillPercent, selectedFuelType, setMapsPreference, setRefillPercent, setSelectedFuelType } = useSettingsStore();
@@ -20,6 +21,7 @@ export default function SettingsScreen() {
   }
   return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}><FormScrollView contentContainerStyle={styles.content}>
     <Text style={styles.kicker}>PREFERENCES</Text><Text style={styles.title}>Settings</Text>
+    <AccountSettingsPanel />
     <View style={styles.card}><Text style={styles.heading}>Bank statements</Text>
       <Link href="/statement-automation" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up quick statement import ›</Text></Pressable></Link>
       <Text style={styles.note}>Add the shortcut and see how to share a PDF from Citizens.</Text>

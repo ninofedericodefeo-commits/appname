@@ -26,7 +26,7 @@ test('station response rejects malformed prices and duplicate identities', () =>
 
 test('distance is computed from coordinates and controls radius and sorting', () => {
   const search = { latitude: closeStation.latitude, longitude: closeStation.longitude, radius: 5, fuelType: 'regular', sortOrder: 'price' };
-  assert.deepEqual(prepareStations([closeStation, cheapStation], search).map((station) => station.id), ['cheap', 'close']);
+  assert.deepEqual(prepareStations([closeStation, cheapStation], search, Date.parse(reportedAt)).map((station) => station.id), ['cheap', 'close']);
   assert.deepEqual(prepareStations([closeStation, cheapStation], { ...search, sortOrder: 'distance' }).map((station) => station.id), ['close', 'cheap']);
   assert.deepEqual(prepareStations([closeStation, cheapStation], { ...search, radius: 0.1 }).map((station) => station.id), ['close']);
 });

@@ -4,6 +4,7 @@ import { usePocketStore } from '@/stores/pocketStore';
 import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
 import { availableCents } from '@/features/pocket/logic';
 import { formatMoney } from '@/lib/money';
+import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';
 import { endRetiredActivities } from './widgetLogic';
 
 export const accountWidgetsAvailable = Platform.OS === 'ios' && Constants.expoConfig?.extra?.goalWidgetAvailable === true;
@@ -14,11 +15,12 @@ export async function syncAccountWidget() {
   const { default: widget } = await import('@/widgets/AccountWidget');
   if (generation !== latestSnapshot) return;
   const account = usePocketStore.getState(), settings = useWidgetSettingsStore.getState();
-  const available = availableCents(account.reportedBalanceCents, account.reservedCents);
+  const estimate = accountBalanceEstimate(account);
+  const available = availableCents(estimate.estimatedCents, account.reservedCents);
   widget.updateSnapshot({ enabled: settings.enabled,
     balance: !settings.enabled ? '' : settings.showAmounts ? available === null ? 'Add a bank balance' : formatMoney(available) : 'Balance hidden',
     savings: settings.enabled && settings.showAmounts ? `${formatMoney(account.reservedCents)} set aside` : 'Open Account to view amounts',
-    updated: settings.enabled ? `Saved balance${account.balanceAsOf ? ` · ${account.balanceAsOf}` : ''} · not a live bank feed` : '',
+    updated: settings.enabled ? `Bank balance${estimate.snapshotDay ? ` · ${estimate.snapshotDay}` : ''}${estimate.newerCount ? ` + ${estimate.newerCount} updates` : ''} · not a live bank feed` : '',
   });
 }
 

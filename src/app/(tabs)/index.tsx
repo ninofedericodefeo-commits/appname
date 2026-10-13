@@ -12,7 +12,7 @@ import StationMap from '@/components/StationMap';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { stationApiBaseUrl } from '@/features/stations/data';
 import { useNearbyStations } from '@/features/stations/hooks';
-import { filterPricedStations, formatFuelPrice, prepareStations } from '@/features/stations/logic';
+import { filterPricedStations, formatFuelPrice, isRecentPrice, prepareStations, recentStationPrice } from '@/features/stations/logic';
 import { withLocalPrices } from '@/features/stations/localPrices';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useReceiptStore } from '@/stores/receiptStore';
@@ -79,20 +79,21 @@ export default function GasScreen() {
   const allStations = useMemo(() => {
     const found = data?.stations ?? [];
     if (!location) return found;
-    return prepareStations(withLocalPrices(found, receiptReports, priceReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder });
-  }, [data?.stations, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder]);
+    return prepareStations(withLocalPrices(found, receiptReports, priceReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder }, now);
+  }, [data?.stations, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder, now]);
   const stations = useMemo(() => filterPricedStations(allStations, selectedFuelType, hideUnpricedStations), [allStations, selectedFuelType, hideUnpricedStations]);
   const cheapest = stations.reduce<(typeof stations)[number] | undefined>((best, station) => {
-    const price = station.prices.find((item) => item.fuelType === selectedFuelType)?.price;
-    const bestPrice = best?.prices.find((item) => item.fuelType === selectedFuelType)?.price;
-    return price !== undefined && (bestPrice === undefined || price < bestPrice) ? station : best;
+    const price = recentStationPrice(station, selectedFuelType, now);
+    const bestPrice = best ? recentStationPrice(best, selectedFuelType, now) : Infinity;
+    return Number.isFinite(price) && price < bestPrice ? station : best;
   }, undefined);
   const canShowResults = (location !== null && locationStatus !== 'denied' && locationStatus !== 'unavailable');
   const selectedStation = stations.find((station) => station.id === selectedStationId);
   const mapPins = useMemo(() => stations.map((station) => ({
     id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude,
     price: station.prices.find((price) => price.fuelType === selectedFuelType)?.price ?? null, sample: false,
-  })), [stations, selectedFuelType]);
+    stale: !!station.prices.find(price => price.fuelType === selectedFuelType) && !isRecentPrice(station.prices.find(price => price.fuelType === selectedFuelType), now),
+  })), [stations, selectedFuelType, now]);
   const selectPin = useCallback(async (id: string) => setSelectedStationId(id), []);
 
   return (
@@ -209,7 +210,7 @@ export default function GasScreen() {
           <View style={styles.listSection}>
             <Text style={styles.sectionEyebrow}>Stations</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
-            {!cheapest && <Text style={styles.noPriceNote}>No reported {selectedFuelType} prices in these results. You can report a price when you visit.</Text>}
+            {!cheapest && <Text style={styles.noPriceNote}>No recent {selectedFuelType} prices in these results. Older saved prices may still be shown.</Text>}
             {stations.map((station) => (
               <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt onReported={() => void refetch()} />
             ))}

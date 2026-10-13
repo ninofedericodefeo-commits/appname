@@ -16,6 +16,8 @@ type SubscriptionState = {
   resetSamples: () => void;
   removeSamples: () => void;
   dismissedBankSuggestions: string[];
+  dismissedBankAlerts: string[];
+  dismissBankAlert: (id: string) => void;
   dismissBankSuggestion: (key: string) => void;
   restoreBankSuggestions: () => void;
   setRemindersEnabled: (enabled: boolean) => void;
@@ -35,6 +37,8 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       resetSamples: () => set(state => ({ subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true })),
       removeSamples: () => set(state => ({ subscriptions: state.subscriptions.filter(subscription => !subscription.isSample), samplesInitialized: true })),
       dismissedBankSuggestions: [],
+      dismissedBankAlerts: [],
+      dismissBankAlert: id => set(state => ({ dismissedBankAlerts: [...new Set([...state.dismissedBankAlerts, id])] })),
       dismissBankSuggestion: (key) => set((state) => ({ dismissedBankSuggestions: [...new Set([...state.dismissedBankSuggestions, key])] })),
       restoreBankSuggestions: () => set({ dismissedBankSuggestions: [] }),
       setRemindersEnabled: (remindersEnabled) => set({ remindersEnabled }),
@@ -45,7 +49,7 @@ export const useSubscriptionStore = create<SubscriptionState>()(
               if (subscription.id !== id) return subscription;
               const reviewChanged = subscription.name !== input.name || subscription.amountCents !== input.amountCents ||
                 subscription.cadence !== input.cadence || subscription.day !== input.day || subscription.month !== input.month;
-              return { ...subscription, ...input, lastReview: reviewChanged ? undefined : subscription.lastReview };
+              return { ...subscription, ...input, ...(subscription.amountCents !== input.amountCents ? { amountUpdatedAt: new Date().toISOString() } : {}), lastReview: reviewChanged ? undefined : subscription.lastReview };
             }),
           };
         }
@@ -54,12 +58,13 @@ export const useSubscriptionStore = create<SubscriptionState>()(
           ...input,
           id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           active: true,
+          createdAt: new Date().toISOString(),
         };
         return { subscriptions: [subscription, ...state.subscriptions] };
       }),
       setActive: (id, active) => set((state) => ({
         subscriptions: state.subscriptions.map((subscription) =>
-          subscription.id === id ? { ...subscription, active } : subscription,
+          subscription.id === id ? { ...subscription, active, canceledAt: active ? undefined : new Date().toISOString(), ...(active ? { amountUpdatedAt: new Date().toISOString() } : {}) } : subscription,
         ),
       })),
       review: (id, renewalDate, decision) => set((state) => ({
@@ -76,10 +81,14 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     {
       name: 'gasfinder-subscriptions',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
         dismissedBankSuggestions: version < 2 ? [] : (persisted as SubscriptionState).dismissedBankSuggestions ?? [],
         samplesInitialized: (persisted as SubscriptionState).samplesInitialized ?? false,
+        dismissedBankAlerts: (persisted as SubscriptionState).dismissedBankAlerts ?? [],
+        subscriptions: ((persisted as SubscriptionState).subscriptions ?? []).map(subscription => ({ ...subscription,
+          createdAt: subscription.createdAt ?? (/^\d{13}-/.test(subscription.id) ? new Date(Number(subscription.id.split('-')[0])).toISOString() : new Date().toISOString()),
+        })),
       }),
     },
   ),

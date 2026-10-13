@@ -21,7 +21,7 @@ export function LogPurchase() {
     {open && <View style={styles.form}>
       <TextInput accessibilityLabel="Purchase name" value={title} onChangeText={setTitle} maxLength={80} placeholder="What did you buy?" style={styles.input} />
       <TextInput accessibilityLabel="Purchase amount" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="Amount" style={styles.input} />
-      <Text style={styles.hint}>Your goal’s rule applies when this is logged. Your saved bank balance stays unchanged.</Text>
+      <Text style={styles.hint}>Your goal’s rule applies when this is logged. Newer purchases update the estimate; the confirmed bank balance stays the same.</Text>
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" style={styles.save} onPress={save}><Text style={styles.saveText}>Save purchase</Text></Pressable>
     </View>}

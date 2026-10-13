@@ -89,6 +89,7 @@ export type LoggedPurchase = {
   source?: 'manual' | 'shortcut' | 'bank-import';
   bankSource?: 'csv' | 'citizens-pdf';
   bankAccountLabel?: string;
+  bankAccountId?: string;
   bankMatchKeys?: string[];
   bankDescription?: string;
   bankPostedAt?: string;

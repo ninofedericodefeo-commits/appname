@@ -1,5 +1,22 @@
 # App review — October 13, 2026
 
+## Implementation progress — October 13
+
+The first implementation batch addresses the data foundations in findings 1–7:
+
+| Finding | Implemented | Remaining scope |
+| --- | --- | --- |
+| 1 | Dated confirmed snapshot plus a reconciled estimate from newer posted/logged activity; consistent savings caps and Account widget value. | Live bank synchronization is not implemented. |
+| 2–3 | Stable identity across renames, one linked account, statement ownership guard, linked-history view with older-history access. | Full multi-account balances are not implemented; CSV account ownership needs user review. |
+| 4 | Per-period summary totals and opening-to-closing checks, visible status, manual mismatch acknowledgment and quick-import review. | Unreadable fields remain unverified; OCR and new layouts need separate work. |
+| 5 | Newest source wins per fuel, Old pins, recent-only price sorting/lowest-price/drive comparisons. | Shared community prices/backend remain planned. |
+| 6 | Suggestions use the full corrected bank ledger, including history-only imports and legacy bank-confirmed purchases. | Classification remains conservative and reviewable. |
+| 7 | Price-change and charge-after-cancellation review alerts with persistent per-charge dismissals. | Billing-date mismatch detection remains planned. |
+
+Verification: 204 logic tests, lint, TypeScript and iOS/Android/web exports pass. Mobile-width synthetic checks cover rename/reimport, mismatch gating and a purchase updating the estimate once. Phone-specific behavior remains a device gate.
+
+Findings 8–18 remain the next work queue. The review below records the state before this batch; implementation changes above take precedence.
+
 ## Scope and conclusion
 
 Reviewed the mobile-width Gas, Account, Goals, Subscriptions, Settings and statement-setup screens, the main data flows, and the feature plans. Lint, TypeScript and all 179 existing logic tests pass. Two additional read-only synthetic checks reproduced the nickname/deduplication problem and stale local-price precedence. Passing the current tests does not resolve these product gaps.

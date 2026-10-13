@@ -47,7 +47,7 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
         <View style={styles.corrections}><Pressable accessibilityRole="button" accessibilityLabel={`Mark ${title} as ${incoming ? 'withdrawal' : 'deposit'}`} style={styles.directionButton} onPress={() => correctDirection(transaction.id, incoming ? 'out' : 'in')}><Text style={styles.directionText}>{incoming ? 'Mark as withdrawal' : 'Mark as deposit'}</Text></Pressable>
           {transaction.directionCorrected && <Pressable accessibilityRole="button" style={styles.directionButton} onPress={() => correctDirection(transaction.id, null)}><Text style={styles.directionText}>Use imported direction</Text></Pressable>}
         </View>
-        <Text style={styles.detailText}>Corrects this history row. Your saved balance, set-asides and original import stay unchanged.</Text>
+        <Text style={styles.detailText}>Corrects this history row and newer-activity estimates. Your confirmed bank balance, set-asides and original import stay unchanged.</Text>
       </>}
       <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${title} from history`} onPress={() => onRemove(transaction)} style={styles.removeButton}><Text style={styles.removeText}>Remove from history</Text></Pressable>
     </View>}

@@ -12,10 +12,13 @@ import type { Subscription } from './logic';
 import CancelSubscriptionButton from './CancelSubscriptionButton';
 import SubscriptionButton from './SubscriptionButton';
 import SubscriptionEditor from './SubscriptionEditor';
+import { subscriptionBankAlerts, subscriptionBankEvidence } from './bankEvidence';
 
 export default function SubscriptionsPanel() {
-  const { subscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions } = useSubscriptionStore();
-  const purchases = usePocketStore(state => state.purchases);
+  const { subscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, dismissedBankAlerts, dismissBankAlert } = useSubscriptionStore();
+  const { purchases, accountTransactions, transactionDirections, linkedBankAccount } = usePocketStore();
+  const evidence = useMemo(() => subscriptionBankEvidence(accountTransactions, purchases, transactionDirections, linkedBankAccount), [accountTransactions, purchases, transactionDirections, linkedBankAccount]);
+  const alerts = useMemo(() => subscriptionBankAlerts(evidence, subscriptions, dismissedBankAlerts), [evidence, subscriptions, dismissedBankAlerts]);
   const pocketReady = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const subsReady = useSyncExternalStore(useSubscriptionStore.persist.onFinishHydration, useSubscriptionStore.persist.hasHydrated, () => false);
   const [today, setToday] = useState(() => new Date());
@@ -24,7 +27,7 @@ export default function SubscriptionsPanel() {
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionLimit, setSuggestionLimit] = useState(5);
-  const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(purchases, subscriptions, dismissedBankSuggestions, today) : [], [purchases, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
+  const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(evidence, subscriptions, dismissedBankSuggestions, today) : [], [evidence, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
   const due = subscriptionsToReviewTomorrow(subscriptions, today);
   const active = subscriptions.filter(subscription => subscription.active).sort((a, b) => nextRenewal(a, today).getTime() - nextRenewal(b, today).getTime());
   const inactive = subscriptions.filter(subscription => !subscription.active);
@@ -61,6 +64,10 @@ export default function SubscriptionsPanel() {
 
   return <View style={styles.content}>
     <View><Text style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Your renewals, all in one place.</Text></View>
+    {pocketReady && subsReady && alerts.length > 0 && <><Text style={styles.sectionTitle}>Updates from your bank · {alerts.length}</Text>{alerts.map(alert => <View key={alert.id} style={styles.card}>
+      <Text style={styles.name}>{alert.subscription.name}</Text><Text style={styles.note}>{alert.kind === 'price-change' ? `A new posted charge was ${formatMoney(alert.charge.amountCents)}. Your saved price is ${formatMoney(alert.subscription.amountCents)}.` : `A ${formatMoney(alert.charge.amountCents)} charge posted after you marked this subscription canceled.`} Posted {new Date(alert.charge.purchasedAt).toLocaleDateString()}.</Text>
+      <View style={styles.actions}><SubscriptionButton label={alert.kind === 'price-change' ? 'Review price' : 'Review subscription'} tone="primary" grow onPress={() => setEditor({ subscription: alert.kind === 'price-change' ? { ...alert.subscription, amountCents: alert.charge.amountCents } : alert.subscription })} /><SubscriptionButton label="Dismiss" grow onPress={() => dismissBankAlert(alert.id)} /></View>
+    </View>)}</>}
     <View style={styles.heading}><Text style={styles.sectionTitle}>Upcoming · {active.length}</Text><SubscriptionButton label="Add" accessibilityLabel="Add subscription" tone="primary" disabled={!subsReady} onPress={() => setEditor({})} /></View>
     {!!due.length && <Text style={styles.reviewSummary}>{due.length} renewing tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))} total</Text>}
     {!active.length && <View style={styles.card}><Text style={styles.name}>No upcoming subscriptions</Text><Text style={styles.note}>Add one to keep track of its price and next renewal.</Text></View>}

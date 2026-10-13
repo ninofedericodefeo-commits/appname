@@ -77,7 +77,7 @@ export function GasStationCard({
     <View style={[styles.card, isCheapest && styles.cheapestCard]}>
       <View style={styles.row}>
         <View style={styles.textBlock}>
-          {isCheapest && <Text style={styles.bestLabel}>BEST PRICE IN THIS LIST</Text>}
+          {isCheapest && <Text style={styles.bestLabel}>LOWEST RECENT REPORT</Text>}
           <Text style={styles.name}>{station.name === 'Gas station' ? 'Name not listed' : station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
           <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi · {priceDescription(price, isDemo, now)}</Text>

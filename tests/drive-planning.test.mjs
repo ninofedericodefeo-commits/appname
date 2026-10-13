@@ -8,7 +8,7 @@ import { driveRouteWindow, parseDestinationInput } from '../src/features/station
 import { preferredMapsApp, validateRefillPercent } from '../src/features/stations/preferences.ts';
 
 const car = { id: 'car-a', name: 'My Subaru', model: 'Subaru Crosstrek', mpg: 28, tankGallons: 14, estimateSource: 'estimate' };
-const station = (id, milesAhead, price, milesOffRoute = 0.1, source = 'report') => ({ id, name: id, latitude: 40, longitude: -75 + milesAhead / 1000, milesAhead, milesOffRoute, prices: price ? [{ fuelType: 'regular', price, source }] : [], address: '', city: '', state: '' });
+const station = (id, milesAhead, price, milesOffRoute = 0.1, source = 'report') => ({ id, name: id, latitude: 40, longitude: -75 + milesAhead / 1000, milesAhead, milesOffRoute, prices: price ? [{ fuelType: 'regular', price, source, currency: 'USD', reportedAt: new Date().toISOString() }] : [], address: '', city: '', state: '' });
 const inWindow = (all, window) => all.filter((item) => item.milesAhead >= window.searchStartMiles && item.milesAhead <= window.searchEndMiles);
 
 test('percent fuel uses saved capacity and MPG, gallons never exceed the tank', () => {

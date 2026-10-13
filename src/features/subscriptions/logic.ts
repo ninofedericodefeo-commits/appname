@@ -11,6 +11,9 @@ export type Subscription = {
   isSample?: boolean;
   associatedApp?: SubscriptionApp;
   bankMerchantKey?: string;
+  createdAt?: string;
+  amountUpdatedAt?: string;
+  canceledAt?: string;
   lastReview?: {
     renewalDate: string;
     decision: 'keep' | 'plan-to-cancel';

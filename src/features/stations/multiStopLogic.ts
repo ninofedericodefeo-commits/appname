@@ -1,4 +1,5 @@
 import type { RouteStation } from './routeLogic.ts';
+import { isRecentPrice } from './logic.ts';
 import { validateRefillPercent } from './preferences.ts';
 
 export type StopWindow = { fromMiles: number; targetMiles: number; searchStartMiles: number; searchEndMiles: number; rangeMiles: number };
@@ -19,14 +20,14 @@ export function nextStopWindow(routeMiles: number, fromMiles: number, rangeMiles
   return { fromMiles, targetMiles, searchStartMiles: Math.max(fromMiles, targetMiles - 60), searchEndMiles, rangeMiles };
 }
 
-export function chooseStop(stations: RouteStation[], window: StopWindow, fuelType: string, usedIds: string[]) {
+export function chooseStop(stations: RouteStation[], window: StopWindow, fuelType: string, usedIds: string[], now = Date.now()) {
   const candidates = stations.filter((station) => !usedIds.includes(station.id) &&
     (window.fromMiles === 0 ? station.milesAhead >= 0 : station.milesAhead > window.fromMiles + 0.1) &&
     station.milesAhead >= window.searchStartMiles && station.milesAhead + station.milesOffRoute * 2 <= window.searchEndMiles);
   if (window.targetMiles <= window.fromMiles) return [...candidates].sort((a, b) => a.milesAhead + a.milesOffRoute * 2 - b.milesAhead - b.milesOffRoute * 2)[0] ?? null;
   const near = candidates.filter((station) => station.milesAhead >= window.targetMiles - 25);
   return [...(near.length ? near : candidates)].sort((a, b) => {
-    const price = (station: RouteStation) => station.prices.find((item) => item.fuelType === fuelType && item.source !== 'sample' && item.price > 0)?.price;
+    const price = (station: RouteStation) => station.prices.find((item) => item.fuelType === fuelType && isRecentPrice(item, now))?.price;
     const pa = price(a), pb = price(b);
     if (pa === undefined && pb !== undefined) return 1;
     if (pb === undefined && pa !== undefined) return -1;

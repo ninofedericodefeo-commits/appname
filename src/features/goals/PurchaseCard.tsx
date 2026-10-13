@@ -6,6 +6,7 @@ import type { Goal, LoggedPurchase } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
+import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';
 
 import { formatAmount, formatMoney as money } from '@/lib/money';
 
@@ -16,7 +17,9 @@ function Action({ label, onPress, secondary = false, disabled = false }: { label
 }
 
 export default function PurchaseCard({ purchase, history, goal, compact = false }: { purchase: LoggedPurchase; history: LoggedPurchase[]; goal: Goal | null; compact?: boolean }) {
-  const { goalSettings, reserveForGoal, skipPurchase, updatePurchase, removePurchase, reportedBalanceCents, reservedCents } = usePocketStore();
+  const pocket = usePocketStore();
+  const { goalSettings, reserveForGoal, skipPurchase, updatePurchase, removePurchase, reservedCents } = pocket;
+  const estimatedBalance = accountBalanceEstimate(pocket).estimatedCents;
   const [custom, setCustom] = useState('');
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(purchase.title);
@@ -25,7 +28,7 @@ export default function PurchaseCard({ purchase, history, goal, compact = false 
   const [error, setError] = useState('');
   const [showActions, setShowActions] = useState(purchase.decision === 'pending');
   const suggestion = goal && purchase.decision === 'pending' ? suggestAmounts({ purchase, history, goal, settings: goalSettings }) : { amounts: [], sparse: false, paceLimited: false };
-  const available = reportedBalanceCents === null ? null : reportedBalanceCents - reservedCents;
+  const available = estimatedBalance === null ? null : estimatedBalance - reservedCents;
 
   function save(cents: number) {
     if (cents <= 0 || !reserveForGoal(cents, purchase.id)) {

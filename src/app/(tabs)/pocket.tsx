@@ -12,6 +12,7 @@ import { pocketTransactions } from '@/features/pocket/transactions';
 import { formatAmount, formatMoney as money } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
+import { accountBalanceEstimate, belongsToLinkedAccount } from '@/features/pocket/balanceEstimate';
 
 function AccountAction({ label, path, onPress }: { label: string; path: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
@@ -21,7 +22,8 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 }
 
 export default function PocketScreen() {
-  const { reportedBalanceCents, balanceUpdatedAt, balanceAsOf, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance, reserve, release } = usePocketStore();
+  const pocket = usePocketStore();
+  const { linkedBankAccount, reportedBalanceCents, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance, reserve, release } = pocket;
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
   const [amountInput, setAmountInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
@@ -29,12 +31,13 @@ export default function PocketScreen() {
   const [showCurrentBalance, setShowCurrentBalance] = useState(false);
   const [balanceError, setBalanceError] = useState('');
   const [pocketError, setPocketError] = useState('');
-  const available = availableCents(reportedBalanceCents, reservedCents);
+  const estimate = accountBalanceEstimate(pocket);
+  const available = availableCents(estimate.estimatedCents, reservedCents);
   const availableLabel = available === null ? '—' : money(available);
   const balanceFontSize = availableLabel.length > 9 ? Math.max(28, Math.floor(414 / availableLabel.length)) : 46;
   const unassigned = reservedCents - (activeGoal?.savedCents ?? 0);
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections]);
+  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, linkedBankAccount]);
 
   function updateBalance() {
     const cents = parseDollars(balanceInput);
@@ -55,17 +58,19 @@ export default function PocketScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
       <View style={styles.balanceCard}>
-        <View style={styles.accountHeading}><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={colors.lime} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg><Text style={styles.accountName}>My account</Text></View>
-        <Text style={styles.balanceLabel}>Available to spend</Text>
+        <View style={styles.accountHeading}><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={colors.lime} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? 'My account'}</Text></View>
+        <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
+        {!!estimate.snapshotDay && <Text style={styles.snapshot}>{balanceSource === 'citizens-pdf' ? 'Statement balance from' : 'Bank balance checked'} {new Date(`${estimate.snapshotDay}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
         <Text accessibilityLabel={available === null ? 'Available to spend: add your bank balance' : `Available to spend: ${money(available)}`} style={[styles.balanceMain, { fontSize: balanceFontSize }, available !== null && available < 0 && styles.balanceNegative]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{availableLabel}</Text>
-        <Text style={styles.formula}>{available === null ? 'Add your current bank balance to get started.' : 'Bank balance minus money set aside'}</Text>
+        <Text style={styles.formula}>{available === null ? 'Add your current bank balance to get started.' : estimate.newerCount ? `Bank balance + ${estimate.newerCount} newer update${estimate.newerCount === 1 ? '' : 's'} − money set aside` : 'Saved bank balance minus money set aside'}</Text>
         <View style={styles.pocketRow}><Text style={styles.pocketLabel}>Set aside</Text><Text style={styles.pocketValue}>{money(reservedCents)}</Text></View>
-        <Pressable accessibilityRole="button" accessibilityLabel={showCurrentBalance ? 'Hide current bank balance' : 'Show current bank balance'} accessibilityState={{ expanded: showCurrentBalance }} onPress={() => setShowCurrentBalance(!showCurrentBalance)} style={styles.currentRow}>
-          <Text style={styles.currentLabel}>Current balance</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={showCurrentBalance ? 'Hide last bank balance' : 'Show last bank balance'} accessibilityState={{ expanded: showCurrentBalance }} onPress={() => setShowCurrentBalance(!showCurrentBalance)} style={styles.currentRow}>
+          <Text style={styles.currentLabel}>Last bank balance</Text>
           <View style={styles.currentValueGroup}><Text style={styles.currentValue}>{showCurrentBalance ? (reportedBalanceCents === null ? 'Not entered' : money(reportedBalanceCents)) : 'Show'}</Text><Text style={styles.reveal}>{showCurrentBalance ? '⌄' : '›'}</Text></View>
         </Pressable>
-        {balanceSource === 'citizens-pdf' && balanceAsOf ? <Text style={styles.updated}>Statement balance · {new Date(`${balanceAsOf}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text> : balanceUpdatedAt && <Text style={styles.updated}>Balance saved {new Date(balanceUpdatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
-        {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>Your set-aside amount is above your saved bank balance. Update the balance or lower your set-aside amount.</Text>}
+        {estimate.newerCount > 0 && <Text style={styles.updated}>{estimate.deltaCents < 0 ? '−' : '+'}{money(Math.abs(estimate.deltaCents))} from posted/logged activity since that balance. Unlogged activity may be missing.</Text>}
+        {estimate.pendingCount > 0 && <Text style={styles.updated}>{estimate.pendingCount} pending bank transaction{estimate.pendingCount === 1 ? '' : 's'} excluded from this estimate.</Text>}
+        {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>Your set-aside amount is above your estimated bank balance. Update the balance or lower your set-aside amount.</Text>}
         <View style={styles.accountActions}>
           <AccountAction label="Update balance" path="m16 3 5 5M3 21l5-1L20 8a3.54 3.54 0 0 0-5-5L3 15v6Z" onPress={() => { Keyboard.dismiss(); setEditingBalance(!editingBalance); setEditingPocket(false); }} />
           <AccountAction label="Manage savings" path="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" onPress={() => { Keyboard.dismiss(); setEditingPocket(!editingPocket); setEditingBalance(false); }} />
@@ -99,6 +104,7 @@ const styles = StyleSheet.create({
   balanceCard: { backgroundColor: colors.ink, borderRadius: 20, padding: 22 }, accountHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
   accountName: { color: colors.surface, fontSize: 16, fontWeight: '700' }, balanceLabel: { color: colors.surface, fontSize: 14, lineHeight: 21 },
   balanceMain: { color: colors.surface, fontSize: 46, lineHeight: 56, fontWeight: '800', letterSpacing: -1.6, fontVariant: ['tabular-nums'], marginTop: 4 }, balanceNegative: { color: '#FFB49A' },
+  snapshot: { color: colors.lime, fontSize: 12, lineHeight: 18, marginTop: 5 },
   formula: { color: '#C5D5CC', fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: 21 },
   pocketRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
   pocketLabel: { color: colors.lime, fontSize: 14 }, pocketValue: { color: colors.lime, fontWeight: '700', fontSize: 17, fontVariant: ['tabular-nums'] },

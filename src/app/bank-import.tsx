@@ -24,6 +24,8 @@ import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 import { useStatementAutomationStore } from '@/stores/statementAutomationStore';
 import { colors } from '@/theme';
+import { accountContains, inferLinkedAccount, resolveLinkedAccount } from '@/features/bank/accountIdentity';
+import StatementChecks from '@/features/bank/StatementChecks';
 
 type Column = Exclude<keyof BankMapping, 'mode' | 'spendingSign' | 'dateOrder'>;
 const columnNames: Record<Column, string> = { date: 'Date', description: 'Description', amount: 'Amount', debit: 'Debit / money out', credit: 'Credit / money in', currency: 'Currency', type: 'Transaction type', status: 'Status', transactionId: 'Transaction ID' };
@@ -50,6 +52,7 @@ export default function BankImportScreen() {
   const consumedArchive = useRef('');
   const processedPDF = useRef(0);
   const pocket = usePocketStore();
+  const automation = useStatementAutomationStore();
   const hydrated = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const automationHydrated = useSyncExternalStore(useStatementAutomationStore.persist.onFinishHydration, useStatementAutomationStore.persist.hasHydrated, () => false);
   const [csv, setCSV] = useState<BankCSV | null>(null);
@@ -59,7 +62,17 @@ export default function BankImportScreen() {
   const [mapping, setMapping] = useState<BankMapping | null>(null);
   const [name, setName] = useState('');
   const [accountDraft, setAccountDraft] = useState<string | null>(null);
-  const account = accountDraft ?? pocket.bankImportAccountLabel;
+  const account = accountDraft ?? pocket.linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel;
+  const accountIdentity = useMemo(() => {
+    try {
+      const legacy = inferLinkedAccount(pocket);
+      const guarded = legacy && !legacy.statementIdentifier && automation.confirmedAccountIdentifier && accountContains(legacy, automation.accountLabel)
+        ? { ...legacy, statementIdentifier: automation.confirmedAccountIdentifier } : legacy;
+      return { value: resolveLinkedAccount({ ...pocket, linkedBankAccount: guarded }, account, statement?.accountIdentifier), error: '' };
+    } catch (error) { return { value: null, error: error instanceof Error ? error.message : 'Check the bank account.' }; }
+  }, [pocket, account, statement, automation.confirmedAccountIdentifier, automation.accountLabel]);
+  const accountRef = accountIdentity.value ?? account;
+  const [mismatchReviewed, setMismatchReviewed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [automaticSaving, setAutomaticSaving] = useState(false);
   const [pendingAutomatic, setPendingAutomatic] = useState<{ id: number; statement: CitizensStatement; file: BankFile; accountLabel: string } | null>(null);
@@ -93,31 +106,31 @@ export default function BankImportScreen() {
   }, [pdfJob]);
   const review = useMemo(() => {
     if (!csv || !mapping) return { rows: [], excluded: [], error: '' };
-    try { return { ...previewBankCSV(csv, mapping, account, pocket.purchases, pocket.bankImportKeys), error: '' }; }
+    try { return { ...previewBankCSV(csv, mapping, accountRef, pocket.purchases, pocket.bankImportKeys), error: '' }; }
     catch (cause) { return { rows: [], excluded: [], error: cause instanceof Error ? cause.message : 'Check the selected columns.' }; }
-  }, [csv, mapping, account, pocket.purchases, pocket.bankImportKeys]);
+  }, [csv, mapping, accountRef, pocket.purchases, pocket.bankImportKeys]);
   const selectedIds = useMemo(() => new Set(review.rows.filter((row) => row.duplicate !== 'known' &&
     (selectionOverrides.get(row.id) ?? !row.duplicate)).map((row) => row.id)), [review.rows, selectionOverrides]);
   const selected = useMemo(() => review.rows.filter((row) => row.duplicate !== 'known' && selectedIds.has(row.id)), [review.rows, selectedIds]);
   const historyReview = useMemo(() => {
     if (!csv || !mapping || review.error) return { rows: [], excluded: [] };
-    return previewAccountTransactions(csv, mapping, account);
-  }, [csv, mapping, account, review.error]);
+    return previewAccountTransactions(csv, mapping, accountRef);
+  }, [csv, mapping, accountRef, review.error]);
   const history = useMemo(() => linkAccountTransactions(historyReview.rows, review.rows, selectedIds), [historyReview.rows, review.rows, selectedIds]);
   const historyPlan = useMemo(() => mergeAccountTransactions(pocket.accountTransactions, saveHistory ? history : []), [pocket.accountTransactions, history, saveHistory]);
   const matchedRows = useMemo(() => review.rows.filter((row) => row.duplicate === 'possible' && !selectedIds.has(row.id)), [review.rows, selectedIds]);
-  const balanceStatus = statement?.balance ? statementBalanceStatus(pocket, statement.balance, account) : 'invalid';
+  const balanceStatus = statement?.balance ? statementBalanceStatus(pocket, statement.balance, accountRef) : 'invalid';
   const needsBalanceChoice = !!statement?.balance && balanceStatus !== 'invalid';
   const updateBalance = needsBalanceChoice && balanceStatus !== 'applied' && balanceOverride === true;
-  const importOptions = useMemo(() => ({ matches: matchedRows, balance: updateBalance ? statement?.balance : null }), [matchedRows, updateBalance, statement?.balance]);
-  const plan = useMemo(() => applyAccountImport(pocket, selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions), [pocket, selected, applyRule, account, saveHistory, history, importOptions]);
+  const importOptions = useMemo(() => ({ matches: matchedRows, balance: updateBalance ? statement?.balance : null, statementIdentifier: statement?.accountIdentifier }), [matchedRows, updateBalance, statement?.balance, statement?.accountIdentifier]);
+  const plan = useMemo(() => accountIdentity.error ? { imported: 0, skipped: 0, savedCents: 0, matched: 0, balanceUpdated: false } : applyAccountImport(pocket, selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions), [pocket, selected, applyRule, accountRef, saveHistory, history, importOptions, accountIdentity.error]);
   const canImport = sourceFile !== null || selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0 || plan.matched > 0 || plan.balanceUpdated;
   const purchaseRows = useMemo(() => [...review.rows].sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt)), [review.rows]);
   const historyRows = useMemo(() => [...historyReview.rows].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [historyReview.rows]);
 
   const load = useCallback((text: string, filename: string) => {
     const parsed = parseBankCSV(text);
-    setStatement(null); setBalanceOverride(null);
+    setStatement(null); setBalanceOverride(null); setMismatchReviewed(false);
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setReviewOptions(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
@@ -125,7 +138,7 @@ export default function BankImportScreen() {
     Keyboard.dismiss();
   }, []);
   const openFile = useCallback((file: BankFile, current: number, shared = false) => {
-    setReviewOptions(false); setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setDone(null);
+    setReviewOptions(false); setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setMismatchReviewed(false); setDone(null);
     setAutomaticReview(''); setPendingAutomatic(null);
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
     else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
@@ -137,7 +150,7 @@ export default function BankImportScreen() {
       if (current !== request.current) return;
       consumedToken.current = bankFileToken;
       const incoming = takeBankFile(bankFileToken);
-      setError(''); setDone(null); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setPendingAutomatic(null); setBusy(true);
+      setError(''); setDone(null); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setMismatchReviewed(false); setPendingAutomatic(null); setBusy(true);
       let readingPDF = false;
       try {
         if (!incoming) throw new Error('This file handoff expired. Choose the statement from Files.');
@@ -161,7 +174,7 @@ export default function BankImportScreen() {
       try {
         const { file, entry } = await readBankImport(archiveId);
         if (current !== request.current) return;
-        setAccountDraft(entry.accountLabel);
+        setAccountDraft(usePocketStore.getState().linkedBankAccount?.nickname ?? entry.accountLabel);
         readingPDF = file.kind === 'pdf'; openFile(file, current);
       } catch (cause) {
         if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not reopen this saved import.');
@@ -189,7 +202,7 @@ export default function BankImportScreen() {
         isCurrent: () => request.current === current,
         archive: (automatic) => saveBankImport(pending.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
           purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf }),
-        commit: (automatic, balance) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.accountLabel, automatic.history, { balance }),
+        commit: (automatic, balance) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.account, automatic.history, { balance, statementIdentifier: pending.statement.accountIdentifier }),
       });
       if (request.current !== current || result.status === 'canceled') return;
       if (result.status === 'review') setAutomaticReview(result.reason);
@@ -204,6 +217,7 @@ export default function BankImportScreen() {
   }
   async function chooseFile() {
     const current = ++request.current;
+    setPendingAutomatic(null);
     setBusy(true); setError('');
     let readingPDF = false;
     try {
@@ -220,15 +234,24 @@ export default function BankImportScreen() {
   }
   function toggle(id: string) { setSelectionOverrides((previous) => new Map(previous).set(id, !selectedIds.has(id))); }
   async function importSelected() {
-    if (!hydrated || review.error || !canImport || busy || pendingAutomatic || (needsBalanceChoice && balanceOverride === null)) return;
+    if (!hydrated || !automationHydrated || review.error || accountIdentity.error || !canImport || busy || pendingAutomatic || statement?.reconciliation?.status === 'mismatch' && !mismatchReviewed || (needsBalanceChoice && balanceOverride === null)) return;
     const current = ++request.current;
+    const reviewedState = usePocketStore.getState();
     setBusy(true); setError('');
     try {
       if (sourceFile) await saveBankImport(sourceFile, { accountLabel: account.trim(), transactionCount: historyReview.rows.length, purchaseCount: review.rows.length,
         ...(statement?.balance ? { balanceCents: statement.balance.amountCents, balanceAsOf: statement.balance.asOf } : {}),
       });
       if (current !== request.current) return;
-      const result = usePocketStore.getState().importBankPurchases(selected, applyRule && !!pocket.activeGoal, account, saveHistory ? history : [], importOptions);
+      const liveState = usePocketStore.getState();
+      if (liveState !== reviewedState) {
+        setBalanceOverride(null);
+        setAccountDraft(null);
+        setError('Your account changed while the file was being saved. Review the updated preview and balance choice before importing.');
+        return;
+      }
+      const result = liveState.importBankPurchases(selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions);
+      const setup = useStatementAutomationStore.getState(); setup.configure(setup.enabled, account);
       if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
         { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false });
       setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
@@ -267,13 +290,16 @@ export default function BankImportScreen() {
         {csv && mapping && !automaticSaving && <>
           {automaticReview ? <View style={styles.card}><Text style={styles.section}>A quick review is needed</Text><Text style={styles.body}>{automaticReview}</Text></View> : null}
           <View style={styles.card}>
-            <View style={styles.rowBetween}><Text style={styles.section}>Selected file</Text><Pressable accessibilityRole="button" style={styles.smallLink} disabled={busy} onPress={() => { cancelReading(); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setError(''); }}><Text style={styles.linkText}>Change file</Text></Pressable></View>
+            <View style={styles.rowBetween}><Text style={styles.section}>Selected file</Text><Pressable accessibilityRole="button" style={styles.smallLink} disabled={busy} onPress={() => void chooseFile()}><Text style={styles.linkText}>Change file</Text></Pressable></View>
             <Text style={styles.body}>{name}</Text>
             <Text style={styles.hint}>{account} · {historyReview.rows.length.toLocaleString()} bank transactions · {selected.length.toLocaleString()} new purchases</Text>
             {matchedRows.length > 0 && <Text style={styles.hint}>{matchedRows.length} possible purchase match{matchedRows.length === 1 ? '' : 'es'} will link to existing purchases. Use Import options if these were separate purchases.</Text>}
             {statement && <Text style={styles.hint}>{statement.pages} pages · {statement.periods.join(' · ')}</Text>}
             {statement && statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} reading warnings. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
           </View>
+          {accountIdentity.error && <Text accessibilityRole="alert" style={styles.error}>{accountIdentity.error}</Text>}
+          {statement?.reconciliation && <StatementChecks value={statement.reconciliation} />}
+          {statement?.reconciliation?.status === 'mismatch' && <View style={styles.card}><Text style={styles.body}>Check the mismatched totals against the original PDF before importing.</Text><View style={styles.row}><Check checked={mismatchReviewed} label="I reviewed the statement totals mismatch" onPress={() => setMismatchReviewed(!mismatchReviewed)} /><Text style={[styles.body, { flex: 1 }]}>I reviewed the statement totals mismatch</Text></View></View>}
           {statement && <View style={styles.card}>
             <Text style={styles.section}>Use the PDF’s balance?</Text>
             {statement.balance ? <>
@@ -294,7 +320,7 @@ export default function BankImportScreen() {
             <Text style={styles.section}>{statement ? 'Account and statement details' : 'Account and CSV columns'}</Text>
             <Text style={styles.label}>Account nickname</Text>
             <TextInput value={account} onChangeText={setAccountDraft} editable={!busy} maxLength={60} style={styles.input} accessibilityLabel="Bank account nickname" placeholder="Main checking" />
-            <Text style={styles.hint}>Use this same nickname next time to prevent repeat imports.</Text>
+            <Text style={styles.hint}>This changes the linked account’s display name. Transaction identity stays the same. CSV must belong to this account.</Text>
             {statement && <>{statement.pageCounts.map((page) => <Text key={page.page} style={styles.hint}>Page {page.page}: {page.spending} spending · {page.credits} credits</Text>)}</>}
             {!statement && <>{columnField('date')}{columnField('description')}
             <View style={styles.row}><Choice label="One amount column" selected={mapping.mode === 'signed'} onPress={() => setMapping({ ...mapping, mode: 'signed' })} /><Choice label="Debit / credit columns" selected={mapping.mode === 'debit-credit'} onPress={() => setMapping({ ...mapping, mode: 'debit-credit' })} /></View>
@@ -351,7 +377,7 @@ export default function BankImportScreen() {
           <View style={styles.card}>
             <Text style={styles.body}>Your original file will be saved in Imports. Spending helps find subscriptions.</Text>
             {applyRule && <Text style={styles.hint}>{formatMoney(plan.savedCents)} will be added to your set-aside estimate.</Text>}
-            <Button label={busy ? 'Saving import…' : 'Save import'} disabled={!canImport || !!review.error || !hydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
+            <Button label={busy ? 'Saving import…' : 'Save import'} disabled={!canImport || !!review.error || !!accountIdentity.error || statement?.reconciliation?.status === 'mismatch' && !mismatchReviewed || !hydrated || !automationHydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
           </View>
         </>}
       </>}
