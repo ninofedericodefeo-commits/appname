@@ -1,369 +1,571 @@
-# GasFinder Product Roadmap
+# GasFinder future roadmap
+
+**Updated:** October 13, 2026
+
+**Baseline:** `a9de911` — account reconciliation, gas freshness and subscription evidence
+
+**Purpose:** a dependable personal app, installed privately; no App Store launch is planned.
+
+This is the main future-work plan. It replaces the earlier prototype roadmap. Feature-specific documents provide implementation detail; dated notes in the handoff record history. Proposed features below are not claims that they already work.
+
+## 1. Product direction
+
+The app should help you answer four questions with little effort:
+
+1. **Account:** How much can I spend after protecting my set-aside money, and what has changed since my last bank balance?
+2. **Goals:** What am I saving for, and how do I adjust that money without accidentally changing something else?
+3. **Subscriptions:** What will renew, what is it costing me, and where do I go to cancel it?
+4. **Gas:** Where should I refuel, what price information can I trust, and will my planned drive need stops?
+
+The intended result is a useful daily companion for one person. Reliability, fewer steps and recoverable data take priority over more dashboards or integrations.
+
+### Decisions to preserve
+
+- Keep the four main tabs: **Gas, Goals, Account, Subs**. Account replaces Pocket in product copy; old route/storage names can remain for compatibility.
+- Keep one universal Settings destination with a gear in the upper right of each main page.
+- Keep the requested Leaflet/OpenStreetMap map and the price or **N/A** markers. Report a price and Gas on your drive stay below the map.
+- Keep the prominent amount as available money after set-asides. Keep the smaller confirmed bank balance behind **Show** and the snapshot date visible.
+- Keep purchases and savings adjustments in Transactions, with newest dates first, readable merchant names, red spending and green deposits. Full history stays at the bottom of the preview.
+- Keep bank entry simple: **Choose bank PDF or CSV** plus **Saved imports**. Shortcut setup belongs in Settings. Do not restore paste CSV or another import landing page full of options.
+- Ask before replacing the saved balance with a PDF closing balance. Importing, renaming and repeated sharing must not create duplicate charges or repeat savings contributions.
+- Keep subscription app selection through the supported installed-app picker, with cancellation completed by you in the provider's app or billing page.
+- Keep samples available for testing, with explicit sample labels and isolation from ordinary financial summaries.
+- Keep browsing possible while supported checkout routes are paused. Do not restore the purchase waiting list or a separate Activity page.
+- Store personal financial records locally by default. A set-aside is bookkeeping inside your bank balance; the app does not move money.
+- Favor free map/location services and local reports. An optional paid signing account or data service is a separate decision, not assumed approval to spend.
+
+### Success for personal use
+
+- You can open the app away from the development computer, understand its numbers and recover your data after an update or reinstall.
+- A supported Citizens statement takes one share handoff, a balance answer and review only when needed.
+- A purchase logged in the app and later found on a statement appears once, while two actual equal purchases remain two charges.
+- Common actions are direct: add money to a goal, review a renewal, report a gas price and change a search area.
+- Missing data or platform limitations produce a useful explanation and a fallback.
+
+## 2. Current baseline: keep completed work out of the backlog
+
+“Implemented” means code exists. It does not imply every native phone flow has been verified.
+
+| Area | Implemented today | Main remaining gap |
+| --- | --- | --- |
+| Account balance | Dated confirmed snapshot, newer-activity estimate, set-aside subtraction, pending exclusion, manual balance capture | More explanation of coverage; stronger handling of reversals, posting changes and time-zone edges |
+| Account identity | One linked account, stable namespace across renames, known PDF account guard, access to older histories | Safe switch-account workflow; separate balances only if multiple accounts become useful |
+| Transactions | Unified timeline, merchant display names, direction corrections, hiding/undo, source details and purchase matching | Source-linked audit trail, better search/filtering, true data-removal controls distinct from hiding |
+| Citizens import | Local text-PDF/CSV parsing, summary reconciliation, page counts, balance question, duplicate prevention, archived originals | Device verification, archive management, batch/folder import, supported-layout expansion |
+| Statement handoff | Signed iPhone shortcut and native file opening; optional quick import of matching clean shared PDFs | Cold/warm launch and interrupted-save checks on the installed phone; simpler repeat setup |
+| Goals | One active goal, deadlines, rules, assignments, purchase contributions and archived goals | Direct money actions, one gear, clearer editor semantics and legacy-demo placement |
+| Subscriptions | Renewal review, supported app picker, bank suggestions, price-change/after-cancellation alerts, local reminders | Durable snooze, sample test mode, permission status, upcoming-cost summaries and billing destinations |
+| Gas | Free station discovery, restored map/list, local reports, newest-price precedence, Old pins and recent-price ranking | Manual location search, compact filters/cars, reporting consolidation, useful personal price coverage |
+| Cars and drives | Saved cars, editable MPG/capacity estimates, successive stops and Maps handoff | Better road-access/detour evidence, range calibration and saved trip conveniences |
+| Amazon goals | Public direct/short-link name and USD price lookup, editable draft, provenance and fallback | Successful live extraction on the phone; optional image/share convenience |
+| Checkout pause | Safari extension, desktop Chrome source/package builder, recognized checkout URL interruption | Real browser coverage tests, easy desktop handoff and honest pause-state reporting |
+| Widgets | Account/goal widget code and native capability configuration | Enrolled-team signing and device verification for current integration; no active replacement Live Activity |
+| Data and delivery | Local persisted stores, original-import archive, versioned migrations, development builds | Complete backup/restore, app lock/encryption decisions, private standalone builds and update recovery |
 
-## Purpose
+The baseline reports **204 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
 
-This roadmap turns four product goals into a staged plan:
+## 3. Priorities, effort and sequence
 
-1. Learn from other gas-finding apps and improve GasFinder.
-2. Test GasFinder on a physical phone and bring gas data online.
-3. Explore useful money-management features, including support for reducing impulse online purchases.
-4. Give users a clear, trustworthy view of money saved and contributions made.
+- **P0:** data loss, incorrect balances/duplicates, an unusable installed app, or a broken core handoff.
+- **P1:** a main daily task that is confusing, repetitive or unnecessarily difficult.
+- **P2:** useful convenience, better insight or broader coverage after the foundations work.
+- **Optional:** a new cost, infrastructure commitment or change in personal-use scope.
 
-The roadmap prioritizes learning and safe testing before connecting accounts or handling real money. It is a product direction, not a promise that every idea is technically available on every platform.
+Effort is relative: **S** = contained change; **M** = one feature across UI/state/tests; **L** = migration, native integration or several connected workflows; **Spike** = resolve feasibility before estimating implementation. These are not promised dates. Ship one coherent batch at a time; do not begin every workstream together.
 
-## Where the app is today
+| Milestone | Outcome | Main work | Priority / size | Completion gate |
+| --- | --- | --- | --- | --- |
+| M0 — Dependable personal installation | The installed app and your data survive ordinary use | Device smoke tests, versioned backup/restore, a private bundled build and update plan | P0 / L | Cold launch without Metro; restore and repeat import preserve totals |
+| M1 — Simpler daily actions | Core tasks stop hiding behind unrelated screens | Goal money controls, universal settings, samples/snooze, Gas layout | P1 / M | Main tasks work at small width with clear save/cancel behavior |
+| M2 — Complete account workflow | Each displayed amount can be traced and corrected | Canonical transaction model, import history/archives, bank coverage and automation polish | P0–P1 / L | Duplicate/reversal/balance scenarios reconcile and failed saves recover |
+| M3 — Useful subscriptions | Renewals and cancellation follow-through require less work | Cost summaries, billing destinations, alert review and reminder permission state | P1 / M | Real subscriptions stay distinct from samples; review and reminders persist |
+| M4 — Useful personal gas data | Nearby and route results work with or without GPS | Manual search, favorites, one report flow, reviewed receipt OCR, route improvements | P1–P2 / L | A real refuel can become a linked price/receipt without repeated entry |
+| M5 — Less manual capture | Repeated imports and eligible purchases become easier | Folder/batch statements, Wallet setup/health, scheduled user prompts | P1–P2 / M–L | No unseen duplicates, silent balance replacement or false automation status |
+| M6 — Convenience surfaces | Proven core data appears where it is useful | Widgets, checkout coverage/package handoff, reliable Amazon lookup/share | P2 / M–L | Each supported surface is verified on its actual device/browser |
+| M7 — Personal insights | Trends explain decisions without inventing savings | Spending/subscription/fuel summaries, optional simple budgets and forecasts | P2 / M | Every figure traces to records and states its assumptions |
+| M8 — Optional expansion | Add only integrations you will actually use | Multiple accounts/goals, private sync, external data or richer trip support | Optional / Spike–L | Explicit need, tested data ownership and acceptable ongoing cost |
 
-GasFinder is an Expo/React Native mobile app with separate gas and savings-goal screens. The gas finder uses free OpenStreetMap station lookup, local price reports, and an optional labeled sample API. It has a map/list view and trip planning with saved cars and successive fuel stops. Savings goals use manually logged purchases and the on-device savings pocket; the previous simulated investing ledger remains in a read-only archive. The local prototype also includes an optional online-purchase cooling-off planner. It does not connect to a bank, Venmo, card, or brokerage; detect real transactions; transfer funds; or execute trades.
+```mermaid
+flowchart TD
+  M0["M0: installation and recovery"] --> M1["M1: simpler daily actions"]
+  M0 --> M2["M2: account and import integrity"]
+  M1 --> M3["M3: subscriptions"]
+  M2 --> M3
+  M1 --> M4["M4: personal gas workflow"]
+  M2 --> M5["M5: less manual capture"]
+  M1 --> M6["M6: widgets, checkout and Amazon"]
+  M2 --> M6
+  M3 --> M7["M7: personal insights"]
+  M4 --> M7
+  M5 --> M8["M8: optional expansion"]
+  M7 --> M8
+```
 
-That is a useful foundation for testing the experience, but simulated values must remain clearly identified as demo data until backed by a real, reviewed financial integration.
+M0 device checks and M1 reversible UI cleanup can proceed together. Backup/recovery must be available before storage migrations, destructive data tools or account switching. Widget signing is an independent gate; it should not hold up account, subscription or gas improvements.
 
-### Implemented locally so far
+## 4. M0 — Installation, recovery and data protection
 
-- A savings tracker summarizes simulated contributions, current demo balances, and withdrawals, with itemized contribution and withdrawal history.
-- An optional, on-device purchase-pause planner lets users set a 24-hour, 2-day, or 7-day delay and self-report whether they bought or skipped a planned online purchase.
-- The purchase-pause feature does not monitor accounts, intercept checkout, or block transactions. Its skipped-purchase total is an unverified user-reported estimate, not confirmed savings.
-- Both features are persisted locally for the prototype. This does not make the balances real or suitable for financial decisions.
-- The gas screen now separates a labeled Philadelphia sample from an opt-in online backend contract. Online search requires location permission, validates server data, and shows errors without silently substituting samples. A provider and backend are still required before live fuel prices are available.
-- Gas also offers a free OpenStreetMap map/list view (map by default), progressively loaded station markers, and locally reported prices. Saved car profiles supply editable EPA-based MPG and estimated tank capacity. Destination share/paste opens trip planning with percent or gallons left, successive full-refill stops for long drives, and Apple/Google Maps handoff. Active Maps routes cannot be read directly; a missing reachable stop marks the trip incomplete. Setup and limitations are in `docs/ON_ROUTE_GAS.md`.
-- Local ledger entries can be filtered by date and removed with balance-safe corrections; purchase-pause records can be deleted. Physical-phone verification is tracked in `docs/PHONE_SMOKE_TEST.md`.
-- A mobile receipt-report flow now stores a photo and user-confirmed fuel price, fuel type, date, and station address or on-site GPS on the device. It does not extract receipt text or publish prices to other users. Shared prices require an authenticated backend, duplicate checks, moderation, retention rules, and a plan for handling false reports.
-- A separate savings pocket now earmarks part of a manually entered account balance on this device. It is an estimate within the user's existing account; it cannot verify, transfer, or restrict bank funds. This matches the requested no-bank-connection scope.
-- One active savings goal can use all or none of an existing pocket amount, accept confirmed set-asides, and show suggestions based on manually logged purchases and an optional deadline. An optional iPhone widget shows goal progress, with amounts hidden by default. Neither goals nor the widget represent a verified balance or an investment.
-- A local subscription tracker now records monthly or yearly renewal dates and user-entered prices. It prompts for each renewal on the preceding calendar day and can schedule optional local 9 AM notifications. A plan-to-cancel decision is a reminder to act with the provider, not a cancellation or blocked charge.
+### REL-01 · Finish the native acceptance pass · P0 / M
 
-## Amazon links as goals
+Use the current iPhone as the primary device. Keep Android builds compatible and test them when an Android device is available; browser previews support development but cannot prove native behavior.
 
-The paste → automatic product name/full USD price → editable preview → confirmed goal flow is implemented for public Amazon pages. Direct product links and a.co redirects are validated; blocked or unclear prices offer retry/manual entry. Existing deadline, savings rule and pocket assignment controls are reused. Native reads the page in a temporary WebView; production web requires the exported API server. The live server check returned an Amazon service error; real iPhone/Android extraction still needs verification. Images and an optional shared-page helper remain future work. Implementation status and acceptance checks are in [Amazon goals plan](docs/AMAZON_GOALS_PLAN.md).
+- Test Citizens Share/Download and the shortcut with the app closed, open and backgrounded; both balance choices; old/repeated/no-activity PDFs; warnings and account mismatches.
+- Test real Wallet automation setup and an eligible purchase; repeat the handoff without another charge/contribution.
+- Test reboot, offline launch, file-picker cancellation, interrupted archive writes, large PDFs, keyboard movement, safe areas and accessibility text.
+- Verify subscription app launching, notification permission changes, native map gestures and Maps trip handoff.
+- Record build/OS, outcome and remaining limitations in one short verification log. Browser/module simulation must not be labeled native verification.
 
-## Product principles
+**Done when:** each supported core task works on the installed phone, failures retain recoverable drafts, and remaining optional capability gates are visible in Settings.
 
-- **Solve demonstrated user problems.** Use competitor research as evidence gathering, not as a reason to copy a product.
-- **Be explicit about data quality.** Show whether prices are current, approximate, stale, or unavailable.
-- **Ask before moving money.** Explain the amount, destination, and timing before any real transfer or investment.
-- **Separate estimates from money.** A spending estimate, a pending contribution, cash held by a partner, and an investment’s market value are not interchangeable.
-- **Make money features optional and controllable.** Users should be able to configure, pause, cancel, export, and understand them.
-- **Use appropriate safeguards.** Provider approval, security, privacy, customer support, and legal/compliance review are release gates for real financial activity.
+### DATA-01 · Complete portable backup and restore · P0 / L
 
-## Roadmap overview
+Add Settings → Data → Back up / Restore. Start with a complete versioned backup, not cloud synchronization.
 
-| Priority | Workstream | Outcome |
-|---|---|---|
-| 1 | Competitor research and product discovery | Evidence-backed list of gas-finder problems and opportunities |
-| 2 | Phone testing and experience quality | A repeatable real-device test process and a stable mobile demo |
-| 3 | Online gas information | Reliable, licensed station and price data for a defined launch area |
-| 4 | Savings tracker | A reconciliable record of contributions, balances, and withdrawals |
-| 5 | Online-purchase guardrails | Optional tools that help users pause or budget discretionary spending |
-| 6 | Real financial connections | A carefully selected, consent-based route to transaction data and, separately, money movement or investing |
+- Include linked account identity/namespace, balance snapshots and baseline IDs, transactions, purchase links/import keys, corrections/hidden rows, set-asides, goals/archives/rules, subscriptions/reviews/dismissals, cars, reports and preferences.
+- Offer original PDFs/CSVs and receipt photos as an attachment option; show size/counts. A records-only backup must clearly say originals/photos are excluded.
+- Use an encrypted portable backup for financial records and attachments, with established cryptography and a recovery/password design. Keep portable backup recovery separate from a key tied only to the current device.
+- Restore into temporary storage, validate schema and file checksums, show counts and affected data, then explicitly replace app data. Keep a rollback copy until the restored state passes validation. Merging two backups is later work.
+- Reject corrupted/newer unsupported backups and wrong passwords without altering existing records. Re-importing a statement after restore must still deduplicate.
+- Preserve reminder preference as an intention, but recheck device permission and reschedule only under the applicable user settings. Do not restore another device's permission or capability detection as fact.
+- Save through the system file/share flow so you can choose Files/iCloud Drive or another destination. Remind about backups in-app; do not silently upload originals.
 
-Workstreams 1 and 2 can begin with the current demo. Online gas data, the savings tracker, and purchase guardrails can be explored independently. Real financial integrations depend on selecting providers and completing the required product, legal, security, and operational reviews.
+**Done when:** a backup restored into a separate test installation reproduces balances, links, goals, subscription choices and selected attachments; a failed restore leaves the previous installation intact.
 
----
+### DATA-02 · Privacy controls and local storage · P1 / M; migration L if justified
 
-## 1. Research gas apps and improve GasFinder
+- Add optional biometric/passcode app lock, configurable relock timing and a privacy screen in the app switcher. Widget amounts remain separately opt-in.
+- Explain where originals/photos live, what is exported and how to delete app-owned data. Separate financial-data deletion from deleting a source file or hiding a timeline row.
+- Keep bank text, account identifiers, exact locations, filenames and receipt details out of ordinary logs, crash reports and screenshots committed to Git.
+- Review OS file protection and temporary-file cleanup. An app lock alone does not encrypt stored records.
+- Keep the current Zustand storage while it is sufficient. Introduce a repository layer first; evaluate SQLite for atomic writes, query performance and audit history when measurements/data needs justify migration.
+- Evaluate native SQLCipher encryption and key storage as a deliberate migration; do not store a complete ledger in a small secret store. Web storage needs its own tested strategy. Expo documents native SQLCipher support and cautions that SQLite web support is alpha. [SQLite SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/sqlite/), [SecureStore SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/securestore/).
 
-### Goal
+**Done when:** locking/privacy states are honest, deletion targets are explicit, recovery works, and any storage migration retains all source identities and accounting totals.
 
-Find specific problems people encounter when locating fuel, comparing prices, and deciding where to stop. Turn validated findings into original improvements to GasFinder.
+### REL-02 · Private builds and updates · P0 / M
 
-### Activities
+Build a personal-use installation process; details are in section 13. Keep the same bundle/application ID across compatible updates to preserve data, and back up before changing signing identity, native capabilities or storage. Display app/build/runtime version in Settings and keep a known-good build available.
 
-1. Select a small set of relevant gas-price, navigation, and fuel-rewards apps.
-2. Review publicly available app-store descriptions, release notes, ratings, and user reviews. Test apps directly where access is available.
-3. Organize observations by user task, such as:
-   - Finding stations near the user's current location or along a route.
-   - Comparing prices by fuel type and understanding how recently a price was reported.
-   - Filtering stations by distance, amenities, hours, and accessibility.
-   - Getting directions and recovering from missing or inaccurate data.
-   - Understanding rewards, discounts, and any conditions attached to them.
-4. Maintain an opportunity log with:
-   - Source and date reviewed.
-   - User problem and evidence (including counterexamples).
-   - Who is affected and how often it may occur.
-   - Proposed GasFinder response and its differentiation.
-   - Data, privacy, platform, and maintenance dependencies.
-   - A low-cost way to test whether the fix helps.
-5. Prioritize using user impact, strength of evidence, confidence, implementation/operational cost, and risk.
-6. Revisit priorities as new reviews, usage observations, or user interviews add evidence.
+## 5. M1 — Simplify the daily interface
 
-### Deliverables
+### UX-01 · Direct goal money actions · P1 / M
 
-- A competitor and user-problem inventory.
-- A ranked opportunity backlog with supporting evidence.
-- A short product brief for each approved improvement, including acceptance criteria.
+- Add **Add money** and **Adjust savings** outside Edit goal. Choose the destination explicitly: active goal or unassigned set-aside.
+- Keep Edit goal for name, target, deadline and rule. Editing a draft and performing an immediate accounting action must not share an ambiguous Save/Cancel boundary.
+- Reuse one purchase-logging form from Transactions and any deliberate shortcut entry points.
+- Show available money and the exact expected set-aside change before confirmation. Lowering a goal's savings and deleting the goal are different actions.
+- Preserve saved contributions when editing/deleting a purchase unless an explicit separate adjustment is chosen.
 
-### Acceptance criteria
+**Done when:** common contribution/adjustment tasks take no more than two actions to reach their form, Cancel has predictable behavior, and no new form bypasses balance/rule limits.
 
-- The leading opportunities cite specific evidence and are not based only on a competitor feature existing.
-- Each proposed improvement has a testable user outcome.
-- Research records sources and distinguishes observation from interpretation.
-- No proprietary text, visual assets, or distinctive interface expression is copied.
+### UX-02 · Universal settings and consistent names · P1 / S–M
 
-### Decision gate
+- Remove the extra Goals gear; move global suggestion/widget preferences into universal Settings.
+- Use a named goal menu for finish/archive/delete. Keep goal-specific rule controls in the goal editor.
+- Make the tab and page title agree on Goals. Move read-only investing/demo history to Settings → Data → Legacy records without deleting it.
+- Reuse shared buttons, validation messages, sheets and destructive confirmation patterns. Preserve inline subscription deletion confirmation.
+- Add an optional short setup checklist: first statement, first goal, optional car, optional reminders/automation. Completed or skipped items stay dismissed.
+- Add dark mode and broader appearance polish after the shared components are consistent; respect system accessibility settings throughout.
 
-Do not commit to a feature solely because it appears in another app. Confirm that the underlying user problem fits GasFinder's intended audience and can be addressed sustainably with available data.
+**Done when:** each main page has one gear, no duplicate primary import/log-purchase actions appear, and equivalent actions have consistent labels and behavior.
 
----
+### UX-03 · Samples and renewal interruptions · P1 / M
 
-## 2. Test on a physical phone
+- Introduce explicit **Test subscriptions** mode in Settings. Samples remain editable/resettable and clearly labeled.
+- Exclude sample costs, bank alerts and phone reminders from normal mode. In test mode show which behaviors are simulated.
+- Replace repeated full-screen interruption with a renewal banner/list that opens review. Persist a snooze until tomorrow, a chosen time, or the next relevant renewal.
+- Keep Keep / Plan to cancel / I canceled it distinct. Foregrounding, navigation and restart must not reset the snooze.
 
-### Goal
+**Done when:** samples can still exercise the feature, while normal use is not repeatedly interrupted by invented renewals.
 
-Make the current prototype dependable to install and use on a real phone before relying on it for online data or financial workflows.
+### UX-04 · Gas controls where they are needed · P1 / S–M
 
-### Activities
+- Show location/search state above the map, with fuel/radius/price-only controls adjacent to it.
+- Compact My cars into selected car + Manage; expand vehicle details only when planning or editing.
+- Show useful loading, denied-location, empty-price and offline states in the first viewport.
+- Preserve map/list selection, report/trip actions below the map and the requested map style.
 
-1. Confirm the target platforms and devices (initially Android, iOS, or both) and define the minimum supported OS versions.
-2. Create and install the appropriate Expo development build on the target phone. Use a development build when Expo Go does not include a required native module.
-3. Test the current local-data experience:
-   - First launch, reload, and app restart.
-   - Location permission granted, denied, unavailable, and later changed in Settings.
-   - Gas-to-investing navigation and return navigation.
-   - Small and large screens, text scaling, keyboard appearance, and touch target sizes.
-   - Investment settings, persisted demo state, and transaction consent flow.
-   - Slow/no connectivity and readable loading, empty, and error states.
-4. Record OS/device, steps, expected and actual result, severity, and a screen recording or screenshot when useful.
-5. Keep a smoke-test checklist for each build and retest fixes on affected platforms.
-6. Use only sample/test data for mobile UI testing. Do not use real payment credentials or customer funds in a prototype.
+**Done when:** the initial screen explains why there are no results and provides a working next action without scrolling past unrelated cards.
 
-### Deliverables
+## 6. M2 — Account, ledger and import completeness
 
-- A defined device/platform support matrix.
-- A repeatable phone-install and smoke-test guide.
-- A prioritized device-issue backlog and regression checklist.
+### ACC-01 · One authoritative record model · P0 / L
 
-### Acceptance criteria
+The UI currently combines bank movements, local purchases and savings entries. Consolidate their relationship through a transaction repository before adding more ways to ingest data.
 
-- The app installs and opens on every agreed target test device.
-- Core gas and investing navigation works after reload and restart.
-- Permission denial does not strand the user or misrepresent the default test location.
-- Text, buttons, inputs, and confirmation steps remain usable on small screens and with accessibility settings.
-- Critical issues found during smoke testing are resolved or explicitly documented before the next release step.
+- Keep raw imported evidence immutable. Store corrected direction, merchant name/category, matching decisions and visibility separately.
+- Record stable transaction/account/source IDs, source-file/page references, transaction date, posting date when known, status and relationship to a local purchase. Preserve all existing IDs/aliases during migration.
+- Represent refunds, reversals and transfers explicitly when evidence allows. An incoming transfer is a bank credit but is not income earned or avoided spending.
+- Keep confirmed bank snapshots separate from estimates. Every estimate should explain which newer movements it includes, pending exclusions and missing coverage.
+- Handle pending-to-posted changes, changed descriptions, overlapping files, one-to-one app matches and repeated equal charges. Ambiguous matches get review, not automatic deletion.
+- Track source calendar dates separately from artificial noon timestamps; test daylight saving, time-zone changes and same-day manual checks.
+- Make import records, purchase links and any chosen contributions one recoverable commit. A crash between archiving the original and committing records must be detectable and retryable.
 
----
+**Done when:** no listed ingestion/correction/reversal scenario silently duplicates money or contributions, and the same calculator serves Account, rule caps, summaries and widgets.
 
-## 3. Bring gas information online
+### ACC-02 · Explain freshness and coverage · P1 / M
 
-### Goal
+- Show last successful statement period/import and which period remains uncovered. Add a gentle statement reminder, based on a configurable cadence rather than claiming Citizens has a new PDF.
+- Offer **Why this amount?**: confirmed balance, newer deposits/spending, pending exclusions and set-asides.
+- Add user-controlled merchant aliases and categories without changing duplicate identity.
+- Expand full-history filters with date range, merchant/category and source. Preserve source descriptions in details/search and the bottom full-history entry point.
+- Explain **Remove from history** as hiding. Put permanent app-record removal/reset in Data with its impact on estimates, duplicates and future reimports shown before confirmation; offer recovery where practical.
+- Add reconciliation review for uncertain matches and corrections, with an audit history and an undo path.
 
-Replace or supplement sample station records with a dependable online source for real station locations and, if available, fuel prices.
+**Done when:** you can trace a balance, understand missing activity and correct a displayed transaction without rewriting its bank evidence.
 
-### Activities
+### IMP-01 · Archive management · P1 / M
 
-1. Treat station locations and fuel prices as separate data needs; a location database may not provide prices.
-2. Evaluate candidate providers for:
-   - Geographic coverage and accuracy in the intended initial area.
-   - Price freshness, source, reporting process, and update frequency.
-   - Permitted use, attribution, retention, and redistribution.
-   - Free-tier limits, pricing at expected usage, rate limits, and service guarantees.
-   - Whether the provider supports mobile-app display and the planned commercial model.
-3. Select one initial geography and define what qualifies as a usable result there.
-4. Define the mobile-to-backend API contract. Keep private provider credentials on the backend, not in the mobile bundle.
-5. Add caching, request limits, monitoring, data validation, and clear handling for provider timeouts or missing prices.
-6. Preserve a clearly labeled local demo mode so product work and testing can continue when the service is unavailable.
-7. Show source and freshness for prices; never present missing or stale data as current.
+- Add rename, search/sort, statement-period display, file size, reconciliation status and import outcome to Saved imports.
+- Open the original from transaction details and the transactions associated with a saved import.
+- Support deleting an archived original independently of imported records; say that explicitly. Offer recoverable trash or export before permanent removal.
+- Detect missing/corrupt originals and provide reselect/relink recovery without another financial import.
+- Bulk export selected originals. Preserve content-based duplicate protection even if filenames change.
 
-### Deliverables
+**Done when:** originals are easy to find/manage and no file-only action unexpectedly removes transactions, savings or subscription evidence.
 
-- Provider comparison and documented licensing/attribution decision.
-- Backend/API contract and environment setup guide.
-- Initial geography launch criteria and operational monitoring plan.
-- Online and demo-mode acceptance test cases.
+### IMP-02 · Broader import support · P1–P2 / M per format; OCR Spike/L
 
-### Acceptance criteria
+- Finish Citizens layout/version coverage first: wrapped rows, multiple periods, checks, zero activity, mixed debit/credit headings, account masking and totals unavailable/mismatched.
+- Add parser/version/source provenance so reprocessing can preview proposed repairs without silently replacing corrected records.
+- Add a persistent import report: rows read, excluded reasons, matched charges, totals checks, balance decision and any optional contribution.
+- Add batch PDF/CSV review with per-file status and one reviewed balance choice for a clearly identified candidate. Do not assume the last filename is the newest account balance.
+- Support additional banks or credit cards only when useful and when sample formats are available. Credit-card debt needs a separate model; do not put it into the checking available-money calculation.
+- Treat scanned bank PDF OCR as a separate reviewed mode. OCR must not bypass totals checks or guess ambiguous directions, dates or amounts.
 
-- Station and price records meet defined coverage and freshness thresholds in the selected area.
-- The UI identifies unavailable, stale, and current price information accurately.
-- Provider failure produces a useful error or clearly labeled demo state, not fabricated success.
-- Credentials are not exposed in the client application.
-- Attribution and provider terms are satisfied.
+**Done when:** each supported format has meaningful fixtures and acceptance checks; an unsupported or incomplete file remains a review/error, not a fabricated successful import.
 
-### Decision gate
+### ACC-03 · Account switching and multiple accounts · P2 / M then optional L
 
-Do not switch the app to production online data until the data source's terms permit the intended use and the product has an owner for outages, cost monitoring, and data-quality reports.
+- First provide a deliberate switch-account workflow: backup, explanation of existing history/set-asides, explicit account selection and a reviewed opening snapshot.
+- Until separate balances exist, keep the known different-account PDF guard.
+- Add multiple checking/savings accounts only if needed: per-account snapshots/history, explicit set-aside allocation and internal transfer linking. Never sum two sides of a transfer as new income/spending.
+- Credit cards, cash wallets and liabilities remain distinct optional models.
 
----
+**Done when:** importing a second account cannot overwrite or combine the first account's balance accidentally.
 
-## 4. Build a savings and contribution tracker
+## 7. M3 — Finish subscription management
 
-### Goal
+### SUB-01 · Costs and upcoming renewals · P1 / M
 
-Help users understand what they have contributed, what remains available, and what they have withdrawn—without claiming that simulated contributions or market changes are guaranteed savings.
+- Show next 7/30 days, monthly equivalent and annual total for real active subscriptions. Clearly distinguish an annual charge from its monthly equivalent.
+- Add a calendar/list switch, trial end dates, custom cadence if needed and categories.
+- Let you override a bank-estimated renewal date; record actual posting separately. Do not shift the renewal automatically after a weekend posting delay.
+- Add billing-date/cadence mismatch review alongside existing price-change alerts, with evidence and a user-confirmed update.
+- If forecasting available money after known bills, show it as a separate forecast. A bill is not deducted from the actual estimate until a transaction arrives; a bill reserve must not be counted twice as a set-aside.
 
-### Define the numbers first
+**Done when:** totals exclude samples/canceled items, annual costs are understandable and each forecast exposes its assumptions.
 
-The interface and data model should distinguish:
+### SUB-02 · Cancellation destinations and follow-through · P1 / M
 
-- **Potential contribution:** a proposed amount not yet accepted or transferred.
-- **Authorized contribution:** an amount the user approved, but which may not have settled.
-- **Settled contribution:** a confirmed amount received by the appropriate provider.
-- **Cash balance:** funds held by an identified account provider.
-- **Investment value:** current value reported by a brokerage/custodian and subject to market movement.
-- **Withdrawal or sale proceeds:** a requested, pending, or completed withdrawal/sale.
-- **Avoided spending:** an estimate based on a user-defined counterfactual; it is not the same as cash saved.
+- Add billing channel: Apple, Google Play, provider website or direct provider app. The installed app is not necessarily where the subscription is billed.
+- Maintain verified provider-specific billing links/instructions and a website fallback. Update the supported app catalog based on what you use.
+- Follow Plan to cancel with a due-date reminder, easy retry/open and explicit I canceled it/date entry. Retain/reactivate intentionally; do not infer cancellation from opening the app.
+- Show new charges after a recorded cancellation with posting evidence. Account for later refunds and allow dismissal or correction.
+- Preserve the supported installed-app picker; explain when an app is outside its catalog. iOS URL queries are restricted to declared schemes, with a 50-entry limit for apps linked on/after iOS 15. [Apple canOpenURL](https://developer.apple.com/documentation/uikit/uiapplication/canopenurl%28_%3A%29).
 
-### Activities
+**Done when:** each supported cancellation path opens the correct billing starting point, and cancellation status changes only through an explicit user action or reviewed evidence.
 
-1. Start with an itemized, local/demo ledger and label every demo value.
-2. Show contribution date, purchase or trigger reference, selected rule, calculated amount, destination, and status.
-3. Add clear totals for contributions, withdrawals, and current balance; keep them separate.
-4. Plan for duplicate transaction events, pending-to-posted changes, refunds, reversals, corrections, and provider reconciliation.
-5. Provide a transaction detail view, date filtering, export, and a way to correct or remove user-entered demo data.
-6. When a provider is selected, specify which figures come from the provider and how recently they were refreshed.
+### SUB-03 · Reminders reflect phone permission · P1 / M
 
-### Deliverables
+- In Settings distinguish wanted reminders, permission granted, scheduling success and any disabled/error state.
+- Recheck on foregrounding and after returning from phone Settings; offer an Open settings action when needed.
+- Reschedule after edits, cancellation, restores and time-zone changes without duplicate notifications. Test month ends, leap years and local daylight-saving changes.
+- Persist snooze/review decisions. Remove obsolete scheduled reminders when a subscription is removed/canceled.
 
-- A shared definition of each displayed financial metric.
-- A transaction-ledger data model and screen design.
-- Reconciliation, correction, refund, reversal, export, and deletion behavior.
+**Done when:** an enabled switch never silently implies notifications will arrive when the phone has denied permission or scheduling failed.
 
-### Acceptance criteria
+## 8. M4 — Make gas useful with personal data
 
-- Users can trace every displayed total to itemized activity.
-- Pending, settled, withdrawn, estimated, simulated, and market-valued amounts are not combined ambiguously.
-- Transaction duplicates and reversals do not silently inflate balances.
-- Users can understand where a real balance is held and which provider reports it.
+### GAS-01 · Search without GPS · P1 / M
 
----
+- Add city/ZIP/address or explicit map-area search, with a visible search center and distance measured from it.
+- Keep current location as an option; permission denial must not strand the search.
+- Add **Search this area**, recent search areas and favorite stations. Search only when requested or after a controlled movement, not on every small pan.
+- Cache recent station locations/results with timestamps and show cached/offline status. Keep existing service failover and cancellation behavior.
+- Offline map downloads are not part of the default public tile service: OSM's tile policy prohibits bulk/prefetch offline downloads. Use an explicitly permitted provider if offline basemaps become a requirement. [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/).
 
-## 5. Explore ways to limit unnecessary online purchases
+**Done when:** GPS-denied and offline-result flows show honest results or a usable manual fallback without inventing a current location.
 
-### Goal
+### GAS-02 · One report flow · P1 / M
 
-Offer optional, user-directed tools that help people think before discretionary purchases without secretly monitoring them or implying the app can block payments it does not control.
+- Combine price and receipt reporting: choose a station, fuel, observed date/time and price; attach a receipt optionally.
+- Start from a station pin/card when possible. Search/select the correct station in direct entry; never attach a report by a vague name match alone.
+- Preserve edit/delete and price history. Show cash/card/member-only price qualifiers if supported; do not compare discounted/member prices as ordinary pump prices.
+- Let a complete fuel purchase optionally link to Account or an existing bank charge after review. The current receipt feature is separate; linking must avoid a second transaction when its statement arrives.
+- Check gallons × unit price versus total using an explicit rounding tolerance; retain extra fees/discounts rather than forcing an incorrect equality.
 
-### Start with discovery
+**Done when:** reporting a real refill does not require two overlapping forms and every map price has a deliberate station/fuel/date/source relationship.
 
-- Ask users what they mean by “unnecessary” and which purchase situations they want help with.
-- Learn whether their preferred intervention is a reminder, a budget, a delay, or a spending summary.
-- Identify accessibility needs, false-positive concerns, privacy expectations, and ways the feature could feel judgmental or coercive.
+### GAS-03 · Reviewed receipt OCR · P2 / Spike → L
 
-### Candidate first features
+- Evaluate on-device recognition first: Apple Vision and Android ML Kit are candidate platform components, not dependencies already selected. Native integration/model availability needs an SDK-compatible spike. [Apple text recognition](https://developer.apple.com/documentation/vision/recognizing-text-in-images), [ML Kit text recognition](https://developers.google.com/ml-kit/vision/text-recognition/v2).
+- Prefill station/date/fuel/unit price/gallons/total only when supported by the image. Mark uncertain fields; keep manual input usable.
+- Show a review screen before saving. Distinguish unit price from total, discounts, multiple purchases and card/account numbers.
+- Avoid collecting payment details; support cropping/redaction and clear photo retention/deletion. Recognition failure must keep the photo/draft recoverable.
 
-- **Cooling-off reminder:** user chooses a delay before acting on a planned nonessential purchase.
-- **Intent prompt:** user records what they intend to buy and why, then reviews that note after the chosen delay.
-- **Discretionary budget:** user sets a voluntary period/category limit and receives a progress indicator or warning.
-- **Purchase reflection:** a configurable prompt or reminder before a user goes shopping, without intercepting an external payment.
-- **Spending summary:** opt-in totals and trends based on data the user has explicitly provided or authorized.
+**Done when:** a useful real-receipt sample set reduces typing while uncertain arithmetic or missing fields still require correction. Never claim OCR is verified merely because text was returned.
 
-### Guardrails
+### GAS-04 · Price coverage and quality · P1–P2 / M
 
-- Every feature is opt-in, plainly explained, and easy to pause or disable.
-- The app does not shame users or use dark patterns to steer them toward a financial product.
-- Do not claim to prevent a purchase unless a specific supported integration actually has that capability and the user explicitly enabled it.
-- Minimize transaction data collection and explain retention and deletion behavior.
-- Provide a way to adjust rules and correct incorrect categories or imported transactions.
+- Keep local personal reports as the default. Make favorite-station prices fast to update and show price age on map/list/history.
+- Separate latest, recent, old and unknown values consistently across searches, selected markers, routes and comparisons.
+- Preserve selected fuel, N/A and hide-unpriced behavior; optionally offer a recent-prices-only filter separately from having any saved price.
+- Broader pump-price coverage needs a permitted data source or deliberate shared-report service. OpenStreetMap station locations do not provide universal live prices, and a free complete price feed is not assumed.
+- Any shared backend is optional for this personal app; add it only if sharing is useful. It then needs source labels, correction/deletion, input limits, private credentials and an operating-cost decision.
 
-### Deliverables
+**Done when:** unavailable or old prices cannot masquerade as live bargains, and price coverage limitations are visible.
 
-- User-research summary and selected problem statement.
-- Tested prototype for the most useful low-risk intervention.
-- Privacy/data-minimization plan and user-controlled settings.
+### DRIVE-01 · Better fuel-stop decisions · P2 / M–L
 
-### Acceptance criteria
+- Show estimated fuel needed, range assumptions and the remaining safety margin. MPG/tank capacity remain editable estimates.
+- Use receipts to suggest measured MPG only with enough compatible full-fill data; do not infer accurate MPG from an isolated partial refill.
+- Improve road-access/detour checks using routable approaches where available. Straight-line offset is not proof that an exit/station is reachable.
+- Compare estimated fuel savings with the cost of the detour; label assumptions when prices are old/missing.
+- Add swap/remove stop, preferred/avoid stations, saved destinations and flexible full/partial-refill planning after the base plan is dependable.
+- Keep incomplete-plan warnings and Maps waypoint preservation. Use explicit replan when fuel/destination/stops change.
+- Trip tracking/background location and EV charging are optional later projects, each with a new data/permission design.
 
-- Users can state what each intervention does before enabling it.
-- A user can pause, disable, and edit it without contacting support.
-- Usability testing shows that the feature supports the user's stated goal and does not unexpectedly interfere with payments.
-- Any spending estimate is clearly identified as an estimate.
+**Done when:** the app explains its recommendation and does not mark an uncovered leg complete; real routes and Maps handoffs preserve every chosen stop.
 
-### Decision gate
+## 9. M5 — Reduce repeated capture work
 
-Do not build broad account monitoring or transaction blocking before validating user demand, privacy impact, technical feasibility, and platform/provider terms.
+### AUTO-01 · Citizens share and folder workflow · P1 / M–L
 
----
+- Keep Share → GasFinder Import Statement as the primary path. Show setup health based on an actual received/saved file, not a return from Shortcuts.
+- Add an optional Files shortcut: choose a user-owned statement folder, select the newest unimported candidate(s), then send them to the app. Confirm actual iOS Files/Shortcut permissions and behavior before promising background folder watching.
+- Use parsed statement period/account identity and content fingerprints rather than filename order. Already processed files remain known even when renamed.
+- For batches, review warnings/matches per file and present one clear proposed closing-balance/date choice. A clean shared-file quick import retains the existing explicit balance answer.
+- Add a user-scheduled reminder to get a new statement, with a route to the existing setup/download instructions. It cannot tell whether Citizens has produced a statement without an authorized source.
+- Do not store bank credentials or automate around bank authentication. Unattended Citizens downloading is outside the current implementation; research an authorized connection only if monthly PDFs prove insufficient.
 
-## 6. Explore real account, payment, cash, and investment integrations
+**Done when:** the shortcut/folder path reduces picking steps and never silently imports the wrong account, repeats a contribution or replaces a newer balance.
 
-### Goal
+### AUTO-02 · Wallet capture and duplicate review · P1 / M
 
-Determine which real-money product is feasible, then implement only a user-authorized flow supported by qualified providers and reviewed operational controls.
+- Consolidate shortcut setup/status in Settings; show last successfully received purchase, not a claim that every card purchase is captured.
+- Verify merchant/amount/currency and eligible Transaction-trigger behavior on the actual iPhone.
+- Add a small recent import/error log without sensitive payloads; handle malformed/repeated handoffs and app restart.
+- Offer review for similar-looking purchases; date/amount alone is not proof of a duplicate.
+- Keep manual log and PDF reconciliation as fallbacks for unsupported cards, non-Wallet spending and delayed statements.
 
-### Keep the product choices distinct
+**Done when:** supported captures arrive once, reconcile to bank posting once and remain explainable when capture was unavailable.
 
-These are different capabilities and should not be described as one generic “connect an account” feature:
+### AUTO-03 · Optional routines · P2 / S–M
 
-1. **Transaction visibility:** a provider may share eligible account transactions after they occur.
-2. **Prompt after a transaction:** the app may notify a user after an eligible transaction is posted and ask whether they want to make a separate contribution. The prompt does not change the completed purchase.
-3. **Separate contribution transfer:** moving money requires a supported transfer provider, clear user authorization, limits, and handling for failures/returns.
-4. **Cash holding:** customer money must be held through an appropriately structured financial partner and account arrangement.
-5. **Investing:** brokerage/custody, trade execution, disclosures, and the investment service model must be established with appropriate partners.
-6. **Charging at checkout or issuing a card:** applying an added amount at purchase time requires control of that payment flow or a supported issuing/payment program. Linking an existing account does not provide this power.
+User-invoked shortcuts can later open a gas search, log a purchase, add reviewed goal money, view renewals or begin a backup. Scheduled routines should open a clear action or reminder; they must not perform invisible financial edits. Automating a real transfer is outside scope.
 
-### Activities and gates
+## 10. M6 — Widgets, checkout pause and Amazon convenience
 
-1. Select a single initial flow (for example, read transaction data and ask the user to authorize a separate contribution); document explicitly what it will and will not do.
-2. Evaluate transaction-linking, money-movement, cash-account, or brokerage providers separately. Confirm contract terms, geographic coverage, supported account types, fees, sandbox capability, and production approval process.
-3. Obtain qualified legal/compliance advice for the selected product and launch geography before designing a production funds flow.
-4. Define customer consent, disclosures, eligibility, identity verification, fraud/AML responsibilities, limits, refunds, disputes, error recovery, support escalation, and account closure.
-5. Build all secret-bearing provider calls and webhook processing on a secured backend. The mobile app must not contain secret keys or be trusted as the financial ledger.
-6. Use idempotent transaction processing, audit trails, encryption, access controls, reconciliation, monitoring, and incident response.
-7. Test in provider sandboxes, then with explicitly authorized internal/test accounts and small controlled transfers after all prerequisites are satisfied.
-8. Prepare customer support and operational procedures before any production pilot.
+### WID-01 · Finish Account and Goal widgets · P2 / M, signing gate
 
-### Deliverables
+- First verify the existing Account/Goal widget integration in a compatible signed build.
+- Use the same account calculator, snapshot date and goal totals as the app. Keep amount visibility opt-in; explain that widgets can lag and are not a live bank feed.
+- Tap through to the appropriate account/goal action. Test gallery sizes, locked-device privacy, disabled amounts, corrections, restore and widget removal.
+- Future subscription widgets can show the next real renewal; gas widgets should use a chosen/favorite station rather than silently requesting background location.
+- SDK 57's `expo-widgets` supports iOS widgets/Live Activities, requires a development/native build, and uses an App Group for widget data. Android widgets are a separate implementation, not something this package currently provides. [Expo Widgets SDK 57](https://docs.expo.dev/versions/v57.0.0/sdk/widgets/).
 
-- Written product-flow decision and alternatives considered.
-- Provider shortlist and partner requirements.
-- Counsel-reviewed compliance and responsibility map for the chosen structure.
-- Backend security, data-retention, reconciliation, and incident-response plans.
-- Sandbox test plan and production go/no-go checklist.
+**Done when:** displayed numbers and privacy behavior match the app on the actual supported phone, including after an update.
 
-### Acceptance criteria
+### WID-02 · Choose a useful Live Activity · Optional / Spike → M–L
 
-- The data provider's access scope and customer authorization are clearly represented in the app.
-- A transaction feed is not treated as permission to debit an account.
-- Each transfer or investment action has an explicit, auditable authorization basis and understandable amount/destination/timing.
-- Duplicates, pending transactions, refunds, reversals, failed transfers, and provider outages are covered by tests and operational procedures.
-- Provider, legal/compliance, security, customer-support, and operations approvals are documented before production funds are involved.
+The old purchase-waiting-list activity is retired. Do not bring the waiting list back to satisfy this item. Evaluate a bounded activity such as a user-started checkout pause countdown or active fuel-stop trip. First establish a reliable data connection to that event; no indefinite “live balance” activity based on monthly PDFs. Handle start/end, stale state, restart and privacy before shipping. Background/push updating is a separate capability decision.
 
-### Non-negotiable release gate
+### PAUSE-01 · Verify browsing versus checkout · P1 / M
 
-No real customer funds, live withdrawals, custody, or trades in a prototype. Sandbox success alone is not approval to launch. A production pilot requires documented partner approval, counsel-led review, customer disclosures/consent, verified operational controls, and a rollback/incident plan.
+- Test selected shops on Safari iPhone and desktop Chrome, including checkout redirects, embedded payment requests, expiry, manual Resume, disabled extension and browser restart.
+- Keep product browsing/carts available. Provide a controlled override for false positives, with visible supported coverage and remaining gaps.
+- Surface **extension installed/enabled** separately from **a pause is active**. The current app/browser storage does not synchronize that state; add active-state reporting only after a feasible bridge is established.
+- Maintain a small supported-shop rule catalog and a repeatable update/coverage test. Test without completing a real payment.
 
----
+**Done when:** selected tested routes pause and ordinary browsing works, with no promise of universal payment prevention.
 
-## Cross-cutting work
+### PAUSE-02 · Easy private desktop installation · P2 / M
 
-### Privacy and security
+- Provide a ZIP and clear Load unpacked instructions for the built desktop Chrome extension, with version and update steps. It can remain privately installed without a Chrome Web Store release.
+- Add a useful handoff from phone setup to the computer, without transmitting bank records.
+- Explain phone coverage before setup. Chrome's phone installation instructions use **Add to Desktop**; they do not install this extension in phone Chrome. A phone Chrome blocker is a separate feasibility question. [Chrome extension installation](https://support.google.com/chrome_webstore/answer/2664769?hl=en).
 
-- Inventory the data collected (location, transaction metadata, account identifiers, and app preferences).
-- Collect only data required for the chosen feature and define retention/deletion behavior.
-- Keep secrets server-side; use secure transport, appropriate storage, and restricted staff access.
-- Explain account permissions and provide revocation and account-disconnection paths.
+**Done when:** you can install/update the package on the intended computer without finding a development directory, and the phone UI does not imply unsupported coverage.
 
-### Quality and release process
+### AMZ-01 · Prove live Amazon lookup first · P1 / M
 
-- Keep unit/logic tests for contribution calculations, caps, rounding increments, refunds, and balance transitions.
-- Run phone smoke tests for each meaningful build.
-- Maintain clear demo versus production configurations.
-- Monitor crashes, API availability, data quality, and user-reported issues without logging sensitive financial data unnecessarily.
+- Verify current direct/a.co links on the actual phone: selected product/variant, full USD price, sale price and partial/blocked results.
+- Keep manual fallback, cancel/timeout handling and provenance. Tax/shipping can be user-entered target adjustments, not guessed product prices.
+- Recheck an existing goal's price only on request, show old/new values and ask before changing its target; never silently reduce saved money.
+- Maintain representative extraction fixtures and investigate changed markup without bypassing login/CAPTCHA or access restrictions.
 
-### Product measures
+**Done when:** the tested public pages autofill correctly or offer an honest usable fallback; saved targets only change after review.
 
-Establish baselines before setting numeric targets. Candidate measures include:
+### AMZ-02 · Share and image convenience · P2 / M
 
-- Station search success and price freshness/coverage in the launch area.
-- Time to complete common gas-finding tasks.
-- App stability and critical device-specific defect rate.
-- Savings-ledger reconciliation success and understanding of displayed amounts.
-- Opt-in, continued use, pause/disable rates, and user-reported usefulness of spending guardrails.
-- For a future financial pilot: transaction match/reversal accuracy, transfer success/failure handling, support contacts, and consent comprehension.
+- Accept an explicitly shared product link into the same reviewed goal draft.
+- Add a product image only with reliable permitted sourcing and cache/size limits; it is optional decoration, not a prerequisite to a goal.
+- Consider a shared-page helper if public lookup consistently fails. Keep it explicit and separate from checkout pause permissions.
+- Wish lists, multiple product goals and price alerts depend on multi-goal design and reliable data; they are not a reason to add background scraping now.
 
-Do not optimize for the amount of money collected or invested without also measuring user understanding, control, errors, and complaints.
+## 11. M7 — Personal insights, after the data is trustworthy
 
-## Suggested next actions
+### INS-01 · Simple spending and subscription views · P2 / M
 
-1. Start the competitor opportunity log and choose the first gas apps/tasks to review.
-2. Confirm phone platforms/devices and complete a local-demo install and smoke test.
-3. Pick an initial online-data geography, then compare station and fuel-price sources and their terms.
-4. Define the savings metrics and ledger statuses before expanding the finance dashboard.
-5. Interview users about impulse-purchase situations and test a reversible reminder/budget concept.
-6. Only after product direction is clear, shortlist financial partners and begin counsel-led feasibility review; keep all financial testing in sandboxes until production gates are met.
+- Spending by period/merchant/category, income and transfers separated, real subscription totals and covered-date ranges.
+- Optional voluntary category budgets with editable classifications; missing statements produce a coverage warning rather than an apparently complete month.
+- Upcoming-bill forecast with chosen assumptions and no double deduction from actual account activity or reserves.
+- Show confirmed contributions to goals separately from avoided spending. A paused or skipped purchase is not proven cash saved.
+- Export transaction CSV and readable summaries with consistent cents/date semantics, source labels and sample exclusion.
 
-## Open decisions
+### INS-02 · Fuel and car costs · P2 / M
 
-- Which mobile platform and phone models are the first supported test targets?
-- Which city or region should be used for online gas-data evaluation?
-- Is the first financial goal transaction visibility, a user-approved transfer, cash savings, or brokerage investment?
-- Should online-spending support focus on budgets, cooling-off reminders, or another user-validated behavior?
-- Which privacy, retention, and account-deletion expectations should be product defaults?
+- Fuel spend, gallons, price history, per-car totals and measured MPG when sufficient data exists.
+- Explain whether a chart covers recorded receipts or all known fuel charges; linking receipts to bank charges must not double-count cost.
+- Optional reminders for a frequent station's aging price or a chosen refill routine; no background tracking by default.
+
+**Done when:** totals reconcile to the selected underlying rows, forecasts are labeled, and empty/incomplete data is understandable. Start with a few useful charts; do not build a general finance dashboard before these views help you.
+
+## 12. M8 — Optional expansion and explicit boundaries
+
+| Candidate | Build only when | Prerequisite / likely cost |
+| --- | --- | --- |
+| Multiple active goals | One goal is restrictive in real use | Explicit allocation of set-asides; contributions/refunds cannot count in two goals |
+| Multiple checking/savings accounts | You need both balances day to day | ACC-03, per-account baselines, transfer pairing and cross-account rule policy |
+| Private multi-device sync | Manual backups are insufficient | Complete restore format, conflict resolution, encryption/key recovery and a chosen private hosting/cloud approach |
+| Read-only authorized bank feed | PDFs/Wallet capture cannot supply needed timeliness | Provider availability, access/cost review, explicit account authorization and reconciliation with imported history |
+| Shared gas reports or a licensed price feed | Personal reports do not cover useful stations | Permitted sourcing, endpoint limits, correction/deletion, attribution and ongoing operating budget |
+| Additional banks, credit cards or currencies | You actually use them | Real sample layouts; separate liability and FX/date/precision models |
+| Active trip tracking / EV charging | You need more than manual fuel-stop planning | New permission/battery model and dependable road/charger data |
+| Desktop/web companion | Bigger-screen review is useful | Storage portability, authenticated access if hosted, and server deployment for existing web API routes |
+
+Do not include an App Store launch, store screenshots/ASO, advertising, subscriptions to this app, public acquisition analytics, multi-tenant accounts or enterprise distribution in the main plan. TestFlight is not a required milestone. Real transfers, card freezes, custody, brokerage/investing and automatic provider cancellation are outside the present product direction. The earlier roadmap's investing/real-money service tracks are superseded; retain legacy records without expanding those services.
+
+## 13. Personal installation and update strategy
+
+### Choose a path without making publication a dependency
+
+| Path | Intended use | Constraint / decision |
+| --- | --- | --- |
+| Existing free Apple Personal Team | Continue private iPhone development and short testing cycles | Apple documents seven-day provisioning expiration and rebuild/reinstall after expiry; include backup and refresh instructions. [Apple Personal Team](https://developer.apple.com/help/account/basics/about-your-developer-account) |
+| Enrolled Apple Developer Program + private build | Optional route for private iPhone builds/capabilities | EAS ad hoc iOS distribution requires paid membership and registered devices; App Store publication is not required. [Expo internal distribution](https://docs.expo.dev/build/internal-distribution/) |
+| Android private APK | Use on an Android phone if needed | APKs can be installed directly; retain signing keys for compatible updates. No Play Store submission is needed. [Expo internal distribution](https://docs.expo.dev/build/internal-distribution/) |
+| Browser preview/optional private companion | Development and larger-screen review | Not a substitute for iPhone native extensions, Wallet, installed-app detection or widgets |
+
+Apple currently lists Developer Program membership at **US$99 per membership year** or local currency where available. This is optional spending, not a recommendation to enroll immediately. Confirm current fees/capabilities before choosing that track. [Apple membership details](https://developer.apple.com/programs/whats-included/).
+
+The repository currently disables widget/App Group and enrolled-team share capabilities unless `EXPO_ENABLE_IOS_CAPABILITIES=1`. Keep the free build working. The current widgets require a compatible enrolled-team build; changing an environment flag alone does not add them to an installed binary.
+
+### REL-03 · Make the app usable away from Metro · P0 / M
+
+- Preserve a development build for coding and add a private release/internal build with its JavaScript/assets bundled. Verify cold launch with the computer off.
+- Configure development, personal-preview and personal-stable build profiles; `eas.json` is not currently configured. Use EAS for enrolled-team cloud builds, preserving the existing free-team local workflow where necessary.
+- Keep a simple capability matrix in Settings/build notes: file opening, Safari extension, widgets, direct share extension and reminders. Local reminders and remote push are different capabilities; do not make a personal reminder depend on a push backend.
+- Prefer local notification scheduling for renewals. Add remote push only for a demonstrated feature requiring it.
+- Keep signed extension/shortcut assets versioned with their source and verify they match; an app update should not require redoing every setup step.
+
+### REL-04 · Optional OTA updates with recovery · P1 / M
+
+- Add `expo-updates`/EAS Update only after stable private installation and backup are established; this repository does not currently include `expo-updates`.
+- Separate preview/stable channels, track build/runtime/schema version and retain rollback instructions.
+- Only ship JavaScript/assets compatible with the installed native runtime. New modules, widgets, extension/query configuration and other native changes require a new binary. OTA does not renew expired iPhone provisioning. [Expo runtime compatibility](https://docs.expo.dev/eas-update/runtime-versions/).
+- Preview each update with synthetic data and a restored copy, then promote deliberately. Backup before an irreversible migration; a bundle rollback alone cannot undo a data-schema migration.
+
+**Done when:** you can install, identify, update and recover a personal build without public distribution or accidental data reset.
+
+## 14. Technical practices that support the roadmap
+
+- Keep Expo SDK 57/API docs as the current reference; reassess matching version docs on every SDK upgrade. Use Expo Router for navigation and CNG/config plugins for native behavior. [Expo versioned docs](https://docs.expo.dev/versions/v57.0.0/), [Expo documentation index](https://docs.expo.dev/llms.txt).
+- Prefer shared domain calculators/selectors for balances, reserves, subscription evidence and gas freshness. Screen components should not invent their own financial totals.
+- Add source/import/transaction repositories before large migrations or additional integrations. Keep data validation at every file, intent, bridge and network boundary.
+- Keep money in integer cents and fuel unit price precision separate. Enforce currency/amount/date limits; do not guess FX conversions.
+- Use atomic commits or recoverable journals for connected changes; idempotency keys survive cancellation, restore, rename and reimport.
+- Keep bank extraction local. Split expensive PDF/OCR work from the interactive UI, cap file/page/image sizes and expose progress/cancel/retry.
+- Cache and cancel gas/route requests; retain last successful results with age and avoid uncontrolled retries. Free service capacity is finite even for a private app.
+- Preserve accessibility labels, useful touch targets, focus/keyboard behavior, status-bar spacing and text scaling in shared components.
+- Keep diagnostics local and redacted by default. Optional remote crash reporting requires a reviewed payload; never upload bank documents as diagnostics.
+- Keep build artifacts, actual statements, credentials and personal photos out of Git. Keep native output generated, not hand-edited.
+
+### Performance targets to measure, not claim as achieved
+
+Establish a baseline on the actual phone, then target responsive common actions, bounded memory during maximum supported PDF imports, and a smooth virtualized history with roughly 10,000 synthetic movements. No duplicate work on hydration/foregrounding; no idle location polling merely to refresh a widget. Record measured regressions before proposing a large storage/rendering rewrite.
+
+## 15. Acceptance, release and maintenance
+
+### Required gate for an implementation batch
+
+1. Check applicable SDK docs before touching Expo/RN/native APIs.
+2. Run lint and TypeScript; add/run meaningful regression tests for the changed risk.
+3. Export affected platforms for bundling/native-runtime concerns; do not treat export success as device behavior proof.
+4. Use synthetic/redacted fixtures for UI tests and keep original personal files out of the repository.
+5. For native integrations, test the actual phone/browser; for data changes, restore and migrate an older state.
+6. Record what works, remaining gates and whether a native rebuild is needed.
+7. Update this roadmap/current status, commit and push the scoped change. Keep a usable rollback point.
+
+### Permanent regression scenarios
+
+- **Account:** PDF-period spending already in closing balance; later credits/debits; pending transitions; same-day manual checks; linked app charges; reversed/corrected signs; negative available money; clock/time-zone changes.
+- **Duplicates:** same file, renamed file, overlapping files, identical real purchases, posting delays, merchant changes, restored state, hidden records and parser repairs.
+- **Imports:** zero activity, missing entire row/page, checks, multiple periods, partial totals, mismatches, unsupported/encrypted/scanned layouts, different accounts, cancellation and failed storage.
+- **Savings:** fixed/percent/round-up rules, insufficient available money, goal remainder, edit/delete/assign/archive, refunds and independent set-aside adjustments.
+- **Subscriptions:** monthly/annual/custom dates, month ends/leap years, price/cadence changes, samples, durable snooze, cancel/reactivate, denied notifications and returned app/billing links.
+- **Gas/drives:** selected fuel, N/A, old/future timestamps, source precedence, GPS denial, offline cache, wrong-station linking, receipt arithmetic, route gaps, detours and Maps waypoint limits.
+- **Recovery:** interrupted writes, wrong/corrupt backup, older schemas, restores with attachments, device replacement, signing changes and compatible updates.
+- **Convenience:** extension restart/false positives/expiry, widget privacy/staleness, Amazon ambiguity/timeouts and late results from a canceled draft.
+
+### Personal maintenance routine
+
+- On each meaningful build: short phone smoke pass and backup before data/native changes.
+- Periodically: restore a backup in a separate test environment; inspect storage size, missing originals and last import coverage.
+- When bank/site/provider layouts change: update supported fixtures, mappings and checkout/cancellation destinations.
+- On Expo/OS upgrades: check matching docs, config plugins, native modules and signing/capabilities; test before replacing the stable private build.
+- Keep only one current status summary. Put dated verification history below it; remove stale claims such as fake unknown-price placeholders, a current vector map or a supported waiting list.
+
+## 16. Suggested next implementation queue
+
+These are concrete batches, not approval to deploy services or purchase accounts.
+
+| Order | Batch | IDs | Why now |
+| --- | --- | --- | --- |
+| 1 | Native checks + backup/first restore + private bundled installation | REL-01, DATA-01, REL-02, REL-03 | Validate the accounting, protect data and remove Metro dependence |
+| 2 | Direct goal money actions + one universal gear | UX-01, UX-02 | Removes the most confusing daily controls |
+| 3 | Durable renewal snooze + explicit sample mode + permission status | UX-03, SUB-03 | Stops repeated interruptions and misleading reminder settings |
+| 4 | Gas location/error placement + manual area search | UX-04, GAS-01 | Makes Gas usable when GPS is denied or you want another area |
+| 5 | Saved-import management + source-linked transaction details | IMP-01, ACC-02 | Makes existing files/history easier to inspect and recover |
+| 6 | Canonical ledger/recoverable imports | ACC-01, IMP-02 | Foundation for more capture methods and corrections; after restore works |
+| 7 | Subscription cost summaries + billing/cancellation paths | SUB-01, SUB-02 | Completes the practical renewal-management loop |
+| 8 | One gas report flow, reviewed receipt-to-bank linking | GAS-02, GAS-04 | Reduces duplicate typing and improves your own station prices |
+| 9 | Optional update channels and recovery | REL-04 | Reduce repeated rebuilds for compatible JS changes; keep rollback available |
+| 10 | Folder statement shortcut + Wallet health | AUTO-01, AUTO-02 | Reduces monthly and per-purchase capture work without false automation |
+| 11 | Live Amazon/checkout verification and desktop package handoff | AMZ-01, PAUSE-01, PAUSE-02 | Proves existing feature usefulness before expanding coverage |
+| 12 | OCR, richer drive decisions and widgets where supported | GAS-03, DRIVE-01, WID-01 | Add convenience after sources and device capability are verified |
+| 13 | Personal insights; optional expansion only as needed | INS-01, INS-02, M8 | Benefit from reliable data without expanding infrastructure prematurely |
+
+Private standalone installation belongs in M0. If signing/build preparation takes longer, reversible UI batches can continue alongside it; M0 is complete only after cold launch without Metro and recovery pass. Move a concrete P0 defect ahead of this queue. Small reversible UI improvements can ship while a backup/native spike is underway; financial/storage migrations wait for recovery readiness.
+
+DATA-02 privacy/storage work begins with backup design and continues before any storage migration. AUTO-03 routines and AMZ-02 sharing/images can be picked up after their core workflows pass. ACC-03, WID-02 and M8 expansions require their stated need/capability decisions rather than a fixed place in the core queue.
+
+## 17. Decisions to settle when their milestone begins
+
+- Stay with free weekly iPhone reprovisioning, or choose an enrolled membership for private builds/widgets? No App Store submission is part of either plan.
+- Is one bank account/one active goal still enough? If so, skip multiple-account/goal work.
+- Are direct statement sharing and Wallet capture sufficient, or is folder ingestion worth the added setup?
+- Which cancellation providers, stations, cars and routes do you actually use? Expand those first.
+- Should originals/photos be included in every backup, or only selected ones? What recovery/password experience is acceptable?
+- Is a phone-only app sufficient, or is private desktop review/sync worth maintaining?
+- Does a Live Activity solve a recurring task, or are static widgets/reminders enough?
+- Keep GasFinder as the personal name, or choose a broader name once the navigation is settled? Renaming must preserve app identity/data and shortcut links.
+
+No decision here blocks creating this roadmap. Each becomes a small, concrete choice before its dependent implementation.
+
+## 18. Supporting project documents
+
+- [App weaknesses and implementation progress](docs/APP_REVIEW.md)
+- [Current project handoff and historical verification](docs/PROJECT_HANDOFF.md)
+- [Bank imports, balances, archives and subscription evidence](docs/BANK_IMPORT.md)
+- [Citizens sharing and future folder ingestion](docs/CITIZENS_IMPORT_PLAN.md)
+- [Physical phone acceptance checklist](docs/PHONE_SMOKE_TEST.md)
+- [Gas reports and receipts](docs/RECEIPT_REPORTS.md)
+- [Cars, fuel-stop planning and Maps handoff](docs/ON_ROUTE_GAS.md)
+- [Installed subscription app catalog and limits](docs/SUBSCRIPTION_APPS.md)
+- [Checkout extensions and widgets](docs/SPENDING_PAUSE.md)
+- [Amazon goal lookup and verification](docs/AMAZON_GOALS_PLAN.md)
+- [Wallet/transaction automation](docs/PURCHASE_AUTOMATION.md)
+
+Review this roadmap after each milestone. Mark implemented work with its verification evidence, keep optional work optional, and reorder based on what makes the app more useful in your actual daily routine.

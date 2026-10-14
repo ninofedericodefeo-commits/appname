@@ -16,6 +16,10 @@ Verification: lint, TypeScript and all 204 logic tests pass; iOS/Android Hermes 
 
 Remaining audit work: simpler goal money actions and one universal gear, location/filter placement and manual location search, combined receipt reporting/OCR, sample test mode/durable snooze, notification-permission state, archive management and backup/restore, desktop extension handoff, cancellation destinations/cost summaries, and naming cleanup. No native capability or new dependency was added in this batch.
 
+## Future work and private-use scope
+
+The comprehensive [future roadmap](../ROADMAP.md) is the main planning document. The user has confirmed there is no App Store publishing plan. Prioritize personal installation/recovery, daily-flow simplification and the phased feature backlog; optional signing/services/sync remain separate decisions. Native signing and update compatibility still apply. Use the roadmap’s current-baseline section rather than the superseded prototype directions in older notes.
+
 ## Project and working rules
 
 - Workspace: `/Users/nino/Documents/appname`; repository: `ninofedericodefeo-commits/appname`; current branch: `agents/enable-online-functionality`.

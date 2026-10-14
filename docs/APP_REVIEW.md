@@ -1,5 +1,7 @@
 # App review — October 13, 2026
 
+The [future roadmap](../ROADMAP.md) turns this audit and existing feature plans into a phased personal-use backlog, with dependencies and completion gates. App Store publication is outside the plan.
+
 ## Implementation progress — October 13
 
 The first implementation batch addresses the data foundations in findings 1–7:
