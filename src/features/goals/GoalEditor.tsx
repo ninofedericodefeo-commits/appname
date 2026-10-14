@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
@@ -24,15 +24,13 @@ function Choice({ label, selected, onPress }: { label: string; selected: boolean
   </Pressable>;
 }
 
-export default function GoalEditor({ goal, draft, reservedCents, onSave, onCancel, onLowerPocket, children, disabled = false }: {
-  children?: ReactNode;
+export default function GoalEditor({ goal, draft, reservedCents, onSave, onCancel, disabled = false }: {
   goal: Goal | null;
   draft?: AmazonProductDraft;
   disabled?: boolean;
   reservedCents: number;
   onSave: (input: GoalInput, assignAll: boolean) => boolean;
   onCancel?: () => void;
-  onLowerPocket?: (cents: number) => boolean;
 }) {
   const product = goal?.product ?? draft;
   const [title, setTitle] = useState(goal?.title ?? product?.title ?? '');
@@ -47,7 +45,6 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
   const [fixedAmount, setFixedAmount] = useState(currentRule.mode === 'fixed' ? formatAmount(currentRule.cents) : '1.00');
   const [percentAmount, setPercentAmount] = useState(currentRule.mode === 'percent' ? String(currentRule.percent) : '5');
   const [roundIncrement, setRoundIncrement] = useState(currentRule.mode === 'round' ? currentRule.incrementCents : 100);
-  const [lowerAmount, setLowerAmount] = useState('');
   const [error, setError] = useState('');
   const previewCents = parseDollars(target);
 
@@ -68,13 +65,6 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
       setError('Could not save this goal. Please try again.');
       return;
     }
-    setError('');
-  }
-
-  function lowerPocket() {
-    const cents = parseDollars(lowerAmount);
-    if (!onLowerPocket || cents === null || cents <= 0 || !onLowerPocket(cents)) { setError('Enter an amount no greater than the money assigned to this goal.'); return; }
-    setLowerAmount('');
     setError('');
   }
 
@@ -108,11 +98,9 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
     <View style={styles.row}><Choice label="Untimed" selected={!timed} onPress={() => setTimed(false)} /><Choice label="Timed" selected={timed} onPress={() => setTimed(true)} /></View>
     {timed && <><Text style={styles.label}>Target date</Text><CalendarDateField label="Goal target date" value={deadline} onChange={setDeadline} minimumDate={tomorrowKey()} /><Text style={styles.hint}>Choose a future calendar date.</Text></>}
     {!goal && reservedCents > 0 && <><Text style={styles.label}>Existing savings</Text><Text style={styles.hint}>You already have {money(reservedCents)} earmarked. Assigning it changes goal progress, not the amount set aside.</Text><View style={styles.row}><Choice label="Assign none" selected={!assignAll} onPress={() => setAssignAll(false)} /><Choice label="Assign all" selected={assignAll} onPress={() => setAssignAll(true)} /></View></>}
-    {goal && onLowerPocket && <View style={styles.warning}><Text style={styles.section}>Lower savings for this goal</Text><Text style={styles.hint}>Currently assigned: {money(goal.savedCents)}. Lowering it also lowers goal progress. No money moves in your account.</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={lowerAmount} onChangeText={setLowerAmount} placeholder="Amount to remove" keyboardType="decimal-pad" accessibilityLabel="Lower goal savings by" /><Action label="Lower savings" secondary onPress={lowerPocket} disabled={goal.savedCents === 0} /></View></View>}
-    <Text style={styles.hint}>Money stays in your existing account. This app cannot verify your balance, transfer funds, or buy stocks.</Text>
+    <Text style={styles.hint}>Money stays in your bank account. Saving a goal changes its details and the rule for future purchases.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
     <View style={styles.row}><Action label={goal ? 'Save goal' : 'Create goal'} onPress={save} disabled={disabled} />{onCancel && <Action label="Cancel" secondary onPress={onCancel} />}</View>
-    {children}
   </View>;
 }
 

@@ -13,9 +13,10 @@ import CancelSubscriptionButton from './CancelSubscriptionButton';
 import SubscriptionButton from './SubscriptionButton';
 import SubscriptionEditor from './SubscriptionEditor';
 import { subscriptionBankAlerts, subscriptionBankEvidence } from './bankEvidence';
+import { subscriptionsForMode, renewalSnoozeUntil } from './reviewPreferences';
 
 export default function SubscriptionsPanel() {
-  const { subscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, dismissedBankAlerts, dismissBankAlert } = useSubscriptionStore();
+  const { subscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, dismissedBankAlerts, dismissBankAlert, sampleMode, reviewSnoozes, snoozeReviews, resumeReviews } = useSubscriptionStore();
   const { purchases, accountTransactions, transactionDirections, linkedBankAccount } = usePocketStore();
   const evidence = useMemo(() => subscriptionBankEvidence(accountTransactions, purchases, transactionDirections, linkedBankAccount), [accountTransactions, purchases, transactionDirections, linkedBankAccount]);
   const alerts = useMemo(() => subscriptionBankAlerts(evidence, subscriptions, dismissedBankAlerts), [evidence, subscriptions, dismissedBankAlerts]);
@@ -27,10 +28,14 @@ export default function SubscriptionsPanel() {
   const [removeId, setRemoveId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionLimit, setSuggestionLimit] = useState(5);
-  const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(evidence, subscriptions, dismissedBankSuggestions, today) : [], [evidence, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
-  const due = subscriptionsToReviewTomorrow(subscriptions, today);
-  const active = subscriptions.filter(subscription => subscription.active).sort((a, b) => nextRenewal(a, today).getTime() - nextRenewal(b, today).getTime());
-  const inactive = subscriptions.filter(subscription => !subscription.active);
+  const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(evidence, subscriptions.filter(item => !item.isSample), dismissedBankSuggestions, today) : [], [evidence, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
+  const visibleSubscriptions = subscriptionsForMode(subscriptions, sampleMode);
+  const due = subscriptionsToReviewTomorrow(visibleSubscriptions, today);
+  const snoozed = due.filter(({ subscription, renewal }) => renewalSnoozeUntil(subscription, renewal, reviewSnoozes, today));
+  const nextSnoozeEnd = snoozed.length ? new Date(Math.min(...snoozed.map(({ subscription, renewal }) => Date.parse(renewalSnoozeUntil(subscription, renewal, reviewSnoozes, today)!)))) : null;
+  const snoozeEndLabel = nextSnoozeEnd?.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  const active = visibleSubscriptions.filter(subscription => subscription.active).sort((a, b) => nextRenewal(a, today).getTime() - nextRenewal(b, today).getTime());
+  const inactive = visibleSubscriptions.filter(subscription => !subscription.active);
   useEffect(() => {
     const timer = setInterval(() => setToday(new Date()), 60_000);
     const listener = AppState.addEventListener('change', state => { if (state === 'active') setToday(new Date()); });
@@ -64,12 +69,13 @@ export default function SubscriptionsPanel() {
 
   return <View style={styles.content}>
     <View><Text style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Your renewals, all in one place.</Text></View>
+    {sampleMode && <View style={styles.review}><Text style={styles.reviewText}>Test subscriptions are on</Text><Text style={styles.note}>Sample renewals appear here for testing. Phone reminders only include your real subscriptions.</Text><SubscriptionButton label="Manage test mode in Settings" onPress={() => router.push('/settings')} /></View>}
+    {!!due.length && <View style={styles.card}><Text style={styles.sectionTitle}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))}</Text><Text style={styles.note}>{snoozed.length ? `${snoozed.length} review${snoozed.length === 1 ? '' : 's'} snoozed. Next returns ${snoozeEndLabel}. You can still review the cards below.` : 'Review the cards below, or snooze the reminder banner.'}</Text><View style={styles.actions}><SubscriptionButton label="Later · 2h" grow onPress={() => snoozeReviews('two-hours')} /><SubscriptionButton label="Hide for today" grow onPress={() => snoozeReviews('today')} /></View>{!!snoozed.length && <SubscriptionButton label="Show renewal banner again" onPress={resumeReviews} />}</View>}
     {pocketReady && subsReady && alerts.length > 0 && <><Text style={styles.sectionTitle}>Updates from your bank · {alerts.length}</Text>{alerts.map(alert => <View key={alert.id} style={styles.card}>
       <Text style={styles.name}>{alert.subscription.name}</Text><Text style={styles.note}>{alert.kind === 'price-change' ? `A new posted charge was ${formatMoney(alert.charge.amountCents)}. Your saved price is ${formatMoney(alert.subscription.amountCents)}.` : `A ${formatMoney(alert.charge.amountCents)} charge posted after you marked this subscription canceled.`} Posted {new Date(alert.charge.purchasedAt).toLocaleDateString()}.</Text>
       <View style={styles.actions}><SubscriptionButton label={alert.kind === 'price-change' ? 'Review price' : 'Review subscription'} tone="primary" grow onPress={() => setEditor({ subscription: alert.kind === 'price-change' ? { ...alert.subscription, amountCents: alert.charge.amountCents } : alert.subscription })} /><SubscriptionButton label="Dismiss" grow onPress={() => dismissBankAlert(alert.id)} /></View>
     </View>)}</>}
     <View style={styles.heading}><Text style={styles.sectionTitle}>Upcoming · {active.length}</Text><SubscriptionButton label="Add" accessibilityLabel="Add subscription" tone="primary" disabled={!subsReady} onPress={() => setEditor({})} /></View>
-    {!!due.length && <Text style={styles.reviewSummary}>{due.length} renewing tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))} total</Text>}
     {!active.length && <View style={styles.card}><Text style={styles.name}>No upcoming subscriptions</Text><Text style={styles.note}>Add one to keep track of its price and next renewal.</Text></View>}
     {active.map(card)}
     {!!inactive.length && <><Text style={styles.sectionTitle}>Canceled · {inactive.length}</Text>{inactive.map(card)}</>}
@@ -101,6 +107,6 @@ const styles = StyleSheet.create({
   meta: { color: colors.muted, fontSize: 13 }, badges: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' }, badge: { color: colors.inkSoft, fontSize: 11, fontWeight: '700', backgroundColor: colors.paleGreen, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }, appName: { color: colors.muted, fontSize: 12 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 4 }, note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   manage: { borderTopWidth: 1, borderColor: colors.line, paddingTop: 10, gap: 10, marginTop: 4 }, confirm: { backgroundColor: colors.dangerPale, borderRadius: 10, padding: 12, gap: 8 }, confirmText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
-  review: { backgroundColor: colors.paleOrange, borderRadius: 10, padding: 12, gap: 10, marginVertical: 4 }, reviewText: { color: colors.accentDark, fontSize: 13, fontWeight: '700' }, reviewSummary: { color: colors.accentDark, fontSize: 13, lineHeight: 19 },
+  review: { backgroundColor: colors.paleOrange, borderRadius: 10, padding: 12, gap: 10, marginVertical: 4 }, reviewText: { color: colors.accentDark, fontSize: 13, fontWeight: '700' },
   bankSection: { marginTop: 10, borderTopWidth: 1, borderColor: colors.line, paddingTop: 20 }, suggestions: { gap: 14, marginTop: 14 }, suggestion: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, borderRadius: 16, padding: 16, gap: 8 }, footer: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 5 },
 });

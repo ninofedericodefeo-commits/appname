@@ -4,7 +4,7 @@ The [future roadmap](../ROADMAP.md) turns this audit and existing feature plans 
 
 ## Implementation progress — October 13
 
-The first implementation batch addresses the data foundations in findings 1–7:
+The first implementation batch addressed data foundations in findings 1–7. The second batch simplifies daily goal and subscription actions:
 
 | Finding | Implemented | Remaining scope |
 | --- | --- | --- |
@@ -14,10 +14,15 @@ The first implementation batch addresses the data foundations in findings 1–7:
 | 5 | Newest source wins per fuel, Old pins, recent-only price sorting/lowest-price/drive comparisons. | Shared community prices/backend remain planned. |
 | 6 | Suggestions use the full corrected bank ledger, including history-only imports and legacy bank-confirmed purchases. | Classification remains conservative and reviewable. |
 | 7 | Price-change and charge-after-cancellation review alerts with persistent per-charge dismissals. | Billing-date mismatch detection remains planned. |
+| 8 | Shared direct savings sheet with destination/limits/preview; goal editor only saves its draft; one purchase entry through Transactions. | Phone keyboard/accessibility acceptance. |
+| 9 | One universal gear; suggestion/widget preferences in Settings; named Goal actions with inline archive/delete confirmation. | Broader shared-component polish. |
+| 12 | Explicit sample mode, normal-mode exclusion and no sample phone notifications; nonmodal renewal banner, durable two-hour/midnight snoozes and visible return time. | Physical-phone restart/foreground acceptance. |
+| 13 | Read-only permission/actual schedule status, refresh, permission request and phone-settings actions; resync on foreground. | Permission revocation, actual delivery and time-zone checks on the phone. |
+| 17 | Goals page/title match; legacy demo link moved to Settings → Data; shared savings buttons. | Optional setup checklist and remaining appearance cleanup. |
 
-Verification: 204 logic tests, lint, TypeScript and iOS/Android/web exports pass. Mobile-width synthetic checks cover rename/reimport, mismatch gating and a purchase updating the estimate once. Phone-specific behavior remains a device gate.
+Verification: 215 logic tests, lint, TypeScript and iOS/Android/web exports pass. First-batch mobile checks covered rename/reimport, mismatch gating and balance estimates. Second-batch 390/320 px synthetic checks verified preview/cancel, add/lower conservation, unassigned limits, goal draft cancellation, inline confirmation, snooze reload persistence, sample-mode isolation and universal Settings. Phone-specific behavior remains a device gate.
 
-Findings 8–18 remain the next work queue. The review below records the state before this batch; implementation changes above take precedence.
+Findings 10–11 and 14–16 remain open, alongside the remaining scope above and documentation/appearance cleanup. The review below records the original audit state; implementation changes above take precedence.
 
 ## Scope and conclusion
 

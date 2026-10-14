@@ -9,6 +9,7 @@ import { colors } from '@/theme';
 import WidgetSettingsPanel from '@/features/spending/WidgetSettingsPanel';
 import SubscriptionSettingsPanel from '@/features/subscriptions/SubscriptionSettingsPanel';
 import AccountSettingsPanel from '@/features/bank/AccountSettingsPanel';
+import GoalSettingsPanel from '@/features/goals/GoalSettingsPanel';
 
 export default function SettingsScreen() {
   const { mapsPreference, refillPercent, selectedFuelType, setMapsPreference, setRefillPercent, setSelectedFuelType } = useSettingsStore();
@@ -32,6 +33,7 @@ export default function SettingsScreen() {
     </View>
     <SubscriptionSettingsPanel />
     <WidgetSettingsPanel />
+    <GoalSettingsPanel />
     <View style={styles.card}><Text style={styles.heading}>Which Maps do you use?</Text>
       <View style={styles.row}>{(['apple', 'google'] as const).map((app) => <Pressable key={app} accessibilityRole="button" accessibilityState={{ selected: maps === app, disabled: app === 'apple' && Platform.OS !== 'ios' }} disabled={app === 'apple' && Platform.OS !== 'ios'} onPress={() => setMapsPreference(app)} style={[styles.choice, maps === app && styles.selected, app === 'apple' && Platform.OS !== 'ios' && styles.disabled]}><Text style={[styles.choiceText, maps === app && styles.selectedText]}>{app === 'apple' ? 'Apple Maps' : 'Google Maps'}</Text></Pressable>)}</View>
       <Text style={styles.note}>Station directions and planned trips open in your preferred Maps app. Apple Maps is available on iPhone.</Text>
@@ -45,7 +47,7 @@ export default function SettingsScreen() {
     </View>
     <View style={styles.card}><Text style={styles.heading}>Fuel price preference</Text><View style={styles.row}>{(['regular', 'midgrade', 'premium', 'diesel'] as const).map((fuel) => <Pressable key={fuel} accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} onPress={() => setSelectedFuelType(fuel)} style={[styles.choice, selectedFuelType === fuel && styles.selected]}><Text style={[styles.choiceText, selectedFuelType === fuel && styles.selectedText]}>{fuel.charAt(0).toUpperCase() + fuel.slice(1)}</Text></Pressable>)}</View></View>
     <Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Manage saved cars</Text></Pressable></Link>
-    <Link href="/investment" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Savings goals & settings ›</Text></Pressable></Link>
+    <View style={styles.card}><Text style={styles.heading}>Data</Text><Link href="/legacy-investment" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Legacy demo records ›</Text></Pressable></Link><Text style={styles.note}>Read-only records from the earlier prototype.</Text></View>
     <Text style={styles.note}>Your preferences are saved on this device.</Text>
   </FormScrollView></SafeAreaView>;
 }

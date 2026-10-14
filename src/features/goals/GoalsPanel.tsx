@@ -1,156 +1,62 @@
-import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';
-import { colors } from '@/theme';
-import { useRef, useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { Link, router } from 'expo-router';
-import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { IconButton } from '@/components/IconButton';
-import GoalEditor from '@/features/goals/GoalEditor';
-import GoalProgressCard from '@/features/goals/GoalProgressCard';
-import { goalWidgetAvailable } from '@/features/goals/widget';
-import type { Goal } from '@/features/goals/logic';
-import { parseDollars } from '@/features/pocket/logic';
-import { formatAmount, formatMoney as money } from '@/lib/money';
+import GoalEditor from './GoalEditor';
+import GoalProgressCard from './GoalProgressCard';
+import SavingsAdjustmentSheet from './SavingsAdjustmentSheet';
+import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
+import type { Goal } from './logic';
+import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
+import { colors } from '@/theme';
 
-const newId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
-  return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
-    <Text style={[styles.actionText, secondary && styles.actionSecondaryText]}>{label}</Text>
-  </Pressable>;
-}
-
-function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.choice, selected && styles.choiceSelected]}>
-    <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{label}</Text>
-  </Pressable>;
-}
-
-
-function SettingsPanel({ goal, onClose }: { goal: Goal | null; onClose: () => void }) {
-  const { goalSettings, updateGoalSettings, endGoal } = usePocketStore();
-  const [maxAmount, setMaxAmount] = useState(formatAmount(goalSettings.maxSuggestionCents));
-  const [maxPercent, setMaxPercent] = useState(String(goalSettings.maxPurchasePercent));
-  const [confirmEnd, setConfirmEnd] = useState(false);
-  const [message, setMessage] = useState('');
-
-  function saveCaps() {
-    const cents = parseDollars(maxAmount);
-    const percent = Number(maxPercent);
-    if (cents === null || percent < 0 || percent > 100 || !Number.isFinite(percent) || !maxPercent.trim()) {
-      setMessage('Enter a valid dollar cap and a percent from 0 to 100.');
-      return;
-    }
-    updateGoalSettings({ maxSuggestionCents: cents, maxPurchasePercent: percent });
-    setMessage('Suggestion limits saved.');
+function GoalActions({ goal }: { goal: Goal }) {
+  const [open, setOpen] = useState(false);
+  const [confirm, setConfirm] = useState<'archive' | 'delete' | null>(null);
+  const [error, setError] = useState('');
+  function finish() {
+    const live = usePocketStore.getState();
+    if (live.activeGoal?.id !== goal.id) return setError('This goal changed. Close these actions and try again.');
+    if (confirm === 'archive') live.endGoal(); else if (confirm === 'delete') live.deleteGoal();
   }
-
-  return <View style={styles.settingsGroup}>
-    <View style={styles.card}>
-      <View style={styles.rowBetween}><Text style={styles.section}>Goal settings</Text><Action label="Close" secondary onPress={onClose} /></View>
-      {goal && <View style={styles.row}><Action label="Finish and archive goal" secondary onPress={() => setConfirmEnd(true)} /></View>}
-      {confirmEnd && <View style={styles.warning}><Text style={styles.section}>End this goal?</Text><Text style={styles.hint}>Its progress will be saved in history. Money remains set aside in your account and becomes available to assign to your next goal.</Text><View style={styles.row}><Action label="End goal" onPress={() => { endGoal(); setConfirmEnd(false); onClose(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmEnd(false)} /></View></View>}
-      <Text style={styles.label}>Savings suggestions</Text>
-      <View style={styles.row}><Choice label="On" selected={goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: true })} /><Choice label="Off" selected={!goalSettings.suggestionsEnabled} onPress={() => updateGoalSettings({ suggestionsEnabled: false })} /></View>
-      <Text style={styles.label}>Maximum suggested per purchase ($)</Text>
-      <TextInput style={styles.input} value={maxAmount} onChangeText={setMaxAmount} keyboardType="decimal-pad" accessibilityLabel="Maximum suggested dollars per purchase" />
-      <Text style={styles.label}>Maximum percent of a purchase</Text>
-      <TextInput style={styles.input} value={maxPercent} onChangeText={setMaxPercent} keyboardType="decimal-pad" accessibilityLabel="Maximum percent of a purchase" />
-      <Action label="Save suggestion limits" onPress={saveCaps} />
-      <Text style={styles.label}>iPhone goal widget</Text>
-      {goalWidgetAvailable ? <>
-        <View style={styles.row}><Choice label="Off" selected={!goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: false })} /><Choice label="On" selected={goalSettings.widgetEnabled} onPress={() => updateGoalSettings({ widgetEnabled: true })} /></View>
-        <Text style={styles.hint}>Add the Savings goal widget from your iPhone widget gallery.</Text>
-        {goalSettings.widgetEnabled && <><Text style={styles.label}>Widget privacy</Text><View style={styles.row}><Choice label="Percent only" selected={!goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: false })} /><Choice label="Show amounts and title" selected={goalSettings.widgetShowAmounts} onPress={() => updateGoalSettings({ widgetShowAmounts: true })} /></View></>}
-      </> : <Text style={styles.hint}>The widget needs App Groups, which this free Apple Personal Team build cannot use. Goal progress is still available in the app.</Text>}
-      {message ? <Text style={styles.hint}>{message}</Text> : null}
-    </View>
+  return <View style={styles.menu}>
+    <SubscriptionButton label={open ? 'Close goal actions' : 'Goal actions'} accessibilityState={{ expanded: open }} onPress={() => { Keyboard.dismiss(); setOpen(!open); setConfirm(null); }} />
+    {open && <View style={styles.card}>
+      {confirm ? <><Text style={styles.section}>{confirm === 'archive' ? 'Finish and archive this goal?' : 'Delete this goal?'}</Text>
+        <Text style={styles.note}>{confirm === 'archive' ? 'Its progress stays in Past goals.' : 'Its details will be removed.'} {formatMoney(goal.savedCents)} stays set aside as unassigned savings.</Text>
+        <View style={styles.row}><SubscriptionButton label="Keep goal" grow onPress={() => setConfirm(null)} /><SubscriptionButton label={confirm === 'archive' ? 'Archive goal' : 'Delete goal'} tone={confirm === 'archive' ? 'primary' : 'danger'} grow onPress={finish} /></View>
+      </> : <><SubscriptionButton label="Finish and archive goal" onPress={() => setConfirm('archive')} /><SubscriptionButton label="Delete goal" tone="danger" onPress={() => setConfirm('delete')} /></>}
+      {!!error && <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text>}
+    </View>}
   </View>;
 }
 
 export default function GoalsPanel() {
-  const { activeGoal, reservedCents, reportedBalanceCents, createGoal, updateGoal, deleteGoal, addPurchase, reserveForGoal, releaseFromGoal } = usePocketStore();
-  const [showSettings, setShowSettings] = useState(false);
-  const [showCreateForm, setShowCreateForm] = useState(false);
-  const [showMoneyForm, setShowMoneyForm] = useState(false);
-  const [showPurchaseForm, setShowPurchaseForm] = useState(false);
-  const [editingGoal, setEditingGoal] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [purchaseTitle, setPurchaseTitle] = useState('');
-  const [purchaseAmount, setPurchaseAmount] = useState('');
-  const purchaseId = useRef(newId());
-  const [directAmount, setDirectAmount] = useState('');
-  const [error, setError] = useState('');
-  const remaining = activeGoal ? Math.max(0, activeGoal.targetCents - activeGoal.savedCents) : 0;
-
-  function closeEditor() {
-    Keyboard.dismiss();
-    setEditingGoal(false); setShowMoneyForm(false); setShowPurchaseForm(false); setError('');
-  }
-
-  function logPurchase() {
-    const cents = parseDollars(purchaseAmount);
-    if (!purchaseTitle.trim() || cents === null || cents <= 0) { setError('Enter a purchase name and actual amount greater than $0.'); return; }
-    if (!addPurchase(purchaseId.current, purchaseTitle, cents)) { setError('This purchase was already logged or the details are invalid.'); return; }
-    purchaseId.current = newId();
-    setPurchaseTitle(''); setPurchaseAmount(''); setError('');
-    Keyboard.dismiss(); setShowPurchaseForm(false);
-  }
-
-  function changeGoalMoney() {
-    const cents = parseDollars(directAmount);
-    if (cents === null || cents <= 0 || !reserveForGoal(cents)) {
-      setError('Enter an amount within the remaining goal and your estimated available balance.');
-      return;
-    }
-    setDirectAmount(''); setError('');
-    Keyboard.dismiss(); setShowMoneyForm(false);
-  }
-
+  const { activeGoal, reservedCents, createGoal, updateGoal } = usePocketStore();
+  const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
+  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adjustment, setAdjustment] = useState<'add' | 'lower' | null>(null);
+  function closeEditor() { Keyboard.dismiss(); setEditingId(null); }
+  const editing = !!activeGoal && editingId === activeGoal.id;
   return <View style={styles.content}>
-    <View style={styles.header}>
-      <Text style={styles.title}>Savings</Text>
-      <View style={styles.row}>
-        <IconButton icon="activity" label="View transactions" onPress={() => router.push('/account-transactions')} />
-        <IconButton icon="settings" label="Goal settings" selected={showSettings} onPress={() => { Keyboard.dismiss(); closeEditor(); setShowSettings(!showSettings); }} />
-      </View>
-    </View>
+    <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Goals</Text><IconButton icon="activity" label="View transactions" onPress={() => router.push('/account-transactions')} /></View>
     <Text style={styles.intro}>Your savings stay in your bank account.</Text>
     <Link href="/amazon-goal" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Goal from Amazon link ↗</Text></Pressable></Link>
-    {showSettings && <SettingsPanel goal={activeGoal} onClose={() => setShowSettings(false)} />}
-    {!activeGoal ? <>
-      {showCreateForm ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setShowCreateForm(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setShowCreateForm(false); }} /> : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.hint}>Choose a target and a set-aside rule you can edit any time.</Text><Action label="Set a goal" onPress={() => setShowCreateForm(true)} /></View>}
-    </> : <>
-      <GoalProgressCard key={`progress-${activeGoal.id}`} goal={activeGoal} editing={editingGoal} onEdit={() => editingGoal ? closeEditor() : setEditingGoal(true)} onDelete={() => setConfirmDelete(true)} />
-      {editingGoal && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onSave={(input) => { const saved = updateGoal(input); if (saved) closeEditor(); return saved; }} onCancel={closeEditor} onLowerPocket={releaseFromGoal}>
-        <View style={styles.manualForm}><Text style={styles.section}>Manual updates</Text><Text style={styles.hint}>Add a purchase or adjust what you have set aside. These updates are saved immediately.</Text></View>
-        <View style={styles.row}>
-          <Action label={showMoneyForm ? 'Hide set-aside form' : 'Set money aside'} secondary disabled={remaining === 0 && !showMoneyForm} onPress={() => { Keyboard.dismiss(); setShowMoneyForm(!showMoneyForm); }} />
-          <Action label={showPurchaseForm ? 'Hide purchase form' : 'Log a purchase'} onPress={() => { Keyboard.dismiss(); setShowPurchaseForm(!showPurchaseForm); }} />
-        </View>
-        {showMoneyForm && <View style={styles.manualForm}><Text style={styles.section}>Set money aside</Text><Text style={styles.hint}>This updates your set-aside estimate; no money moves between accounts. {reportedBalanceCents === null ? 'Enter your account balance in Account if you want an available-to-spend estimate.' : `Estimated available before this change: ${money((accountBalanceEstimate(usePocketStore.getState()).estimatedCents ?? reportedBalanceCents) - reservedCents)}.`}</Text><View style={styles.row}><TextInput style={[styles.input, styles.shortInput]} value={directAmount} onChangeText={setDirectAmount} placeholder="10.00" keyboardType="decimal-pad" accessibilityLabel="Set aside for goal" /><Action label="Set aside" onPress={changeGoalMoney} disabled={remaining === 0} /></View></View>}
-        {showPurchaseForm && <View style={styles.manualForm}><Text style={styles.section}>Log a purchase</Text><Text style={styles.hint}>Your rule automatically updates your set-aside estimate. If it cannot set money aside, you can choose a suggestion. Gas receipts stay separate.</Text><TextInput style={styles.input} value={purchaseTitle} onChangeText={setPurchaseTitle} placeholder="What did you buy?" maxLength={80} accessibilityLabel="Purchase name" /><TextInput style={styles.input} value={purchaseAmount} onChangeText={setPurchaseAmount} placeholder="Actual amount" keyboardType="decimal-pad" accessibilityLabel="Actual purchase amount" /><Action label="Log purchase" onPress={logPurchase} /></View>}
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-      </GoalEditor>}
-      {confirmDelete && <View style={styles.warning}><Text style={styles.section}>Delete this goal?</Text><Text style={styles.hint}>The goal will be removed. Its {money(activeGoal.savedCents)} stays earmarked in your set-aside balance as unassigned money.</Text><View style={styles.row}><Action label="Delete goal" onPress={() => { deleteGoal(); setConfirmDelete(false); closeEditor(); }} /><Action label="Keep goal" secondary onPress={() => setConfirmDelete(false)} /></View></View>}
-      <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Connect Apple Pay purchases ↗</Text><Text style={styles.hint}>Install the logging shortcut, then choose your card in Shortcuts.</Text></Pressable></Link>
-    </>}
+    {activeGoal ? <>
+      <GoalProgressCard key={activeGoal.id} goal={activeGoal} editing={editing} onEdit={() => editing ? closeEditor() : setEditingId(activeGoal.id)} />
+      <View style={styles.row}><SubscriptionButton label="Add money" tone="primary" grow disabled={!ready || activeGoal.savedCents >= activeGoal.targetCents} onPress={() => { Keyboard.dismiss(); setAdjustment('add'); }} /><SubscriptionButton label="Adjust savings" grow disabled={!ready} onPress={() => { Keyboard.dismiss(); setAdjustment('lower'); }} /></View>
+      {editing && <GoalEditor key={`edit-${activeGoal.id}`} goal={activeGoal} reservedCents={0} onSave={input => {
+        if (usePocketStore.getState().activeGoal?.id !== activeGoal.id) return false;
+        const saved = updateGoal(input); if (saved) closeEditor(); return saved;
+      }} onCancel={closeEditor} />}
+      <GoalActions key={`actions-${activeGoal.id}`} goal={activeGoal} />
+      <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Connect Apple Pay purchases ↗</Text><Text style={styles.note}>Install the logging shortcut, then choose your card in Shortcuts.</Text></Pressable></Link>
+    </> : creating ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setCreating(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setCreating(false); }} />
+      : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.note}>Choose a target and a rule you can edit any time.</Text><SubscriptionButton label="Set a goal" tone="primary" disabled={!ready} onPress={() => setCreating(true)} /></View>}
+    {adjustment && <SavingsAdjustmentSheet initialDestination="goal" initialAction={adjustment} onClose={() => setAdjustment(null)} />}
   </View>;
 }
-
-const styles = StyleSheet.create({
-  manualForm: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 14, gap: 10 },
-  content: { gap: 14 },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2, flexShrink: 1 }, intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
-  nav: { backgroundColor: colors.ink, borderRadius: 6, paddingHorizontal: 13, paddingVertical: 11, minHeight: 44, justifyContent: 'center' }, navText: { color: colors.surface, fontWeight: '700' },
-  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 19, gap: 10 },
-  settingsGroup: { gap: 12 }, section: { color: colors.ink, fontSize: 21, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 }, subheading: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: 5 },
-  label: { color: colors.inkSoft, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8 }, hint: { color: colors.muted, fontSize: 13, lineHeight: 19 }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
-  input: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, minHeight: 46, paddingHorizontal: 12, paddingVertical: 10, fontSize: 15, color: colors.ink, backgroundColor: colors.surface }, shortInput: { minWidth: 100, flexGrow: 1 },
-  row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }, rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  action: { backgroundColor: colors.accentDark, borderRadius: 6, minHeight: 46, paddingHorizontal: 14, paddingVertical: 12, justifyContent: 'center' }, actionSecondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.lineStrong }, actionText: { color: colors.surface, fontWeight: '800', fontSize: 13 }, actionSecondaryText: { color: colors.ink }, disabled: { opacity: 0.45 },
-  choice: { borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 13, paddingVertical: 10, minHeight: 44, justifyContent: 'center' }, choiceSelected: { backgroundColor: colors.ink, borderColor: colors.ink }, choiceText: { color: colors.inkSoft, fontWeight: '700' }, choiceTextSelected: { color: colors.surface },
-  link: { borderRadius: 6, backgroundColor: colors.paleGreen, minHeight: 44, paddingHorizontal: 13, paddingVertical: 12 }, linkText: { color: colors.ink, fontWeight: '700', fontSize: 13 },
-  amount: { color: colors.ink, fontSize: 16, fontWeight: '800' }, warning: { backgroundColor: colors.paleOrange, borderRadius: 8, padding: 12, gap: 8 }, historyRow: { borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 9 }, historyName: { fontSize: 14, color: colors.ink, fontWeight: '700' },
-});
+const styles = StyleSheet.create({ content: { gap: 14 }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2 }, intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
+  row: { flexDirection: 'row', gap: 8 }, card: { padding: 18, gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12 }, section: { color: colors.ink, fontSize: 20, fontWeight: '800' }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, error: { color: colors.danger, fontSize: 13 }, menu: { gap: 10, marginTop: 2 }, link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', gap: 5 }, linkText: { color: colors.ink, fontSize: 13, fontWeight: '800' } });

@@ -75,7 +75,7 @@ export function upcomingReminderGroups(subscriptions: Subscription[], now: Date)
   const horizon = addCalendarDays(now, 400).getTime();
 
   for (const subscription of subscriptions) {
-    if (!subscription.active) continue;
+    if (!subscription.active || subscription.isSample) continue;
 
     for (let offset = 0; offset < 14; offset += 1) {
       const year = now.getFullYear();

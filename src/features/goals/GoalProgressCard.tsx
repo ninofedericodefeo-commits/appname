@@ -9,8 +9,8 @@ import type { Goal } from '@/features/goals/logic';
 import { formatCompactMoney, formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
 
-export default function GoalProgressCard({ goal, onEdit, onDelete, editing }: {
-  goal: Goal; onEdit: () => void; onDelete: () => void; editing: boolean;
+export default function GoalProgressCard({ goal, onEdit, editing }: {
+  goal: Goal; onEdit: () => void; editing: boolean;
 }) {
   const [showRemaining, setShowRemaining] = useState(false);
   const percent = progressPercent(goal);
@@ -20,7 +20,6 @@ export default function GoalProgressCard({ goal, onEdit, onDelete, editing }: {
       <Text style={styles.date}>{goal.deadline ? new Date(`${goal.deadline}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
       <View style={styles.actions}>
         <IconButton icon={editing ? 'close' : 'edit'} label={editing ? 'Close goal editor' : 'Edit goal'} inverse onPress={onEdit} />
-        <IconButton icon="delete" label="Delete goal" inverse onPress={onDelete} />
       </View>
     </View>
     <Text style={styles.title}>{goal.title}</Text>

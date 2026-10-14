@@ -13,6 +13,7 @@ import { formatAmount, formatMoney as money } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 import { colors } from '@/theme';
 import { accountBalanceEstimate, belongsToLinkedAccount } from '@/features/pocket/balanceEstimate';
+import SavingsAdjustmentSheet from '@/features/goals/SavingsAdjustmentSheet';
 
 function AccountAction({ label, path, onPress }: { label: string; path: string; onPress: () => void }) {
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
@@ -23,19 +24,16 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 
 export default function PocketScreen() {
   const pocket = usePocketStore();
-  const { linkedBankAccount, reportedBalanceCents, balanceSource, reservedCents, activeGoal, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance, reserve, release } = pocket;
+  const { linkedBankAccount, reportedBalanceCents, balanceSource, reservedCents, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance } = pocket;
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
-  const [amountInput, setAmountInput] = useState('');
   const [editingBalance, setEditingBalance] = useState(false);
   const [editingPocket, setEditingPocket] = useState(false);
   const [showCurrentBalance, setShowCurrentBalance] = useState(false);
   const [balanceError, setBalanceError] = useState('');
-  const [pocketError, setPocketError] = useState('');
   const estimate = accountBalanceEstimate(pocket);
   const available = availableCents(estimate.estimatedCents, reservedCents);
   const availableLabel = available === null ? '—' : money(available);
   const balanceFontSize = availableLabel.length > 9 ? Math.max(28, Math.floor(414 / availableLabel.length)) : 46;
-  const unassigned = reservedCents - (activeGoal?.savedCents ?? 0);
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
   const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, linkedBankAccount]);
 
@@ -44,15 +42,6 @@ export default function PocketScreen() {
     if (cents === null) { setBalanceError('Enter a balance using at most two decimal places.'); return; }
     setReportedBalance(cents); setBalanceDraft(null); setBalanceError(''); setEditingBalance(false); setShowCurrentBalance(false); Keyboard.dismiss();
   }
-  function changePocket(kind: 'reserve' | 'release') {
-    const cents = parseDollars(amountInput);
-    if (cents === null || cents === 0) { setPocketError('Enter an amount greater than $0, using at most two decimal places.'); return; }
-    if (!(kind === 'reserve' ? reserve(cents) : release(cents))) {
-      setPocketError(kind === 'reserve' ? 'That amount exceeds your available balance.' : 'That amount exceeds unassigned savings. Open Edit goal to lower goal savings.'); return;
-    }
-    setAmountInput(''); setPocketError(''); Keyboard.dismiss();
-  }
-
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
     <PageToolbar />
     <FormScrollView contentContainerStyle={styles.content}>
@@ -73,7 +62,7 @@ export default function PocketScreen() {
         {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>Your set-aside amount is above your estimated bank balance. Update the balance or lower your set-aside amount.</Text>}
         <View style={styles.accountActions}>
           <AccountAction label="Update balance" path="m16 3 5 5M3 21l5-1L20 8a3.54 3.54 0 0 0-5-5L3 15v6Z" onPress={() => { Keyboard.dismiss(); setEditingBalance(!editingBalance); setEditingPocket(false); }} />
-          <AccountAction label="Manage savings" path="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" onPress={() => { Keyboard.dismiss(); setEditingPocket(!editingPocket); setEditingBalance(false); }} />
+          <AccountAction label="Manage savings" path="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" onPress={() => { Keyboard.dismiss(); setEditingPocket(true); setEditingBalance(false); }} />
           <AccountAction label="Import statement" path="M12 16V3m-5 5 5-5 5 5M4 15v6h16v-6" onPress={() => router.push('/bank-import')} />
         </View>
       </View>
@@ -83,15 +72,7 @@ export default function PocketScreen() {
         {balanceError ? <Text accessibilityRole="alert" style={styles.error}>{balanceError}</Text> : null}
         <View style={styles.row}><Pressable accessibilityRole="button" style={styles.button} onPress={updateBalance}><Text style={styles.buttonText}>Save balance</Text></Pressable><Pressable accessibilityRole="button" style={styles.secondary} onPress={() => { Keyboard.dismiss(); setEditingBalance(false); }}><Text style={styles.secondaryText}>Close</Text></Pressable></View>
       </View>}
-      {editingPocket && <View style={styles.card}>
-        <Text style={styles.section}>Manage set-aside</Text><Text style={styles.hint}>{money(unassigned)} unassigned{activeGoal ? ` · ${money(activeGoal.savedCents)} for ${activeGoal.title}` : ''}</Text>
-        <TextInput value={amountInput} onChangeText={setAmountInput} style={styles.input} keyboardType="decimal-pad" placeholder="Amount" accessibilityLabel="Set-aside amount" />
-        <View style={styles.row}><Pressable accessibilityRole="button" style={styles.button} onPress={() => changePocket('reserve')}><Text style={styles.buttonText}>Set aside</Text></Pressable><Pressable accessibilityRole="button" style={styles.secondary} onPress={() => changePocket('release')}><Text style={styles.secondaryText}>Lower set-aside</Text></Pressable></View>
-        {pocketError ? <Text accessibilityRole="alert" style={styles.error}>{pocketError}</Text> : null}
-        <Text style={styles.hint}>Money stays in your bank account. Lower money assigned to a goal in Edit goal.</Text>
-        <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.navigate('/investment')}><Text style={styles.link}>Open goals</Text></Pressable>
-
-      </View>}
+      {editingPocket && <SavingsAdjustmentSheet initialDestination="unassigned" onClose={() => setEditingPocket(false)} />}
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
     </FormScrollView>

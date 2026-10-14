@@ -2,7 +2,7 @@
 
 **Updated:** October 13, 2026
 
-**Baseline:** `a9de911` — account reconciliation, gas freshness and subscription evidence
+**Baseline:** `a9de911` data foundations, followed by the October 13 daily-actions batch below
 
 **Purpose:** a dependable personal app, installed privately; no App Store launch is planned.
 
@@ -53,8 +53,8 @@ The intended result is a useful daily companion for one person. Reliability, few
 | Transactions | Unified timeline, merchant display names, direction corrections, hiding/undo, source details and purchase matching | Source-linked audit trail, better search/filtering, true data-removal controls distinct from hiding |
 | Citizens import | Local text-PDF/CSV parsing, summary reconciliation, page counts, balance question, duplicate prevention, archived originals | Device verification, archive management, batch/folder import, supported-layout expansion |
 | Statement handoff | Signed iPhone shortcut and native file opening; optional quick import of matching clean shared PDFs | Cold/warm launch and interrupted-save checks on the installed phone; simpler repeat setup |
-| Goals | One active goal, deadlines, rules, assignments, purchase contributions and archived goals | Direct money actions, one gear, clearer editor semantics and legacy-demo placement |
-| Subscriptions | Renewal review, supported app picker, bank suggestions, price-change/after-cancellation alerts, local reminders | Durable snooze, sample test mode, permission status, upcoming-cost summaries and billing destinations |
+| Goals | One active goal, deadlines/rules, assignments, direct shared money sheet, separate editor, named goal actions and universal preferences | Physical-phone keyboard/accessibility checks; optional setup checklist and appearance polish |
+| Subscriptions | Renewal banner, persistent snoozes, explicit sample mode, app picker, bank evidence/alerts and reminder permission/schedule status | Device permission/delivery checks, upcoming-cost summaries and billing destinations |
 | Gas | Free station discovery, restored map/list, local reports, newest-price precedence, Old pins and recent-price ranking | Manual location search, compact filters/cars, reporting consolidation, useful personal price coverage |
 | Cars and drives | Saved cars, editable MPG/capacity estimates, successive stops and Maps handoff | Better road-access/detour evidence, range calibration and saved trip conveniences |
 | Amazon goals | Public direct/short-link name and USD price lookup, editable draft, provenance and fallback | Successful live extraction on the phone; optional image/share convenience |
@@ -62,7 +62,16 @@ The intended result is a useful daily companion for one person. Reliability, few
 | Widgets | Account/goal widget code and native capability configuration | Enrolled-team signing and device verification for current integration; no active replacement Live Activity |
 | Data and delivery | Local persisted stores, original-import archive, versioned migrations, development builds | Complete backup/restore, app lock/encryption decisions, private standalone builds and update recovery |
 
-The baseline reports **204 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
+The current batch reports **215 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
+
+### October 13 implementation progress
+
+- **UX-01:** direct Add money / Adjust savings and Account → Manage savings share one preview sheet. Goal edits have a separate Save/Cancel boundary. Purchases use Transactions.
+- **UX-02 core cleanup:** one universal gear, global suggestion/widget controls in Settings, inline Goal actions for archive/delete, and preserved Legacy demo records in Settings → Data. The optional setup checklist and appearance work remain planned.
+- **UX-03:** fresh installs start in normal mode; existing requested samples retain explicit test mode. Samples are excluded from phone notifications and bank evidence. Renewal banners can snooze for two hours or through local midnight, persist across restart, and show their return time.
+- **SUB-03:** Settings reads phone permission and actual scheduled reminder counts, offers retry/phone settings, and refreshes after foregrounding. Physical-phone permission, scheduling/delivery and time-zone checks remain open.
+
+Subscription persistence version 5 only adds sample visibility and renewal snooze preferences; existing financial records and decisions are preserved. No native capability or dependency changed. M0 backup/restore and private bundled installation remain unfinished.
 
 ## 3. Priorities, effort and sequence
 
@@ -150,6 +159,8 @@ Build a personal-use installation process; details are in section 13. Keep the s
 
 ### UX-01 · Direct goal money actions · P1 / M
 
+**Status:** implemented; mobile-width preview/save/cancel and accounting-limit checks pass. Native keyboard/accessibility checks remain in REL-01.
+
 - Add **Add money** and **Adjust savings** outside Edit goal. Choose the destination explicitly: active goal or unassigned set-aside.
 - Keep Edit goal for name, target, deadline and rule. Editing a draft and performing an immediate accounting action must not share an ambiguous Save/Cancel boundary.
 - Reuse one purchase-logging form from Transactions and any deliberate shortcut entry points.
@@ -159,6 +170,8 @@ Build a personal-use installation process; details are in section 13. Keep the s
 **Done when:** common contribution/adjustment tasks take no more than two actions to reach their form, Cancel has predictable behavior, and no new form bypasses balance/rule limits.
 
 ### UX-02 · Universal settings and consistent names · P1 / S–M
+
+**Status:** the core cleanup is implemented. Optional setup checklist, appearance and broader shared-component polish remain planned.
 
 - Remove the extra Goals gear; move global suggestion/widget preferences into universal Settings.
 - Use a named goal menu for finish/archive/delete. Keep goal-specific rule controls in the goal editor.
@@ -170,6 +183,8 @@ Build a personal-use installation process; details are in section 13. Keep the s
 **Done when:** each main page has one gear, no duplicate primary import/log-purchase actions appear, and equivalent actions have consistent labels and behavior.
 
 ### UX-03 · Samples and renewal interruptions · P1 / M
+
+**Status:** implemented for in-app reviews. Snoozes apply to the renewal banner; enabled real-subscription phone reminders keep their 9 AM schedule. Device restart/foreground acceptance remains in REL-01.
 
 - Introduce explicit **Test subscriptions** mode in Settings. Samples remain editable/resettable and clearly labeled.
 - Exclude sample costs, bank alerts and phone reminders from normal mode. In test mode show which behaviors are simulated.
@@ -267,6 +282,8 @@ The UI currently combines bank movements, local purchases and savings entries. C
 **Done when:** each supported cancellation path opens the correct billing starting point, and cancellation status changes only through an explicit user action or reviewed evidence.
 
 ### SUB-03 · Reminders reflect phone permission · P1 / M
+
+**Status:** permission/schedule status and refresh/open-settings controls are implemented. Physical-phone permission revocation, notification delivery, duplicate scheduling and time-zone acceptance remain open.
 
 - In Settings distinguish wanted reminders, permission granted, scheduling success and any disabled/error state.
 - Recheck on foregrounding and after returning from phone Settings; offer an Open settings action when needed.
@@ -524,8 +541,8 @@ These are concrete batches, not approval to deploy services or purchase accounts
 | Order | Batch | IDs | Why now |
 | --- | --- | --- | --- |
 | 1 | Native checks + backup/first restore + private bundled installation | REL-01, DATA-01, REL-02, REL-03 | Validate the accounting, protect data and remove Metro dependence |
-| 2 | Direct goal money actions + one universal gear | UX-01, UX-02 | Removes the most confusing daily controls |
-| 3 | Durable renewal snooze + explicit sample mode + permission status | UX-03, SUB-03 | Stops repeated interruptions and misleading reminder settings |
+| 2 | Direct goal money actions + one universal gear | UX-01, UX-02 | Core cleanup implemented; optional checklist/appearance remain |
+| 3 | Durable renewal snooze + explicit sample mode + permission status | UX-03, SUB-03 | Code implemented; phone permission/delivery checks remain |
 | 4 | Gas location/error placement + manual area search | UX-04, GAS-01 | Makes Gas usable when GPS is denied or you want another area |
 | 5 | Saved-import management + source-linked transaction details | IMP-01, ACC-02 | Makes existing files/history easier to inspect and recover |
 | 6 | Canonical ledger/recoverable imports | ACC-01, IMP-02 | Foundation for more capture methods and corrections; after restore works |

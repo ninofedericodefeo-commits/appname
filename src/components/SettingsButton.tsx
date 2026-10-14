@@ -2,6 +2,7 @@ import { Link } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '@/theme';
+import RenewalBanner from '@/features/subscriptions/RenewalBanner';
 
 export function SettingsButton() {
   return <Link href="/settings" asChild><Pressable accessibilityRole="button" accessibilityLabel="Settings" style={styles.button}>
@@ -13,7 +14,7 @@ export function SettingsButton() {
 }
 
 export function PageToolbar() {
-  return <View style={styles.toolbar}><Text style={styles.brand}>GASFINDER</Text><SettingsButton /></View>;
+  return <View><View style={styles.toolbar}><Text style={styles.brand}>GASFINDER</Text><SettingsButton /></View><RenewalBanner /></View>;
 }
 const styles = StyleSheet.create({
   toolbar: { minHeight: 48, paddingHorizontal: 20, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

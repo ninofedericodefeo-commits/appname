@@ -5,6 +5,8 @@ import { replaceSampleSubscriptions } from '@/features/subscriptions/samples';
 
 import { bankMerchant } from '@/features/subscriptions/bankSuggestions';
 import type { Subscription } from '@/features/subscriptions/logic';
+import { clearSampleSnoozes, migrateReviewPreferences, snoozeRenewalReviews } from '@/features/subscriptions/reviewPreferences';
+import type { RenewalSnoozes } from '@/features/subscriptions/reviewPreferences';
 
 type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' | 'day' | 'month' | 'bankMerchantKey' | 'associatedApp'>;
 
@@ -12,6 +14,11 @@ type SubscriptionState = {
   subscriptions: Subscription[];
   remindersEnabled: boolean;
   samplesInitialized: boolean;
+  sampleMode: boolean;
+  setSampleMode: (enabled: boolean) => void;
+  reviewSnoozes: RenewalSnoozes;
+  snoozeReviews: (duration: 'two-hours' | 'today') => void;
+  resumeReviews: () => void;
   initializeSamples: () => void;
   resetSamples: () => void;
   removeSamples: () => void;
@@ -33,9 +40,14 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       subscriptions: [],
       remindersEnabled: false,
       samplesInitialized: false,
-      initializeSamples: () => set(state => state.samplesInitialized ? state : { subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true }),
-      resetSamples: () => set(state => ({ subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true })),
-      removeSamples: () => set(state => ({ subscriptions: state.subscriptions.filter(subscription => !subscription.isSample), samplesInitialized: true })),
+      sampleMode: false,
+      reviewSnoozes: {},
+      snoozeReviews: duration => set(state => ({ reviewSnoozes: snoozeRenewalReviews(state.subscriptions, state.sampleMode, state.reviewSnoozes, duration) })),
+      resumeReviews: () => set({ reviewSnoozes: {} }),
+      setSampleMode: sampleMode => set(state => ({ sampleMode, ...(sampleMode && !state.subscriptions.some(item => item.isSample) ? { subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true } : {}) })),
+      initializeSamples: () => set(state => !state.sampleMode || state.samplesInitialized ? state : { subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true }),
+      resetSamples: () => set(state => ({ subscriptions: replaceSampleSubscriptions(state.subscriptions), samplesInitialized: true, sampleMode: true, reviewSnoozes: clearSampleSnoozes(state.subscriptions, state.reviewSnoozes) })),
+      removeSamples: () => set(state => ({ subscriptions: state.subscriptions.filter(subscription => !subscription.isSample), samplesInitialized: true, sampleMode: false, reviewSnoozes: clearSampleSnoozes(state.subscriptions, state.reviewSnoozes) })),
       dismissedBankSuggestions: [],
       dismissedBankAlerts: [],
       dismissBankAlert: id => set(state => ({ dismissedBankAlerts: [...new Set([...state.dismissedBankAlerts, id])] })),
@@ -53,7 +65,7 @@ export const useSubscriptionStore = create<SubscriptionState>()(
             }),
           };
         }
-        if (input.bankMerchantKey && state.subscriptions.some((subscription) => subscription.bankMerchantKey === input.bankMerchantKey || bankMerchant(subscription.name).key === input.bankMerchantKey)) return state;
+        if (input.bankMerchantKey && state.subscriptions.some((subscription) => !subscription.isSample && (subscription.bankMerchantKey === input.bankMerchantKey || bankMerchant(subscription.name).key === input.bankMerchantKey))) return state;
         const subscription: Subscription = {
           ...input,
           id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -81,8 +93,9 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     {
       name: 'gasfinder-subscriptions',
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
+        ...migrateReviewPreferences(persisted as SubscriptionState),
         dismissedBankSuggestions: version < 2 ? [] : (persisted as SubscriptionState).dismissedBankSuggestions ?? [],
         samplesInitialized: (persisted as SubscriptionState).samplesInitialized ?? false,
         dismissedBankAlerts: (persisted as SubscriptionState).dismissedBankAlerts ?? [],

@@ -4,6 +4,7 @@ import { Platform } from 'react-native';
 
 import { upcomingReminderGroups } from '@/features/subscriptions/logic';
 import type { Subscription } from '@/features/subscriptions/logic';
+import type { ReminderStatus } from './reminderStatus';
 
 const channelId = 'subscription-reviews';
 const notificationKind = 'subscription-review';
@@ -64,4 +65,17 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
 export function syncSubscriptionReminders(subscriptions: Subscription[], enabled: boolean): Promise<void> {
   syncQueue = syncQueue.catch(() => undefined).then(() => syncNow(subscriptions, enabled));
   return syncQueue;
+}
+
+export async function getSubscriptionReminderStatus(subscriptions: Subscription[], enabled: boolean): Promise<ReminderStatus> {
+  if (Platform.OS === 'web') return { permission: 'unavailable', scheduledCount: 0, expectedCount: 0 };
+  // Let queued scheduling/cancellation settle before describing what is on the phone.
+  for (let attempt = 0; attempt < 3; attempt++) { const current = syncQueue; await current.catch(() => {}); if (current === syncQueue) break; }
+  const settings = await Notifications.getPermissionsAsync();
+  const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+  const permission = settings.ios?.status === Notifications.IosAuthorizationStatus.PROVISIONAL ? 'quiet'
+    : settings.ios?.status === Notifications.IosAuthorizationStatus.DENIED || settings.status === 'denied' ? 'denied'
+    : permissionAllowsAlerts(settings) ? 'granted' : 'undetermined';
+  return { permission, scheduledCount: scheduled.filter(item => item.content.data?.kind === notificationKind).length,
+    expectedCount: enabled && permissionAllowsAlerts(settings) ? upcomingReminderGroups(subscriptions, new Date()).length : 0 };
 }
