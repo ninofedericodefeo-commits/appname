@@ -17,7 +17,7 @@ export const archiveStorage: ImportArchiveStorage = {
     const entries = await Promise.all(metadata.map(async (file) => {
       try { return parseSavedImport(JSON.parse(await file.text())); } catch { return null; }
     }));
-    return entries.filter((entry): entry is SavedBankImport => !!entry && savedFile(entry).exists);
+    return entries.filter((entry): entry is SavedBankImport => !!entry).map(entry => ({ ...entry, storageName: entry.storageName ?? archiveFilename(entry), missingOriginal: !savedFile(entry).exists, sizeBytes: savedFile(entry).exists ? savedFile(entry).size : entry.sizeBytes }));
   },
   async read(entry) {
     const file = savedFile(entry);
@@ -52,5 +52,13 @@ export const archiveStorage: ImportArchiveStorage = {
     const file = savedFile(entry);
     if (!file.exists) throw new Error('This saved file is missing.');
     await Sharing.shareAsync(file.uri, { mimeType: entry.kind === 'pdf' ? 'application/pdf' : 'text/csv', UTI: entry.kind === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text', dialogTitle: entry.name });
+  },
+  async setMetadata(entries) {
+    const folder = importsFolder(), keep = new Set(entries.map(entry => `${entry.id}.json`));
+    for (const entry of entries) {
+      const temporary = new File(folder, `${entry.id}.pending`);
+      temporary.write(JSON.stringify(entry)); temporary.move(new File(folder, `${entry.id}.json`), { overwrite: true });
+    }
+    for (const file of folder.list()) if (file instanceof File && /^import-[a-z0-9-]+\.json$/.test(file.name) && !keep.has(file.name)) file.delete();
   },
 };

@@ -9,7 +9,9 @@ import { guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV 
 import type { BankCSV, BankMapping } from '@/features/bank/importLogic';
 import { pickBankFile, readIncomingBankFile } from '@/features/bank/pickBankFile';
 import type { BankFile } from '@/features/bank/bankFileTypes';
-import { readBankImport, saveBankImport } from '@/features/bank/importArchive';
+import { readBankImport, saveBankImport, saveImportOutcome } from '@/features/bank/importArchive';
+import { recoverableBankOperation } from '@/features/data/backupService';
+import type { SavedBankImport } from '@/features/bank/archiveLogic';
 import { takeBankFile } from '@/features/bank/incomingBankFile';
 import { applyAccountImport, statementBalanceStatus } from '@/features/bank/accountImport';
 import { importSharedStatement, prepareAutomaticStatement } from '@/features/bank/statementAutomation';
@@ -196,19 +198,28 @@ export default function BankImportScreen() {
     const current = ++request.current;
     setPendingAutomatic(null); setBusy(true); setAutomaticSaving(true); setError('');
     try {
-      const result = await importSharedStatement({
-        balanceChoice,
-        prepare: () => prepareSharedStatement(pending.statement, pending.accountLabel),
-        isCurrent: () => request.current === current,
-        archive: (automatic) => saveBankImport(pending.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
-          purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf }),
-        commit: (automatic, balance) => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.account, automatic.history, { balance, statementIdentifier: pending.statement.accountIdentifier }),
+      const result = await recoverableBankOperation(async permit => {
+        let saved: SavedBankImport | undefined;
+        const outcome = await importSharedStatement({
+          balanceChoice,
+          prepare: () => prepareSharedStatement(pending.statement, pending.accountLabel),
+          isCurrent: () => request.current === current,
+          archive: async automatic => { saved = await permit(() => saveBankImport(pending.file, { accountLabel: automatic.accountLabel, transactionCount: automatic.transactionCount,
+            purchaseCount: automatic.purchaseCount, balanceCents: automatic.balance.amountCents, balanceAsOf: automatic.balance.asOf,
+            periods: pending.statement.periods, transactionIds: automatic.history.map(row => row.id) })); },
+          commit: (automatic, balance) => permit(() => usePocketStore.getState().importBankPurchases(automatic.purchases, false, automatic.account, automatic.history, { balance, statementIdentifier: pending.statement.accountIdentifier })),
+        });
+        if (outcome.status === 'saved' && saved) {
+          await permit(() => saveImportOutcome(saved!.id, { importReport: { parser: 'citizens-pdf-v3', excludedRows: pending.statement.warnings.length,
+            matched: outcome.result.matched, added: outcome.result.transactionsAdded, balanceUpdated: outcome.result.balanceUpdated, savedCents: outcome.result.savedCents, checks: pending.statement.reconciliation?.status ?? 'unverified' } }));
+          permit(() => useStatementAutomationStore.getState().confirmImport(pending.accountLabel, pending.statement.accountIdentifier,
+            { name: pending.file.name, importedAt: new Date().toISOString(), balanceAsOf: pending.statement.balance!.asOf, automatic: true }));
+        }
+        return outcome;
       });
       if (request.current !== current || result.status === 'canceled') return;
       if (result.status === 'review') setAutomaticReview(result.reason);
       else {
-        useStatementAutomationStore.getState().confirmImport(pending.accountLabel, pending.statement.accountIdentifier,
-          { name: pending.file.name, importedAt: new Date().toISOString(), balanceAsOf: pending.statement.balance!.asOf, automatic: true });
         setDone({ ...result.result, automatic: true }); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null);
       }
     } catch (cause) {
@@ -239,21 +250,22 @@ export default function BankImportScreen() {
     const reviewedState = usePocketStore.getState();
     setBusy(true); setError('');
     try {
-      if (sourceFile) await saveBankImport(sourceFile, { accountLabel: account.trim(), transactionCount: historyReview.rows.length, purchaseCount: review.rows.length,
-        ...(statement?.balance ? { balanceCents: statement.balance.amountCents, balanceAsOf: statement.balance.asOf } : {}),
+      const result = await recoverableBankOperation(async permit => {
+        const saved = sourceFile ? await permit(() => saveBankImport(sourceFile, { accountLabel: account.trim(), transactionCount: historyReview.rows.length, purchaseCount: review.rows.length,
+          transactionIds: saveHistory ? history.map(row => row.id) : [], periods: statement?.periods,
+          ...(statement?.balance ? { balanceCents: statement.balance.amountCents, balanceAsOf: statement.balance.asOf } : {}),
+        })) : undefined;
+        if (current !== request.current) throw new Error('Import was canceled. Review the file again.');
+        const liveState = usePocketStore.getState();
+        if (liveState !== reviewedState) throw new Error('Your account changed. Review the updated preview and balance choice before importing.');
+        const outcome = permit(() => liveState.importBankPurchases(selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions));
+        if (saved) await permit(() => saveImportOutcome(saved.id, { importReport: { parser: statement ? 'citizens-pdf-v3' : 'csv-v1', excludedRows: historyReview.excluded.length,
+          matched: outcome.matched, added: outcome.transactionsAdded, balanceUpdated: outcome.balanceUpdated, savedCents: outcome.savedCents, checks: statement?.reconciliation?.status === 'mismatch' && mismatchReviewed ? 'mismatch acknowledged' : statement?.reconciliation?.status ?? 'unverified' } }));
+        permit(() => { const setup = useStatementAutomationStore.getState(); setup.configure(setup.enabled, account);
+          if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
+            { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false }); });
+        return outcome;
       });
-      if (current !== request.current) return;
-      const liveState = usePocketStore.getState();
-      if (liveState !== reviewedState) {
-        setBalanceOverride(null);
-        setAccountDraft(null);
-        setError('Your account changed while the file was being saved. Review the updated preview and balance choice before importing.');
-        return;
-      }
-      const result = liveState.importBankPurchases(selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions);
-      const setup = useStatementAutomationStore.getState(); setup.configure(setup.enabled, account);
-      if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
-        { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false });
       setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
     } catch (cause) {
       if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not save the file in Imports. Try again.');

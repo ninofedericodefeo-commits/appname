@@ -1,3 +1,4 @@
+import type { TransactionDetails, TransactionRevision } from '../pocket/repository.ts';
 import { applyBankImport, parseBankDate } from './importLogic.ts';
 import type { BankImportState, BankPreviewRow, BankPurchase } from './importLogic.ts';
 import { mergeAccountTransactions } from '../pocket/transactions.ts';
@@ -13,6 +14,8 @@ export type AccountImportState = BankImportState & {
   accountTransactions: AccountTransaction[];
   hiddenTransactionIds?: string[];
   transactionDirections?: TransactionDirections;
+  transactionDetails?: Record<string, TransactionDetails>;
+  correctionHistory?: TransactionRevision[];
   balanceUpdatedAt?: string | null;
   balanceAsOf?: string | null;
   balanceSource?: 'manual' | 'citizens-pdf' | null;
@@ -49,6 +52,10 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
   for (const replacement of movements.replacedIds) if (directions[replacement.from]) {
     directions[replacement.to] = directions[replacement.from]; delete directions[replacement.from];
   }
+  const details = { ...(state.transactionDetails ?? {}) };
+  for (const replacement of movements.replacedIds) if (details[replacement.from]) details[replacement.to] ??= details[replacement.from];
+  const replacements = new Map(movements.replacedIds.map(item => [item.from, item.to]));
+  const correctionHistory = state.correctionHistory?.map(item => replacements.has(item.transactionId) ? { ...item, originalTransactionId: item.originalTransactionId ?? item.transactionId, transactionId: replacements.get(item.transactionId)! } : item);
   const virtualPurchases = new Map(state.purchases.map(purchase => [purchase.id, purchase]));
   const latest = new Date(now); latest.setHours(23, 59, 59, 999);
   for (const candidate of candidates) if (!virtualPurchases.has(candidate.id) && !state.bankImportKeys.includes(candidate.id) && /^bank-[a-f0-9]{16}$/.test(candidate.id) &&
@@ -74,6 +81,7 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
   return { state: { ...withBalance, ...result.state, purchases, bankImportKeys: [...keys], accountTransactions: movements.transactions,
     ...(profile ? renameLinkedAccount({ ...state, purchases, accountTransactions: movements.transactions }, profile) : {}),
     ...(state.hiddenTransactionIds ? { hiddenTransactionIds: [...hidden] } : {}),
+    ...(state.transactionDetails ? { transactionDetails: details } : {}), ...(correctionHistory ? { correctionHistory } : {}),
     ...(state.transactionDirections ? { transactionDirections: directions } : {}) },
     imported: result.imported, skipped: result.skipped, savedCents: result.savedCents,
     matched: matched.size, balanceUpdated, transactionsAdded: movements.added, transactionsUpdated: movements.updated };

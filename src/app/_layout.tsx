@@ -1,3 +1,6 @@
+import { useDataStatus } from '@/features/data/operationStatus';
+import { PrivacyGate } from '@/features/privacy/PrivacyGate';
+import { DataGate } from '@/features/data/DataGate';
 import { colors } from '@/theme';
 import { useEffect } from 'react';
 import { AppState, Platform, StyleSheet, View } from 'react-native';
@@ -25,7 +28,10 @@ if (Platform.OS !== 'web') {
   });
 }
 
-export default function RootLayout() {
+export default function RootLayout() { return <DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate>; }
+
+function ReadyLayout() {
+  const { busy } = useDataStatus();
   useEffect(() => {
     const refresh = () => { void syncAccountWidget().catch(error => console.warn('Could not update account widget', error)); };
     const retire = () => { void endRetiredPurchaseActivities().catch(error => console.warn('Could not dismiss retired purchase activity', error)); };
@@ -34,7 +40,7 @@ export default function RootLayout() {
     const foreground = AppState.addEventListener('change', state => { if (state === 'active') { refresh(); retire(); } });
     refresh(); retire();
     return () => { unsubscribers.forEach(unsubscribe => unsubscribe()); foreground.remove(); };
-  }, []);
+  }, [busy]);
   useEffect(() => {
     const refresh = () => {
       const state = usePocketStore.getState();
@@ -45,7 +51,7 @@ export default function RootLayout() {
     const foreground = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
     if (usePocketStore.persist.hasHydrated()) refresh();
     return () => { unsubscribe(); hydration(); foreground.remove(); };
-  }, []);
+  }, [busy]);
 
   return (
     <QueryClientProvider client={queryClient}>

@@ -59,3 +59,19 @@ test('Stored metadata rejects unsafe identifiers and filenames stay inside Impor
   assert.equal(parseSavedImport({ ...entry, kind: 'exe' }), null);
   assert.equal(archiveFilename(entry).includes('/'), false);
 });
+
+test('Renaming and Trash preserve physical storage and transaction identity; relink rejects another statement', async () => {
+  const { updateArchivedFile, relinkArchivedFile } = await import('../src/features/bank/archiveLogic.ts');
+  const archive = memoryArchive();
+  archive.storage.setMetadata = async entries => { archive.entries.clear(); entries.forEach(entry => archive.entries.set(entry.id, entry)); };
+  const file = { name: 'September checking.pdf', kind: 'pdf', base64: 'JVBERi0xLjcK' };
+  const saved = await saveImportToArchive(archive.storage, file, { ...details, transactionIds: ['transaction-a', 'transaction-b'] }, now);
+  const renamed = await updateArchivedFile(archive.storage, saved.id, { name: 'My statement.pdf' });
+  assert.equal(archiveFilename(renamed), archiveFilename(saved)); assert.deepEqual(renamed.transactionIds, ['transaction-a', 'transaction-b']);
+  const trashed = await updateArchivedFile(archive.storage, saved.id, { trash: true }); assert.ok(trashed.trashedAt);
+  const restored = await updateArchivedFile(archive.storage, saved.id, { trash: false }); assert.equal(restored.trashedAt, undefined);
+  await assert.rejects(relinkArchivedFile(archive.storage, saved.id, { ...file, base64: 'another file' }), /same original/);
+  const relinked = await relinkArchivedFile(archive.storage, saved.id, file);
+  assert.equal(relinked.id, saved.id); assert.equal(relinked.missingOriginal, false); assert.ok(relinked.storageName.startsWith('relink-'));
+  const repeated = await saveImportToArchive(archive.storage, file, details, now); assert.equal(repeated.id, saved.id);
+});

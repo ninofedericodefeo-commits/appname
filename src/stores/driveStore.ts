@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -15,10 +16,10 @@ type DriveState = {
   setDestination: (destination: string) => void;
 };
 
-export const useDriveStore = create<DriveState>()(persist((set) => ({
+export const useDriveStore = create<DriveState>()(persist((rawSet) => { const set = guardedSet(rawSet); return ({
   cars: [], selectedCarId: null, lastDestination: '',
   saveCar: (car) => { const validated = validateCar(car); set((state) => ({ cars: [...state.cars.filter((item) => item.id !== car.id), validated], selectedCarId: car.id })); },
   deleteCar: (id) => set((state) => ({ cars: state.cars.filter((car) => car.id !== id), selectedCarId: state.selectedCarId === id ? state.cars.find((car) => car.id !== id)?.id ?? null : state.selectedCarId })),
   selectCar: (id) => set((state) => state.cars.some((car) => car.id === id) ? { selectedCarId: id } : {}),
   setDestination: (lastDestination) => set({ lastDestination: lastDestination.trim().slice(0, 4000) }),
-}), { name: 'gasfinder-drive-profile', storage: createJSONStorage(() => AsyncStorage), version: 1 }));
+}); }, { name: 'gasfinder-drive-profile', storage: createJSONStorage(() => appStorage), version: 1 }));

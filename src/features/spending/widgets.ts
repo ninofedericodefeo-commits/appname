@@ -1,3 +1,4 @@
+import { dataWritesBlocked } from '@/features/data/writeBarrier';
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -10,10 +11,10 @@ import { endRetiredActivities } from './widgetLogic';
 export const accountWidgetsAvailable = Platform.OS === 'ios' && Constants.expoConfig?.extra?.goalWidgetAvailable === true;
 let latestSnapshot = 0;
 export async function syncAccountWidget() {
-  if (!accountWidgetsAvailable || !usePocketStore.persist.hasHydrated() || !useWidgetSettingsStore.persist.hasHydrated()) return;
+  if (dataWritesBlocked() || !accountWidgetsAvailable || !usePocketStore.persist.hasHydrated() || !useWidgetSettingsStore.persist.hasHydrated()) return;
   const generation = ++latestSnapshot;
   const { default: widget } = await import('@/widgets/AccountWidget');
-  if (generation !== latestSnapshot) return;
+  if (dataWritesBlocked() || generation !== latestSnapshot) return;
   const account = usePocketStore.getState(), settings = useWidgetSettingsStore.getState();
   const estimate = accountBalanceEstimate(account);
   const available = availableCents(estimate.estimatedCents, account.reservedCents);
@@ -26,7 +27,7 @@ export async function syncAccountWidget() {
 
 // Retain the old factory name only to dismiss activities created by older builds.
 export async function endRetiredPurchaseActivities() {
-  if (!accountWidgetsAvailable || !useWidgetSettingsStore.persist.hasHydrated()) return;
+  if (dataWritesBlocked() || !accountWidgetsAvailable || !useWidgetSettingsStore.persist.hasHydrated()) return;
   const { default: factory } = await import('@/widgets/PurchasePauseActivity');
   await endRetiredActivities(factory.getInstances());
   if (useWidgetSettingsStore.getState().trackedPurchaseId !== null) useWidgetSettingsStore.getState().setTrackedPurchaseId(null);

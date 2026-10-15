@@ -1,3 +1,4 @@
+import type { TransactionDetails } from './repository.ts';
 import type { LoggedPurchase } from '../goals/logic.ts';
 import { bankTransactionName } from '../bank/merchantName.ts';
 
@@ -18,6 +19,8 @@ export type AccountTransaction = {
 
 export type PocketTransaction = Omit<AccountTransaction, 'source' | 'status'> & {
   directionCorrected?: boolean;
+  details?: TransactionDetails;
+  displayMerchant?: string;
   source: AccountTransaction['source'] | 'manual' | 'shortcut' | 'savings';
   status: AccountTransaction['status'] | 'logged' | 'adjustment';
   purchase?: LoggedPurchase;
@@ -147,10 +150,11 @@ export function linkAccountTransactions<T extends AccountTransaction & { rowNumb
 
 export function filterTransactions(rows: PocketTransaction[], query: string, filter: 'all' | 'out' | 'in' | 'pending' | 'savings') {
   const search = query.trim().toLowerCase();
-  return rows.filter((item) => (!search || `${transactionDisplayName(item)} ${item.title} ${item.accountLabel}`.toLowerCase().includes(search)) &&
+  return rows.filter((item) => (!search || `${transactionDisplayName(item)} ${item.title} ${item.accountLabel} ${item.details?.category ?? ""} ${item.details?.note ?? ""}`.toLowerCase().includes(search)) &&
     (filter === 'all' || filter === 'savings' && item.source === 'savings' || filter === 'in' && item.source !== 'savings' && item.amountCents > 0 || filter === 'out' && item.source !== 'savings' && item.amountCents < 0 || filter === 'pending' && item.status === 'pending'));
 }
 
-export function transactionDisplayName(transaction: Pick<PocketTransaction, 'title' | 'source'>) {
+export function transactionDisplayName(transaction: Pick<PocketTransaction, 'title' | 'source' | 'displayMerchant'>) {
+  if (transaction.displayMerchant) return transaction.displayMerchant;
   return transaction.source === 'citizens-pdf' || transaction.source === 'csv' ? bankTransactionName(transaction.title) : transaction.title;
 }

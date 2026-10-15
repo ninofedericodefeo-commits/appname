@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { removeDemoPayment, removeDemoWithdrawal } from '@/features/investing/ledger';
@@ -65,7 +66,7 @@ function migrateWithdrawals(
 
 export const useInvestmentStore = create<InvestmentState>()(
   persist(
-    (set) => ({
+    (rawSet) => { const set = guardedSet(rawSet); return ({
       feePercent: 0.5,
       maxExtraPayment: 5,
       reviewIntervalDays: 30,
@@ -144,10 +145,10 @@ export const useInvestmentStore = create<InvestmentState>()(
         });
         return removed;
       },
-    }),
+    }); },
     {
       name: 'gasfinder-investment-demo',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => appStorage),
       version: 5,
       migrate: (persistedState, version) => {
         if (version === 1) {

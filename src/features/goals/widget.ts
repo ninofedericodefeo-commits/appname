@@ -1,3 +1,4 @@
+import { dataWritesBlocked } from '@/features/data/writeBarrier';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 
@@ -10,10 +11,10 @@ let latestUpdate = 0;
 export const goalWidgetAvailable = Platform.OS === 'ios' && Constants.expoConfig?.extra?.goalWidgetAvailable === true;
 
 export async function syncGoalWidget(goal: Goal | null, settings: GoalSettings) {
-  if (!goalWidgetAvailable) return;
+  if (dataWritesBlocked() || !goalWidgetAvailable) return;
   const update = ++latestUpdate;
   const { default: GoalProgressWidget } = await import('@/widgets/GoalProgressWidget');
-  if (update !== latestUpdate) return;
+  if (dataWritesBlocked() || update !== latestUpdate) return;
   const enabled = settings.widgetEnabled && goal !== null;
   GoalProgressWidget.updateSnapshot({
     enabled,

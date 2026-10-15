@@ -38,9 +38,12 @@ function base64(bytes: Uint8Array) {
 }
 
 export const archiveStorage: ImportArchiveStorage = {
-  async list() { return (await readStore<unknown[]>('imports')).map(parseSavedImport).filter((entry): entry is SavedBankImport => !!entry); },
+  async list() {
+    const entries = (await readStore<unknown[]>('imports')).map(parseSavedImport).filter((entry): entry is SavedBankImport => !!entry);
+    return Promise.all(entries.map(async entry => { const blob = await readStore<Blob | undefined>('files', entry.storageName ?? entry.id); return { ...entry, storageName: entry.storageName ?? entry.id, missingOriginal: !blob, sizeBytes: blob?.size ?? entry.sizeBytes }; }));
+  },
   async read(entry) {
-    const blob = await readStore<Blob | undefined>('files', entry.id);
+    const blob = await readStore<Blob | undefined>('files', entry.storageName ?? entry.id);
     if (!blob) throw new Error('This saved file is missing. Choose the original statement again.');
     return entry.kind === 'pdf' ? { name: entry.name, kind: 'pdf', base64: base64(new Uint8Array(await blob.arrayBuffer())) } :
       { name: entry.name, kind: 'csv', text: await blob.text(), base64: base64(new Uint8Array(await blob.arrayBuffer())) };
@@ -52,7 +55,7 @@ export const archiveStorage: ImportArchiveStorage = {
       await new Promise<void>((resolve, reject) => {
         const transaction = db.transaction(['imports', 'files'], 'readwrite');
         transaction.objectStore('imports').put(entry);
-        transaction.objectStore('files').put(blob, entry.id);
+        transaction.objectStore('files').put(blob, entry.storageName ?? entry.id);
         transaction.oncomplete = () => resolve();
         transaction.onabort = () => reject(new Error('Could not save this file. Check available browser storage, then try again.'));
         transaction.onerror = () => reject(new Error('Could not save this file. Check available browser storage, then try again.'));
@@ -60,11 +63,19 @@ export const archiveStorage: ImportArchiveStorage = {
     } finally { db.close(); }
   },
   async share(entry) {
-    const blob = await readStore<Blob | undefined>('files', entry.id);
+    const blob = await readStore<Blob | undefined>('files', entry.storageName ?? entry.id);
     if (!blob) throw new Error('This saved file is missing.');
     const url = URL.createObjectURL(blob);
     // The screen renders a real link after reading local storage so Safari can
     // start the download from a fresh user gesture.
     return { url, name: entry.name };
+  },
+  async setMetadata(entries) {
+    const db = await openArchive();
+    try { await new Promise<void>((resolve, reject) => {
+      const transaction = db.transaction('imports', 'readwrite'), store = transaction.objectStore('imports');
+      store.clear(); entries.forEach(entry => store.put(entry));
+      transaction.oncomplete = () => resolve(); transaction.onabort = transaction.onerror = () => reject(new Error('Could not update import metadata.'));
+    }); } finally { db.close(); }
   },
 };

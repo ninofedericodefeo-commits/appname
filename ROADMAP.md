@@ -64,6 +64,14 @@ The intended result is a useful daily companion for one person. Reliability, few
 
 The current batch reports **223 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
 
+### October 14 core implementation progress
+
+- DATA-01: encrypted versioned portable backups, optional original/photo attachments, authenticated validation, staged restore, durable rollback, startup recovery and Undo restore are implemented. Synthetic browser export/restore/reload/undo passed. Native cross-install/file-sharing acceptance remains open.
+- DATA-02: optional OS authentication, configurable relock delay and app-switcher protection are implemented with device-only preferences. Physical-device authentication and snapshot acceptance remain open; AsyncStorage is not encrypted by the app lock.
+- IMP-01/IMP-02: Saved imports now supports rename, search/sort, size/period display, recoverable Trash, same-original relinking, bulk ZIP export, source transaction links and a persistent latest import outcome. Citizens/CSV file and ledger changes now share a recoverable journal. Batch review and scanned statement OCR remain open.
+- ACC-01/ACC-02: raw evidence stays intact while merchant aliases, categories, transfer/refund/reversal annotations, notes and correction history/Undo are stored separately. Full history includes date/category/source/file filters. Time-zone/source-calendar-date migration and broader match review remain open.
+- Verification for this milestone: 232 logic tests, lint, TypeScript and iOS/Android/web JS exports pass. Native builds and the remaining roadmap milestones are not marked complete by these exports.
+
 ### October 14 implementation progress
 
 **UX-04 / GAS-01:** Gas now shows area/GPS/error state and Filters above the retained map, accepts submitted city/ZIP/address or coordinates without GPS permission, and offers explicit Search this area after panning. Recent areas, station favorites and dated OpenStreetMap result snapshots persist locally. Cached results keep price ages and report partial coverage; late GPS results cannot overwrite a manual choice. My cars is compact, with selection in Manage/trip planning. See [Gas area search](docs/GAS_AREA_SEARCH.md) for service limits, cache behavior and remaining physical-device checks. Financial records, native capabilities and dependencies are unchanged.

@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -11,7 +12,7 @@ type State = StatementAutomationSettings & {
   configure: (enabled: boolean, accountLabel: string) => void;
   confirmImport: (accountLabel: string, accountIdentifier: string | null, receipt: Receipt) => void;
 };
-export const useStatementAutomationStore = create<State>()(persist((set, get) => ({
+export const useStatementAutomationStore = create<State>()(persist((rawSet, get) => { const set = guardedSet(rawSet); return ({
   enabled: false, accountLabel: '', confirmedAccountIdentifier: null, lastImport: null,
   configure: (enabled, accountLabel) => {
     // The app tracks one bank account. Its display name is not its identity.
@@ -23,7 +24,7 @@ export const useStatementAutomationStore = create<State>()(persist((set, get) =>
       (state.confirmedAccountIdentifier && !sameStatementAccount(state.confirmedAccountIdentifier, accountIdentifier))) return;
     set({ confirmedAccountIdentifier: strongestStatementIdentifier(state.confirmedAccountIdentifier, accountIdentifier), lastImport: receipt });
   },
-}), {
-  name: 'gasfinder-statement-automation-v1', storage: createJSONStorage(() => AsyncStorage),
+}); }, {
+  name: 'gasfinder-statement-automation-v1', storage: createJSONStorage(() => appStorage),
   partialize: ({ enabled, accountLabel, confirmedAccountIdentifier, lastImport }) => ({ enabled, accountLabel, confirmedAccountIdentifier, lastImport }),
 }));

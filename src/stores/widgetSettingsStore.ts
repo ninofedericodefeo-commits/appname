@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -10,8 +11,8 @@ type WidgetSettings = {
   setEnabled: (enabled: boolean) => void;
   setShowAmounts: (showAmounts: boolean) => void;
 };
-export const useWidgetSettingsStore = create<WidgetSettings>()(persist(set => ({
+export const useWidgetSettingsStore = create<WidgetSettings>()(persist(rawSet => { const set = guardedSet(rawSet); return ({
   enabled: false, showAmounts: false, trackedPurchaseId: null,
   setTrackedPurchaseId: trackedPurchaseId => set({ trackedPurchaseId }),
   setEnabled: enabled => set({ enabled }), setShowAmounts: showAmounts => set({ showAmounts }),
-}), { name: 'gasfinder-widget-settings', storage: createJSONStorage(() => AsyncStorage), version: 1 }));
+}); }, { name: 'gasfinder-widget-settings', storage: createJSONStorage(() => appStorage), version: 1 }));

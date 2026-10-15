@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { replaceSampleSubscriptions } from '@/features/subscriptions/samples';
@@ -36,7 +37,7 @@ type SubscriptionState = {
 
 export const useSubscriptionStore = create<SubscriptionState>()(
   persist(
-    (set) => ({
+    (rawSet) => { const set = guardedSet(rawSet); return ({
       subscriptions: [],
       remindersEnabled: false,
       samplesInitialized: false,
@@ -89,10 +90,10 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       removeSubscription: (id) => set((state) => ({
         subscriptions: state.subscriptions.filter((subscription) => subscription.id !== id),
       })),
-    }),
+    }); },
     {
       name: 'gasfinder-subscriptions',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: createJSONStorage(() => appStorage),
       version: 5,
       migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
         ...migrateReviewPreferences(persisted as SubscriptionState),

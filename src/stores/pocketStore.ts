@@ -1,4 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { merchantAliasKey, validateDetails, revisionCanUndo } from '@/features/pocket/repository';
+import type { TransactionDetails, TransactionRevision } from '@/features/pocket/repository';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -40,6 +43,11 @@ type PocketState = {
   accountTransactions: AccountTransaction[];
   hiddenTransactionIds: string[];
   transactionDirections: TransactionDirections;
+  transactionDetails: Record<string, TransactionDetails>;
+  merchantAliases: Record<string, string>;
+  correctionHistory: TransactionRevision[];
+  editTransactionDetails: (id: string, details: TransactionDetails, applyAlias: boolean) => void;
+  undoCorrection: (id: string) => boolean;
   correctTransactionDirection: (id: string, direction: 'in' | 'out' | null) => void;
   removeTransactionFromHistory: (id: string) => string[];
   restoreTransactionsToHistory: (ids: string[]) => void;
@@ -69,7 +77,7 @@ function entry(kind: PocketEntry['kind'], amountCents: number, goalId?: string, 
 
 export const usePocketStore = create<PocketState>()(
   persist(
-    (set, get) => ({
+    (rawSet, get) => { const set = guardedSet(rawSet); return ({
       reportedBalanceCents: null,
       balanceUpdatedAt: null,
       balanceAsOf: null,
@@ -86,9 +94,32 @@ export const usePocketStore = create<PocketState>()(
       accountTransactions: [],
       hiddenTransactionIds: [],
       transactionDirections: {},
-      correctTransactionDirection: (id, direction) => set(state => ({ transactionDirections: setTransactionDirection(
-        pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, id, direction,
-      ) })),
+      transactionDetails: {}, merchantAliases: {}, correctionHistory: [],
+      editTransactionDetails: (id, input, applyAlias) => set(state => {
+        const row = pocketTransactions(state.accountTransactions, state.purchases, state.entries).find(row => row.id === id);
+        if (!row) throw new Error('This transaction could not be found.');
+        const details = validateDetails(input), key = merchantAliasKey(row);
+        const before: TransactionRevision['before'] = { details: state.transactionDetails[id] ?? null, ...(applyAlias ? { alias: { key, value: state.merchantAliases[key] ?? null } } : {}) };
+        const after: TransactionRevision['after'] = { details, ...(applyAlias ? { alias: { key, value: details.merchant || null } } : {}) };
+        const aliases = { ...state.merchantAliases }; if (applyAlias) { if (details.merchant) aliases[key] = details.merchant; else delete aliases[key]; }
+        return { transactionDetails: { ...state.transactionDetails, [id]: details }, merchantAliases: aliases,
+          correctionHistory: [...state.correctionHistory, { id: `edit-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before, after }] };
+      }),
+      undoCorrection: id => {
+        const state = get(), revision = state.correctionHistory.find(item => item.id === id);
+        if (!revision || !revisionCanUndo(revision, state)) return false;
+        const details = { ...state.transactionDetails }, aliases = { ...state.merchantAliases };
+        if ('details' in revision.before) { if (revision.before.details) details[revision.transactionId] = revision.before.details; else delete details[revision.transactionId]; }
+        if (revision.before.alias) { if (revision.before.alias.value !== null) aliases[revision.before.alias.key] = revision.before.alias.value; else delete aliases[revision.before.alias.key]; }
+        set({ transactionDetails: details, merchantAliases: aliases,
+          transactionDirections: 'direction' in revision.before ? setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, revision.transactionId, revision.before.direction ?? null) : state.transactionDirections,
+          correctionHistory: state.correctionHistory.map(item => item.id === id ? { ...item, undoneAt: new Date().toISOString() } : item) }); return true;
+      },
+      correctTransactionDirection: (id, direction) => set(state => {
+        const directions = setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, id, direction);
+        if (directions === state.transactionDirections) return state;
+        return { transactionDirections: directions, correctionHistory: [...state.correctionHistory, { id: `direction-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before: { direction: state.transactionDirections[id] ?? null }, after: { direction } }] };
+      }),
       removeTransactionFromHistory: (id) => {
         const state = get();
         const result = hideTransactionFromHistory(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.hiddenTransactionIds, id);
@@ -214,9 +245,9 @@ export const usePocketStore = create<PocketState>()(
         widgetEnabled: settings.widgetEnabled ?? state.goalSettings.widgetEnabled,
         widgetShowAmounts: settings.widgetShowAmounts ?? state.goalSettings.widgetShowAmounts,
       } })),
-    }),
+    }); },
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => AsyncStorage), version: 9,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 10,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };

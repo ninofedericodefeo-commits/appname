@@ -76,7 +76,9 @@
               "name": "AccountWidget",
               "displayName": "GasFinder account",
               "description": "Your saved available balance and set-aside amount.",
-              "ios": { "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"] }
+              "ios": {
+                "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"]
+              }
             },
             {
               "name": "GoalProgressWidget",
@@ -87,6 +89,12 @@
               }
             }
           ]
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to unlock your GasFinder account records."
         }
       ]
     ]

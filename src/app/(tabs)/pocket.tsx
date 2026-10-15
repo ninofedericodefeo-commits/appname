@@ -8,6 +8,7 @@ import { FormScrollView } from '@/components/FormScrollView';
 import { PageToolbar } from '@/components/SettingsButton';
 import { availableCents, parseDollars } from '@/features/pocket/logic';
 import { PocketTransactions } from '@/features/pocket/PocketTransactions';
+import { annotateRows } from '@/features/pocket/repository';
 import { pocketTransactions } from '@/features/pocket/transactions';
 import { formatAmount, formatMoney as money } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -24,7 +25,7 @@ function AccountAction({ label, path, onPress }: { label: string; path: string; 
 
 export default function PocketScreen() {
   const pocket = usePocketStore();
-  const { linkedBankAccount, reportedBalanceCents, balanceSource, reservedCents, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, setReportedBalance } = pocket;
+  const { linkedBankAccount, reportedBalanceCents, balanceSource, reservedCents, entries, purchases, accountTransactions, hiddenTransactionIds, transactionDirections, transactionDetails, merchantAliases, setReportedBalance } = pocket;
   const [balanceDraft, setBalanceDraft] = useState<string | null>(null);
   const [editingBalance, setEditingBalance] = useState(false);
   const [editingPocket, setEditingPocket] = useState(false);
@@ -35,7 +36,7 @@ export default function PocketScreen() {
   const availableLabel = available === null ? '—' : money(available);
   const balanceFontSize = availableLabel.length > 9 ? Math.max(28, Math.floor(414 / availableLabel.length)) : 46;
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
-  const transactions = useMemo(() => pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, linkedBankAccount]);
+  const transactions = useMemo(() => annotateRows(pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), transactionDetails, merchantAliases).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, transactionDetails, merchantAliases, linkedBankAccount]);
 
   function updateBalance() {
     const cents = parseDollars(balanceInput);

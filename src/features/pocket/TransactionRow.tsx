@@ -1,3 +1,4 @@
+import TransactionDetailsEditor from './TransactionDetailsEditor';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -49,6 +50,8 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
         </View>
         <Text style={styles.detailText}>Corrects this history row and newer-activity estimates. Your confirmed bank balance, set-asides and original import stay unchanged.</Text>
       </>}
+      <Text style={styles.detailText}>Remove from history hides this row. It keeps the financial record, duplicate protection and balance estimate.</Text>
+      <TransactionDetailsEditor row={transaction} />
       <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${title} from history`} onPress={() => onRemove(transaction)} style={styles.removeButton}><Text style={styles.removeText}>Remove from history</Text></Pressable>
     </View>}
   </View>;

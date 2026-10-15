@@ -1,4 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { appStorage } from '@/lib/appStorage';
+import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
@@ -13,14 +14,14 @@ type ShortcutSetupState = {
   restart: () => void;
 };
 
-export const useShortcutSetupStore = create<ShortcutSetupState>()(persist((set) => ({
+export const useShortcutSetupStore = create<ShortcutSetupState>()(persist((rawSet) => { const set = guardedSet(rawSet); return ({
   stage: 'install',
   verificationStartedAt: null,
   connectCard: () => set({ stage: 'automation', verificationStartedAt: null }),
   awaitPurchase: () => set({ stage: 'verify', verificationStartedAt: new Date().toISOString() }),
   restart: () => set({ stage: 'install', verificationStartedAt: null }),
-}), {
+}); }, {
   name: 'gasfinder-shortcut-setup-v1',
-  storage: createJSONStorage(() => AsyncStorage),
+  storage: createJSONStorage(() => appStorage),
   partialize: ({ stage, verificationStartedAt }) => ({ stage, verificationStartedAt }),
 }));
