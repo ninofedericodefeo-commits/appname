@@ -22,3 +22,5 @@ export async function writeBackupPhoto(base64: string, id: string, name = 'recei
   const uri = `gas-photo:${id}.${/\.(png|heic|webp)$/i.exec(name)?.[1]?.toLowerCase() ?? 'jpg'}`, bytes = decodeBase64(base64);
   await photoStore(store => store.put(new Blob([new Uint8Array(bytes).buffer], { type: /\.png$/i.test(name) ? 'image/png' : /\.heic$/i.test(name) ? 'image/heic' : /\.webp$/i.test(name) ? 'image/webp' : 'image/jpeg' }), uri), true); return uri;
 }
+
+export async function eraseAppPhotosAndExports() { await photoStore(store => store.clear(), true); }

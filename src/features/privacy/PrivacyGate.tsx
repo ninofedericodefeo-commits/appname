@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { AppState, Modal, Platform, Pressable, Text, View } from 'react-native';
 import { useDevicePrivacy, usePrivacySession } from './deviceStore';
-import { authenticateDevice } from './authenticate';
+import { authenticateDevice, deviceAuthenticationInProgress } from './authenticate';
 import { dataStyles as s } from '@/features/data/styles';
 import { colors } from '@/theme';
 export function PrivacyGate({ children }: { children: ReactNode }) {
@@ -15,9 +15,9 @@ export function PrivacyGate({ children }: { children: ReactNode }) {
     if (Platform.OS === 'web') return;
     const listener = AppState.addEventListener('change', state => {
       setInactive(state !== 'active');
-      if (authenticating.current) return;
+      if (authenticating.current || deviceAuthenticationInProgress()) return;
       if (state !== 'active') { leftAt.current ??= Date.now(); if (enabled && relockSeconds === 0) usePrivacySession.setState({ unlocked: false }); }
-      else { if (enabled && leftAt.current !== null && Date.now() - leftAt.current >= relockSeconds * 1000) usePrivacySession.setState({ unlocked: false }); leftAt.current = null; }
+      else { if (enabled && leftAt.current !== null && (Date.now() < leftAt.current || Date.now() - leftAt.current >= relockSeconds * 1000)) usePrivacySession.setState({ unlocked: false }); leftAt.current = null; }
     });
     return () => listener.remove();
   }, [enabled, relockSeconds]);

@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+import { clearBatch } from '@/features/bank/batch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import { strToU8, strFromU8 } from 'fflate';
@@ -14,10 +16,11 @@ import { BACKUP_LIMIT, decryptBackup, digestBytes, encryptBackup, validateBackup
 import type { BackupAttachment, BackupPayload, StoreRecord } from './backupFormat';
 import { updateDataStatus, markDataReplacement } from './operationStatus';
 import { decodeBase64, encodeBase64 } from './encoding';
-import { exportDataFile, readBackupPhoto, writeBackupPhoto } from './fileIO';
+import { exportDataFile, readBackupPhoto, writeBackupPhoto, eraseAppPhotosAndExports } from './fileIO';
 
-async function secureRandom(count: number) { try { return await (await import('expo-crypto')).getRandomBytesAsync(count); } catch { throw new Error('Secure backups need the updated GasFinder app build.'); } }
+async function secureRandom(count: number) { if (Platform.OS === 'web') { if (!globalThis.crypto?.getRandomValues) throw Error('Secure random generation is unavailable in this browser.'); return globalThis.crypto.getRandomValues(new Uint8Array(count)); } try { return await (await import('expo-crypto')).getRandomBytesAsync(count); } catch { throw new Error('Secure backups need the updated GasFinder app build.'); } }
 const journalKey = 'gasfinder-data-restore-journal-v1';
+const eraseKey = 'gasfinder-erasure-in-progress-v1';
 const importJournalKey = 'gasfinder-bank-import-journal-v1';
 type Journal = { version: 1; phase: 'prepared' | 'committed'; createdAt: string; before: readonly (readonly [string, string | null])[]; archives: SavedBankImport[] };
 let running = false;
@@ -26,7 +29,7 @@ async function exclusively<T>(operation: () => Promise<T>) {
   running = true; setDataWritesBlocked(true); updateDataStatus({ busy: true, recoveryError: '' });
   try { await queryClient.cancelQueries(); await flushBankArchive(); await flushAppStorage(); return await operation(); }
   finally { let unfinished = false;
-    try { const journals = await AsyncStorage.multiGet([journalKey, importJournalKey]); unfinished = journals.some(([, value]) => value ? parseJournal(value).phase === 'prepared' : false); } catch { unfinished = true; }
+    try { const journals = await AsyncStorage.multiGet([journalKey, importJournalKey]); unfinished = !!await AsyncStorage.getItem(eraseKey) || journals.some(([, value]) => value ? parseJournal(value).phase === 'prepared' : false); } catch { unfinished = true; }
     setDataWritesBlocked(unfinished); running = false; updateDataStatus({ busy: false, recoveryError: unfinished ? 'Recovery is unfinished. Retry the saved recovery before continuing.' : '' }); }
 }
 function photoReferences(stores: Record<string, StoreRecord>) {
@@ -39,7 +42,7 @@ function photoAttachment(data: BackupPayload, reference: ReturnType<typeof photo
 export async function makeBackup(password: string, includesFiles: boolean) {
   const payload = await exclusively(async () => {
     const stores = captureStores(); await prepareStores(stores);
-    const archives = await archiveStorage.list(), attachments: BackupAttachment[] = [];
+    const archives = JSON.parse(JSON.stringify(await archiveStorage.list())) as SavedBankImport[], attachments: BackupAttachment[] = [];
     let attachmentBytes = 0;
     const append = (item: Omit<BackupAttachment, 'sha256'>) => {
       const bytes = decodeBase64(item.base64, BACKUP_LIMIT); attachmentBytes += bytes.length;
@@ -94,6 +97,7 @@ async function rollBack(journal: Journal, key = journalKey) {
   await AsyncStorage.removeItem(key);
 }
 export async function recoverInterruptedRestore() {
+  if (await AsyncStorage.getItem(eraseKey)) { await exclusively(finishErasure); return; }
   for (const key of [importJournalKey, journalKey]) {
     const stored = await AsyncStorage.getItem(key);
     if (stored) { const journal = parseJournal(stored); if (journal.phase === 'prepared') await exclusively(() => rollBack(journal, key)); }
@@ -124,7 +128,7 @@ export async function recoverableBankOperation<T>(operation: (permit: <R>(action
 export async function hasRestoreRollback() { return !!await AsyncStorage.getItem(journalKey); }
 export async function undoRestore() {
   const text = await AsyncStorage.getItem(journalKey); if (!text) throw new Error('No previous restore is available.');
-  await exclusively(() => rollBack(parseJournal(text))); markDataReplacement('Previous records recovered.');
+  await exclusively(() => rollBack(parseJournal(text))); clearBatch(); markDataReplacement('Previous records recovered.');
 }
 export async function restoreBackup(payload: BackupPayload) {
   const data = await preparePayload(validateBackup(payload)), records = data.stores;
@@ -159,11 +163,49 @@ export async function restoreBackup(payload: BackupPayload) {
       rollback: async copy => { await flushAppStorage().catch(() => undefined); await rollBack(copy); },
     });
     queryClient.clear();
-  }).then(() => { markDataReplacement('Restore complete. Review Account and reminder status in Settings.'); });
+  }).then(() => { clearBatch(); markDataReplacement('Restore complete. Review Account and reminder status in Settings.'); });
 }
 export function backupSummary(stores: Record<string, StoreRecord>) {
   const pocket = stores['gasfinder-savings-pocket']?.state ?? {};
   return { transactions: Array.isArray(pocket.accountTransactions) ? pocket.accountTransactions.length : 0, purchases: Array.isArray(pocket.purchases) ? pocket.purchases.length : 0,
     subscriptions: Array.isArray(stores['gasfinder-subscriptions']?.state.subscriptions) ? (stores['gasfinder-subscriptions'].state.subscriptions as unknown[]).length : 0,
     reservedCents: typeof pocket.reservedCents === 'number' ? pocket.reservedCents : 0 };
+}
+
+// A reset uses the same durable Undo journal as restore, preserving originals.
+export async function resetAccountData(nickname = '') {
+  if (nickname && (!nickname.trim() || nickname.length > 60)) throw Error('Choose an account name up to 60 characters.');
+  return exclusively(async () => {
+    const before = await AsyncStorage.multiGet(managedStores.map(store => store.persist.getOptions().name));
+    const archives = await archiveStorage.list(), records = captureStores(), defaults = captureStores(true);
+    records['gasfinder-savings-pocket'] = defaults['gasfinder-savings-pocket'];
+    if (nickname) records['gasfinder-savings-pocket'].state.bankImportAccountLabel = nickname.trim();
+    records['gasfinder-statement-automation-v1'] = defaults['gasfinder-statement-automation-v1'];
+    for (const name of ['gasfinder-receipt-reports', 'gasfinder-local-price-reports']) {
+      const reports = records[name].state.reports as Record<string, unknown>[];
+      reports.forEach(report => { delete report.accountLink; });
+    }
+    const prepared = await prepareStores(records);
+    const journal: Journal = { version: 1, phase: 'prepared', createdAt: new Date().toISOString(), before, archives };
+    await recoverableCommit(journal, {
+      saveJournal: async (copy, committed) => { copy.phase = committed ? 'committed' : 'prepared'; await AsyncStorage.setItem(journalKey, JSON.stringify(copy)); },
+      apply: async () => { await archiveStorage.setMetadata!(archives.map(entry => ({ ...entry, trashedAt: entry.trashedAt ?? new Date().toISOString() }))); applyStores(prepared); await flushAppStorage(); },
+      verify: async () => { await verifyPersistedRecords(); if (canonicalJson(captureStores()) !== canonicalJson(prepared)) throw Error('Account reset verification failed.'); },
+      rollback: rollBack,
+    });
+    queryClient.clear();
+  }).then(() => { clearBatch(); markDataReplacement('Account reset complete. Undo is available in Backup & restore.'); });
+}
+
+async function finishErasure() {
+  await rehydrateStores();
+  resetStores(); await flushAppStorage();
+  await archiveStorage.erase!(); await eraseAppPhotosAndExports();
+  await AsyncStorage.multiRemove([journalKey, importJournalKey]);
+  clearBatch(); queryClient.clear();
+  await AsyncStorage.removeItem(eraseKey);
+}
+export async function eraseAllAppRecords() {
+  await exclusively(async () => { await AsyncStorage.setItem(eraseKey, new Date().toISOString()); await finishErasure(); });
+  markDataReplacement('App records and saved originals erased. External backups and device privacy settings remain.');
 }

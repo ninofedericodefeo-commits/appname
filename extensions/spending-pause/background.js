@@ -10,3 +10,5 @@ api.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 api.runtime.onStartup.addListener(() => { void action({ type: 'get' }).catch(() => {}); });
 api.runtime.onInstalled.addListener(() => { void action({ type: 'get' }).catch(() => {}); });
+
+api.alarms?.onAlarm.addListener(alarm => { if (alarm.name === 'pause-override') void action({ type: 'end-override' }).catch(() => {}); });

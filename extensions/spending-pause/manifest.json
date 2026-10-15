@@ -1,11 +1,12 @@
 {
   "manifest_version": 3,
   "name": "GasFinder Spending Pause",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Browse shops while recognized checkout pages take a cooling-off break.",
   "permissions": [
     "declarativeNetRequest",
-    "storage"
+    "storage",
+    "alarms"
   ],
   "background": {
     "service_worker": "worker.js"

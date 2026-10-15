@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
-import { router } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -54,6 +54,8 @@ export default function StatementAutomationScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>CITIZENS → GASFINDER</Text>
       <Text accessibilityRole="header" style={styles.title}>Quick statement import</Text>
+      <Link href="/bank-batch" asChild><Pressable accessibilityRole="button" style={styles.secondary}><Text style={styles.secondaryText}>Import from a saved Files folder ›</Text></Pressable></Link>
+      <Text style={styles.hint}>Save downloaded statements in one folder, then choose that folder to find unarchived files. For a Home Screen shortcut, use URL → Open URLs with gasfinder://bank-batch. Folder permission is requested in the app; there is no background Citizens download.</Text>
       <Text style={styles.body}>Open your PDF in Citizens, tap Share, then send it here. GasFinder handles reading, saving and updating your account.</Text>
       <View style={styles.path}><Text style={styles.pathText}>Citizens PDF</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>Share</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>{isIPhone || Platform.OS === 'web' ? 'Import Statement' : 'GasFinder'}</Text></View>
       <View style={styles.card}>

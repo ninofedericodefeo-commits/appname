@@ -1,3 +1,4 @@
+import { StatementReminderSync } from '@/features/bank/StatementReminder';
 import { useDataStatus } from '@/features/data/operationStatus';
 import { PrivacyGate } from '@/features/privacy/PrivacyGate';
 import { DataGate } from '@/features/data/DataGate';
@@ -71,7 +72,7 @@ function ReadyLayout() {
         </Stack>
         <SubscriptionCancellationNotice />
       </View>
-      <SubscriptionReminderSync />
+      <SubscriptionReminderSync /><StatementReminderSync />
     </QueryClientProvider>
   );
 }

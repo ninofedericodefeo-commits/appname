@@ -1,3 +1,4 @@
+import { transactionDay } from './dates.ts';
 import type { TransactionDetails } from './repository.ts';
 import type { LoggedPurchase } from '../goals/logic.ts';
 import { bankTransactionName } from '../bank/merchantName.ts';
@@ -8,6 +9,13 @@ export type AccountTransaction = {
   // Signed account movement: credits positive, debits negative.
   amountCents: number;
   occurredAt: string;
+  sourceDate?: string;
+  duplicateOf?: string;
+  sourcePage?: number;
+  sourceLine?: number;
+  sourceRow?: number;
+  rawDescription?: string;
+  shadowPurchaseIds?: string[];
   source: 'csv' | 'citizens-pdf';
   status: 'posted' | 'pending' | 'recorded';
   accountLabel: string;
@@ -66,28 +74,33 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
     // A less specific or older export cannot undo a supplied bank status.
     if (old && rank[old.status] > rank[item.status]) continue;
     const next: AccountTransaction = { id: item.id, title: item.title.trim(), amountCents: item.amountCents, occurredAt: item.occurredAt,
-      source: item.source, status: item.status, accountLabel: item.accountLabel.trim(),
+      shadowPurchaseIds: old?.shadowPurchaseIds,
+      sourcePage: item.sourcePage ?? old?.sourcePage, sourceLine: item.sourceLine ?? old?.sourceLine, sourceRow: item.sourceRow ?? old?.sourceRow, rawDescription: item.rawDescription ?? old?.rawDescription,
+      source: item.source, status: item.status, sourceDate: item.sourceDate ?? old?.sourceDate ?? item.occurredAt.slice(0, 10), ...(old?.duplicateOf ? {duplicateOf:old.duplicateOf} : {}), accountLabel: item.accountLabel.trim(),
       ...(item.accountId ?? old?.accountId ? { accountId: item.accountId ?? old?.accountId } : {}),
       ...(item.recurringHint || old?.recurringHint ? { recurringHint: true } : {}),
       ...(item.transactionType ?? old?.transactionType ? { transactionType: item.transactionType ?? old?.transactionType } : {}),
-      ...(item.linkedPurchaseId || old?.linkedPurchaseId ? { linkedPurchaseId: item.linkedPurchaseId ?? old?.linkedPurchaseId } : {}) };
+      ...(item.linkedPurchaseId || old?.linkedPurchaseId ? { linkedPurchaseId: item.linkedPurchaseId && !old?.shadowPurchaseIds?.includes(item.linkedPurchaseId) ? item.linkedPurchaseId : old?.linkedPurchaseId } : {}) };
     if (!old) added++;
     else if (JSON.stringify(old) !== JSON.stringify(next)) updated++;
     if (old && old.id !== item.id) { transactions.delete(old.id); replacedIds.push({ from: old.id, to: item.id }); }
     transactions.set(item.id, next);
   }
-  return { transactions: [...transactions.values()].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
+  const replacements = new Map(replacedIds.map(pair => [pair.from,pair.to]));
+  const resolved = [...transactions.values()].map(row => row.duplicateOf && replacements.has(row.duplicateOf) ? {...row,duplicateOf:replacements.get(row.duplicateOf)} : row);
+  const byResolvedId = new Map(resolved.map(row => [row.id,row]));
+  return { transactions: resolved.map(row => row.duplicateOf && byResolvedId.get(row.duplicateOf)?.amountCents !== row.amountCents ? {...row,duplicateOf:undefined} : row).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
 }
 
 export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 
 export type TransactionDirections = Record<string, 'in' | 'out'>;
 export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = [], hiddenIds: string[] = [], directions: TransactionDirections = {}): PocketTransaction[] {
-  const linked = new Set(bank.map((item) => item.linkedPurchaseId).filter(Boolean));
+  const linked = new Set(bank.flatMap(item => [item.linkedPurchaseId,...(item.shadowPurchaseIds ?? [])]).filter(Boolean));
   const seen = new Set(bank.map((item) => item.id));
   const byPurchase = new Map(purchases.map((item) => [item.id, item]));
   const adjustmentPurchases = new Map(adjustments.map((item) => [`savings-${item.id}`, item.purchaseId]));
-  const rows: PocketTransaction[] = bank.map((item) => ({ ...item, purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
+  const rows: PocketTransaction[] = bank.filter(item => !item.duplicateOf).map((item) => ({ ...item, purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
   for (const purchase of purchases) {
     if (linked.has(purchase.id) || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 || !Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
     seen.add(purchase.id);
@@ -112,7 +125,7 @@ export function pocketTransactions(bank: AccountTransaction[], purchases: Logged
     // A deleted purchase can leave its savings entry visible. Keep that entry
     // hidden too when the user removed the purchase from history.
     !(row.source === 'savings' && hidden.has(adjustmentPurchases.get(row.id) ?? '')))
-    .sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
+    .sort((a, b) => transactionDay(b).localeCompare(transactionDay(a)) || Date.parse(b.occurredAt) - Date.parse(a.occurredAt));
 }
 
 export function setTransactionDirection(rows: PocketTransaction[], directions: TransactionDirections, id: string, direction: 'in' | 'out' | null) {
@@ -150,7 +163,7 @@ export function linkAccountTransactions<T extends AccountTransaction & { rowNumb
 
 export function filterTransactions(rows: PocketTransaction[], query: string, filter: 'all' | 'out' | 'in' | 'pending' | 'savings') {
   const search = query.trim().toLowerCase();
-  return rows.filter((item) => (!search || `${transactionDisplayName(item)} ${item.title} ${item.accountLabel} ${item.details?.category ?? ""} ${item.details?.note ?? ""}`.toLowerCase().includes(search)) &&
+  return rows.filter((item) => (!search || `${transactionDisplayName(item)} ${item.title} ${item.rawDescription ?? ""} ${item.accountLabel} ${item.details?.category ?? ""} ${item.details?.note ?? ""}`.toLowerCase().includes(search)) &&
     (filter === 'all' || filter === 'savings' && item.source === 'savings' || filter === 'in' && item.source !== 'savings' && item.amountCents > 0 || filter === 'out' && item.source !== 'savings' && item.amountCents < 0 || filter === 'pending' && item.status === 'pending'));
 }
 

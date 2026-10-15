@@ -1,7 +1,7 @@
 import type { GasStation } from '@/types/stations';
 
 export type RoutePoint = { latitude: number; longitude: number };
-export type DriveRoute = { points: RoutePoint[]; miles: number; minutes: number };
+export type DriveRoute = { points: RoutePoint[]; miles: number; minutes: number; legMiles?: number[] };
 export type RouteStation = GasStation & { milesAhead: number; milesOffRoute: number };
 export type FuelStopPlan = { rangeMiles: number; targetMiles: number; lastSafeMiles: number; searchStartMiles: number; searchEndMiles: number; needsFuel: boolean };
 
@@ -48,7 +48,8 @@ export function parseDriveRoute(payload: unknown): DriveRoute {
     return { latitude: pair[1], longitude: pair[0] };
   });
   if (points.length < 2) throw new Error('No driving route was found.');
-  return { points, miles: route.distance / 1609.344, minutes: route.duration / 60 };
+  const legMiles = Array.isArray(route.legs) && route.legs.every((leg: { distance?: number }) => Number.isFinite(leg.distance) && Number(leg.distance) >= 0) ? route.legs.map((leg: { distance: number }) => leg.distance / 1609.344) : undefined;
+  return { points, miles: route.distance / 1609.344, minutes: route.duration / 60, ...(legMiles ? { legMiles } : {}) };
 }
 
 function projected(point: RoutePoint, referenceLatitude: number) {

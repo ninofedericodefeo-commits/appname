@@ -8,8 +8,8 @@ import { parseDestinationInput, routeQueryPoints } from '@/features/stations/rou
 import type { DriveRoute, RoutePoint } from '@/features/stations/routeLogic';
 import type { GasStation } from '@/types/stations';
 
-export async function fetchDriveRoute(start: RoutePoint, destination: RoutePoint, signal: AbortSignal): Promise<DriveRoute> {
-  return fetchDrivingRoute(start, destination, signal, Platform.OS !== 'web');
+export async function fetchDriveRoute(start: RoutePoint, destination: RoutePoint, signal: AbortSignal, via: RoutePoint[] = []): Promise<DriveRoute> {
+  return fetchDrivingRoute(start, destination, signal, Platform.OS !== 'web', via);
 }
 
 export async function fetchStationsAlongRoute(points: RoutePoint[], signal: AbortSignal): Promise<GasStation[]> {

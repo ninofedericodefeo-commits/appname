@@ -25,6 +25,13 @@ function render() {
   element('choices').disabled = busy || state.enabled;
   element('start').hidden = state.enabled; element('start').disabled = busy;
   element('resume').hidden = !state.enabled;
+  element('override-box').hidden = !state.enabled;
+  const select = element('override-shop'); select.replaceChildren();
+  state.sites.forEach(site => { const option = document.createElement('option'); option.value = site; option.textContent = named(site); select.append(option); });
+  const temporary = state.override?.until > Date.now();
+  element('override-state').textContent = temporary ? `${named(state.override.site)} allowed until ${new Date(state.override.until).toLocaleTimeString()}` : 'No temporary access active.';
+  element('override').disabled = busy || !state.enabled;
+  element('end-override').hidden = !temporary;
   countdown();
 }
 async function command(value) {
@@ -61,3 +68,6 @@ async function load() {
 }
 void load();
 setInterval(() => { if (state.enabled) countdown(); }, 30_000);
+
+element('override').addEventListener('click', () => { const site = element('override-shop').value; void act(() => command({ type: 'override', site })); });
+element('end-override').addEventListener('click', () => void act(() => command({ type: 'end-override' })));

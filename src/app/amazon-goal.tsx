@@ -1,6 +1,7 @@
+import AmazonPriceReview from '@/features/goals/AmazonPriceReview';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Clipboard from 'expo-clipboard';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -20,9 +21,10 @@ function Button({ label, onPress, secondary = false, disabled = false }: { label
 }
 
 export default function AmazonGoalScreen() {
+  const params = useLocalSearchParams<{ product?: string }>();
   const { activeGoal, reservedCents, createGoal, updateGoal, endGoal } = usePocketStore();
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
-  const [link, setLink] = useState('');
+  const [link, setLink] = useState(params.product ?? '');
   const [draft, setDraft] = useState<AmazonProductDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [lookup, setLookup] = useState<{ link: AmazonLink; id: number } | null>(null);
@@ -30,7 +32,13 @@ export default function AmazonGoalScreen() {
   const [error, setError] = useState('');
   const [editingCurrent, setEditingCurrent] = useState(false);
   const [confirmArchive, setConfirmArchive] = useState(false);
-  const request = useRef(0);
+  const request = useRef(0), consumedProduct = useRef('');
+  useEffect(() => {
+    if (!ready || activeGoal || !params.product || consumedProduct.current === params.product) return;
+    consumedProduct.current = params.product;
+    const parsed = parseAmazonLink(params.product);
+    void Promise.resolve().then(() => { if (!parsed.value) { setError(parsed.error); return; } const id = ++request.current; setLink(params.product!); setLookup({link:parsed.value,id}); });
+  }, [ready,activeGoal,params.product]);
   useEffect(() => () => { request.current++; }, []);
 
   function leave() {
@@ -82,6 +90,7 @@ export default function AmazonGoalScreen() {
             <View style={styles.row}><Button label="Confirm archive" onPress={() => { endGoal(); setConfirmArchive(false); }} /><Button label="Keep current goal" secondary onPress={() => setConfirmArchive(false)} /></View>
           </View>}
         </View>
+        <AmazonPriceReview />
         {editingCurrent && <GoalEditor key={activeGoal.id} goal={activeGoal} reservedCents={0} onCancel={() => setEditingCurrent(false)} onSave={(input) => {
           const saved = updateGoal(input);
           if (saved) leave();

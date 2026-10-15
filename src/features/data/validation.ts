@@ -35,6 +35,19 @@ export function validateStoreState(name: string, state: Record<string, unknown>,
     for (const row of rows(state, 'accountTransactions')) requireValue(typeof row.title === 'string' && Number.isSafeInteger(row.amountCents) && Number.isFinite(Date.parse(String(row.occurredAt))) && ['posted', 'pending', 'recorded'].includes(String(row.status)), 'bank movement');
     for (const row of rows(state, 'entries')) requireValue(nonnegative(row.amountCents) && ['reserve', 'release', 'assign'].includes(String(row.kind)), 'savings entry');
     rows(state, 'archivedGoals');
+    for (const key of ['matchHistory','bankDuplicateHistory']) if (state[key]) for (const revision of rows(state,key)) requireValue(typeof revision.bankId === 'string' && Number.isFinite(Date.parse(String(revision.createdAt))), 'reconciliation history');
+    const bankRows = new Map((state.accountTransactions as Record<string, unknown>[]).map(row => [row.id,row]));
+    const checkedDuplicates = new Set<unknown>();
+    for (const row of bankRows.values()) if (row.duplicateOf && !checkedDuplicates.has(row.id)) {
+      const seen = new Set([row.id]); let pointer: unknown = row.duplicateOf;
+      while (pointer) {
+        requireValue(typeof pointer === 'string' && bankRows.has(pointer) && !seen.has(pointer), 'duplicate relationship');
+        const target = bankRows.get(pointer)!; requireValue(target.amountCents === row.amountCents, 'duplicate amount');
+        if (checkedDuplicates.has(pointer)) break;
+        seen.add(pointer); pointer = target.duplicateOf;
+      }
+      seen.forEach(id => checkedDuplicates.add(id));
+    }
     if (state.transactionDirections) requireValue(object(state.transactionDirections) && Object.values(state.transactionDirections).every(value => value === 'in' || value === 'out'), 'direction corrections');
     if (state.transactionDetails) { requireValue(object(state.transactionDetails), 'transaction details'); Object.values(state.transactionDetails).forEach(value => validateDetails(value as TransactionDetails)); }
     if (state.merchantAliases) requireValue(object(state.merchantAliases) && Object.values(state.merchantAliases).every(value => typeof value === 'string' && value.length <= 80), 'merchant aliases');
@@ -62,5 +75,7 @@ export function validateStoreState(name: string, state: Record<string, unknown>,
     requireValue(!report.accountLink || object(report.accountLink) && ['transaction', 'purchase'].includes(String(report.accountLink.kind)) && typeof report.accountLink.id === 'string', 'fuel account link');
     if (name === 'gasfinder-local-price-reports') requireValue(typeof report.latitude === 'number' && Math.abs(report.latitude) <= 90 && typeof report.longitude === 'number' && Math.abs(report.longitude) <= 180, 'station location');
   }
+  if (name === 'gasfinder-settings' && state.budgets !== undefined) { requireValue(object(state.budgets) && Object.values(state.budgets).every(nonnegative), 'budgets'); requireValue([0, 30, 45, 60, 90].includes(Number(state.statementReminderDays)), 'statement cadence'); }
+  if (name === 'gasfinder-savings-pocket') for (const row of state.accountTransactions as Record<string, unknown>[]) { requireValue(!row.sourceDate || typeof row.sourceDate === 'string' && dateFromKey(row.sourceDate), 'source calendar date'); requireValue(row.shadowPurchaseIds === undefined || Array.isArray(row.shadowPurchaseIds) && row.shadowPurchaseIds.every(id => typeof id === 'string'), 'linked purchase evidence'); requireValue(row.rawDescription === undefined || typeof row.rawDescription === 'string' && row.rawDescription.length <= 500, 'original description'); for (const key of ['sourcePage','sourceLine','sourceRow']) requireValue(row[key] === undefined || Number.isInteger(row[key]) && Number(row[key]) > 0, 'source location'); }
   if (name === 'gasfinder-settings') requireValue(!state.priceQualifier || ['standard', 'cash', 'card', 'member'].includes(String(state.priceQualifier)), 'selected price type');
 }

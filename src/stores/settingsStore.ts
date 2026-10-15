@@ -9,6 +9,10 @@ import { validateRefillPercent } from '@/features/stations/preferences';
 import type { MapsApp } from '@/features/stations/preferences';
 
 type SettingsState = {
+  statementReminderDays: number;
+  budgets: Record<string, number>;
+  setStatementReminderDays: (days: number) => void;
+  setBudget: (category: string, cents: number) => void;
   selectedFuelType: FuelType;
   selectedRadius: number;
   sortOrder: SortOption;
@@ -28,6 +32,9 @@ type SettingsState = {
 };
 
 export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { const set = guardedSet(rawSet); return ({
+  statementReminderDays: 0, budgets: {},
+  setStatementReminderDays: days => { if (![0, 30, 45, 60, 90].includes(days)) throw Error('Choose a reminder cadence.'); set({ statementReminderDays: days }); },
+  setBudget: (category, cents) => { if (!Number.isSafeInteger(cents) || cents < 0 || cents > 100_000_000 || category.length > 40) throw Error('Enter a valid budget.'); set(state => ({ budgets: { ...state.budgets, [category]: cents } })); },
   selectedFuelType: 'regular',
   selectedRadius: 5,
   sortOrder: 'price',
@@ -43,4 +50,4 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   setSelectedFuelType: (selectedFuelType) => set({ selectedFuelType }),
   setSelectedRadius: (selectedRadius) => set({ selectedRadius }),
   setSortOrder: (sortOrder) => set({ sortOrder }),
-}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), version: 2, migrate: state => ({ recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));
+}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), version: 3, migrate: state => ({ statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));

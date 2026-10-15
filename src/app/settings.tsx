@@ -1,3 +1,5 @@
+import BuildCapabilities from '@/features/data/BuildCapabilities';
+import StatementReminderSettings from '@/features/bank/StatementReminder';
 import PrivacySettingsPanel from '@/features/privacy/PrivacySettingsPanel';
 import Constants from 'expo-constants';
 import { useState } from 'react';
@@ -24,8 +26,10 @@ export default function SettingsScreen() {
   }
   return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}><FormScrollView contentContainerStyle={styles.content}>
     <Text style={styles.kicker}>PREFERENCES</Text><Text style={styles.title}>Settings</Text>
+    <BuildCapabilities />
     <PrivacySettingsPanel />
     <AccountSettingsPanel />
+    <Link href="/automations" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Shortcuts & capture health ›</Text></Pressable></Link>
     <View style={styles.card}><Text style={styles.heading}>Bank statements</Text>
       <Link href="/statement-automation" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up quick statement import ›</Text></Pressable></Link>
       <Text style={styles.note}>Add the shortcut and see how to share a PDF from Citizens.</Text>
@@ -34,6 +38,7 @@ export default function SettingsScreen() {
       <Link href="/spending-blocker" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Set up website blocking ›</Text></Pressable></Link>
       <Text style={styles.note}>Browse shops while recognized checkout pages are paused in Safari or desktop Chrome.</Text>
     </View>
+    <StatementReminderSettings />
     <SubscriptionSettingsPanel />
     <WidgetSettingsPanel />
     <GoalSettingsPanel />
@@ -50,7 +55,7 @@ export default function SettingsScreen() {
     </View>
     <View style={styles.card}><Text style={styles.heading}>Fuel price preference</Text><View style={styles.row}>{(['regular', 'midgrade', 'premium', 'diesel'] as const).map((fuel) => <Pressable key={fuel} accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} onPress={() => setSelectedFuelType(fuel)} style={[styles.choice, selectedFuelType === fuel && styles.selected]}><Text style={[styles.choiceText, selectedFuelType === fuel && styles.selectedText]}>{fuel.charAt(0).toUpperCase() + fuel.slice(1)}</Text></Pressable>)}</View></View>
     <Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Manage saved cars</Text></Pressable></Link>
-    <View style={styles.card}><Text style={styles.heading}>Data</Text><Link href="/backup" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Backup & restore ›</Text></Pressable></Link><Link href="/legacy-investment" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Legacy demo records ›</Text></Pressable></Link><Text style={styles.note}>Read-only records from the earlier prototype.</Text></View>
+    <View style={styles.card}><Text style={styles.heading}>Data</Text><Link href="/backup" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Backup & restore ›</Text></Pressable></Link><Link href="/account-data" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Reset or switch bank account ›</Text></Pressable></Link><Link href="/insights" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Insights & transaction export ›</Text></Pressable></Link><Link href="/legacy-investment" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>Legacy demo records ›</Text></Pressable></Link><Text style={styles.note}>Read-only records from the earlier prototype.</Text></View>
     <Text style={styles.note}>GasFinder {Constants.expoConfig?.version ?? "1.0"} · {Platform.OS} build {Platform.OS === "ios" ? Constants.expoConfig?.ios?.buildNumber ?? "development" : Constants.expoConfig?.android?.versionCode ?? "development"}{"\n"}Your preferences are saved on this device.</Text>
   </FormScrollView></SafeAreaView>;
 }

@@ -2,7 +2,22 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
-## Current implementation status — October 14, 2026
+## Current implementation status — October 15, 2026
+
+This section supersedes the older baseline below. The remaining local core roadmap is implemented; see [local features and acceptance](LOCAL_FEATURES.md), [fuel reports](FUEL_REPORTS.md), [private builds](PRIVATE_BUILDS.md) and the current [roadmap status](../ROADMAP.md).
+
+- Encrypted backups, original/photo attachments, durable restore/recovery/Undo, optional device authentication and preview privacy.
+- Account explanations, source-linked/raw transaction details, aliases/categories/classifications/audit, coverage and hidden-row recovery. Reviewed bank/local links and similar-bank duplicate decisions have Undo and feed the shared financial projection. Imported source calendar dates are explicit; legacy timestamps retain a documented compatibility fallback. Pocket schema version 13.
+- Import archive rename/search/sort/Trash/relink/bulk export/outcomes; journaled financial imports; sequential multi-file review and optional native folder candidates. A single reviewed batch balance choice locks after the first save. Signed CSVs with ambiguous direction require confirmation. Scanned native PDFs require manual row review and fully matching totals.
+- Real subscription costs/calendar/trials/categories/billing destinations, cancellation follow-through/history and reviewed newer bank schedule/refund evidence. Samples remain explicit and excluded from real totals/notifications.
+- One price/refill/photo form, reviewed Account linking, qualifiers/recent filters, recoverable report Trash, persistent web photos and recorded per-car fuel/MPG statistics. Receipt and scanned-PDF OCR are local Vision/ML Kit code; real recognition quality still needs device acceptance.
+- Saved trip destinations, preferred/avoided stations, editable stops/partial fills and explicit routed-leg/detour review. Reviewed Amazon price refresh and product share entry. Versioned desktop Chrome ZIP with ten-minute one-shop overrides and alarm failure recovery; active browser pause status remains browser-local.
+- Statement reminder settings, sanitized recent Wallet handoff outcomes and routine deep links. Backup-first recoverable single-account reset/switch and separate typed permanent erasure of app records/owned files. Private build profiles/capability matrix preserve the free Personal Team path.
+- 259 logic tests, lint, TypeScript and all-platform JS exports passed at the implementation checkpoint. Synthetic browser checks covered debit/credit batch imports, duplicate confirmation/Undo, encrypted original/photo restore across isolated origins and account reset/reload/Undo. No real bank record was uploaded or permanently erased.
+
+Remaining gates are physical-phone/native acceptance, Android compilation/real OCR samples, signing-compatible widgets, real Amazon/checkout coverage and standalone cold launch without Metro. Optional cloud/shared-price/OTA services, broader bank/credit-card formats and multi-account balances require their documented source/capability decisions. A local module or JS export is not a claim that these phone gates passed.
+
+## Earlier implementation status — October 14, 2026
 
 This section takes precedence over dated verification notes below. The first batch from `APP_REVIEW.md` implemented the following data foundations:
 
@@ -152,3 +167,5 @@ The comprehensive [future roadmap](../ROADMAP.md) is the main planning document.
 - Subs now has simple renewal cards, one shared button component and Add/Edit sheets. Manage reveals Edit, I canceled it and Delete; confirmation stays adjacent. Review-before-renewal controls remain, including the global prompt. Phone reminders and sample reset/remove are in universal Settings. Reminder changes are guarded against hydration and concurrent taps.
 - Removed the purchase waiting-list screen, store and types. No new waiting-list activity can start; old activities are dismissed at launch/foreground in widget-enabled builds. The old factory registration remains solely for dismissal compatibility. Legacy AsyncStorage and previously logged Account purchases are not erased. The Account widget no longer carries or displays waiting-list counts. Safari/desktop Chrome checkout blocking remains in Settings.
 - Verification: lint, TypeScript, 179 logic tests and iOS/Android/web exports pass, including the widget-enabled iOS export. Isolated CNG includes all 14 queries and auto-links the module on both platforms; the new iOS module compiles unsigned for the simulator. Browser checks at 390/320 px cover card geometry, adjacent delete/keep confirmation, clean Add/Edit sheets, price validation, save/reload, cancel/reactivate, prefilled bank suggestions, Settings reminder placement and honest web picker behavior. The temporary synthetic subscription was deleted afterward. Actual app detection/launch, notification permissions/scheduling and retired ActivityKit dismissal remain physical-phone checks. No Android SDK is installed here, so Kotlin compilation is unverified.
+
+Native verification: a clean ad-hoc iOS simulator build passed with the local OCR module and correctly packaged Safari extension. This does not verify phone recognition quality, device signing, notifications or standalone cold launch.

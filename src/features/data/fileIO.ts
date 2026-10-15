@@ -30,3 +30,5 @@ export async function writeBackupPhoto(base64: string, id: string, name = 'recei
   const directory = new Directory(Paths.document, 'receipts'); directory.create({ idempotent: true });
   const file = new File(directory, `restored-${id}.${/\.(png|heic|webp)$/i.exec(name)?.[1]?.toLowerCase() ?? 'jpg'}`); file.write(base64, { encoding: 'base64' }); return file.uri;
 }
+
+export async function eraseAppPhotosAndExports() { for (const folder of [new Directory(Paths.document, 'receipts'), new Directory(Paths.cache, 'Exports')]) if (folder.exists) folder.delete(); }

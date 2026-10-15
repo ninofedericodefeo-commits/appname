@@ -1,3 +1,6 @@
+import * as Clipboard from 'expo-clipboard';
+import * as Linking from 'expo-linking';
+import Constants from 'expo-constants';
 import { useCallback, useEffect, useState } from 'react';
 import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -30,6 +33,7 @@ export default function SpendingBlockerScreen() {
     catch (cause) { setError(cause instanceof Error ? cause.message : 'Open Settings → Apps → Safari → Extensions → GasFinder Spending Pause.'); }
     finally { setBusy(false); }
   }
+  const downloadUrl = Platform.OS === 'web' ? `${window.location.origin}/downloads/GasFinder-Chrome.zip` : typeof Constants.expoConfig?.extra?.privateDownloadBaseUrl === 'string' ? `${Constants.expoConfig.extra.privateDownloadBaseUrl}/downloads/GasFinder-Chrome.zip` : null;
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}><FormScrollView contentContainerStyle={styles.content}>
     <Text accessibilityRole="header" style={styles.title}>Pause online shopping</Text>
     <Text style={styles.body}>Keep browsing your favorite shops while recognized checkout and payment pages take a cooling-off break.</Text>
@@ -39,6 +43,7 @@ export default function SpendingBlockerScreen() {
       {Platform.OS === 'ios' && status?.bundled && status.settingsSupported && <Pressable accessibilityRole="button" disabled={busy} style={[styles.button, busy && styles.disabled]} onPress={() => void openSettings()}><Text style={styles.buttonText}>{busy ? 'Opening…' : 'Open Safari extension settings'}</Text></Pressable>}
       {status?.bundled && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void refresh()}><Text style={styles.link}>Check extension status</Text></Pressable>}
       {!status?.bundled && <Text style={styles.note}>{Platform.OS === 'ios' ? 'The extension comes with the new GasFinder app build. A Metro reload or Expo Go cannot add it.' : 'Use the GasFinder iPhone build for Safari, or set up the extension in desktop Chrome.'}</Text>}
+      <Text style={styles.note}>Active pause status is held by the browser extension and cannot be read here. Installed/enabled status alone is not a pause.</Text>
       <Text style={styles.note}>Choose shops and start the checkout pause from Safari’s Spending Pause controls. Enabling the extension alone does not start blocking.</Text>
     </View>
     <View style={styles.card}>
@@ -52,10 +57,13 @@ export default function SpendingBlockerScreen() {
       <Text style={styles.body}>Product pages and carts stay available. The extension blocks checkout/payment paths and checkout subdomains at selected shops, with extra rules for Amazon and eBay checkout.</Text>
       <Text style={styles.body}>Closing GasFinder or the browser keeps the pause. After the wait, open the extension and choose Resume shopping when you’re ready.</Text>
       <Text style={styles.note}>Payment inside other pages, external payment services, other browsers and shopping apps may bypass the pause. This is a checkout interruption, not a card freeze. You can disable the extension in browser settings.</Text>
+      <Text style={styles.note}>If the wrong page is blocked, the extension offers a visible 10-minute override for one selected shop. That temporarily allows checkout; blocking resumes with an extension alarm. Browser suspension or disabling the extension can interrupt enforcement.</Text>
       <Text style={styles.note}>Website choices stay in Safari on this device. The extension does not read page contents, bank data or your browsing history.</Text>
     </View>
     <View style={styles.card}>
-      <Text style={styles.heading}>Chrome on a computer</Text>
+      <Text style={styles.heading}>Chrome on a computer · v1.1.0</Text>
+      {downloadUrl ? <><Pressable accessibilityRole="button" style={styles.button} onPress={() => void Linking.openURL(downloadUrl).catch(() => setError('Could not open download.'))}><Text style={styles.buttonText}>Download Chrome extension ZIP</Text></Pressable><Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void Clipboard.setStringAsync(downloadUrl).then(() => setError('Download link copied. Send it to your own computer.'), () => setError('Could not copy download link.'))}><Text style={styles.link}>Copy download link for computer</Text></Pressable></> : <Text style={styles.note}>Open this app’s browser preview on your computer to download the ZIP. A private download address can be configured in your build; this app does not upload financial data.</Text>}
+      <Text style={styles.note}>Unzip, then Load unpacked. To update, replace the same folder and click Reload on chrome://extensions. Keep the same installation to retain its browser preferences.</Text>
       <Text style={styles.body}>The desktop Chrome companion uses the same shops, wait and checkout rules. In Chrome’s Manage extensions page, turn on Developer mode, choose Load unpacked and select the supplied GasFinder extension folder. Open Spending Pause from the extensions menu.</Text>
       <Text style={styles.note}>Chrome on iPhone cannot run browser extensions. Safari is the supported iPhone option. Each browser keeps its own pause; these settings do not sync between devices.</Text>
     </View>

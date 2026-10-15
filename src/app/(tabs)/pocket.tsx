@@ -1,3 +1,5 @@
+import { matchCandidates, bankDuplicateCandidates } from '@/features/pocket/reconciliation';
+import BalanceExplanation from '@/features/pocket/BalanceExplanation';
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -38,6 +40,7 @@ export default function PocketScreen() {
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
   const transactions = useMemo(() => annotateRows(pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), transactionDetails, merchantAliases).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, transactionDetails, merchantAliases, linkedBankAccount]);
 
+  const reviewCount = useMemo(() => matchCandidates(accountTransactions,purchases,linkedBankAccount).length + bankDuplicateCandidates(accountTransactions,linkedBankAccount).length, [accountTransactions,purchases,linkedBankAccount]);
   function updateBalance() {
     const cents = parseDollars(balanceInput);
     if (cents === null) { setBalanceError('Enter a balance using at most two decimal places.'); return; }
@@ -48,7 +51,7 @@ export default function PocketScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
       <View style={styles.balanceCard}>
-        <View style={styles.accountHeading}><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={colors.lime} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? 'My account'}</Text></View>
+        <View style={styles.accountHeading}><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke={colors.lime} strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
         <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
         {!!estimate.snapshotDay && <Text style={styles.snapshot}>{balanceSource === 'citizens-pdf' ? 'Statement balance from' : 'Bank balance checked'} {new Date(`${estimate.snapshotDay}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
         <Text accessibilityLabel={available === null ? 'Available to spend: add your bank balance' : `Available to spend: ${money(available)}`} style={[styles.balanceMain, { fontSize: balanceFontSize }, available !== null && available < 0 && styles.balanceNegative]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.6}>{availableLabel}</Text>
@@ -74,6 +77,9 @@ export default function PocketScreen() {
         <View style={styles.row}><Pressable accessibilityRole="button" style={styles.button} onPress={updateBalance}><Text style={styles.buttonText}>Save balance</Text></Pressable><Pressable accessibilityRole="button" style={styles.secondary} onPress={() => { Keyboard.dismiss(); setEditingBalance(false); }}><Text style={styles.secondaryText}>Close</Text></Pressable></View>
       </View>}
       {editingPocket && <SavingsAdjustmentSheet initialDestination="unassigned" onClose={() => setEditingPocket(false)} />}
+      <BalanceExplanation />
+      {reviewCount > 0 && <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/account-review')}><Text style={styles.secondaryText}>Review {reviewCount} possible transaction match{reviewCount === 1 ? '' : 'es'} ›</Text><Text style={styles.hint}>Similar charges stay separate until reviewed.</Text></Pressable>}
+      <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/insights')}><Text style={styles.secondaryText}>Spending insights & exports ›</Text></Pressable>
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
     </FormScrollView>

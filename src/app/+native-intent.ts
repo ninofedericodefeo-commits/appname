@@ -1,3 +1,4 @@
+import { parseAmazonLink } from '@/features/goals/amazonLink';
 import { clearSharedPayloads, getSharedPayloads } from 'expo-sharing';
 import { registerBankFile } from '@/features/bank/incomingBankFile';
 
@@ -13,6 +14,8 @@ export function redirectSystemPath({ path }: { path: string; initial: boolean })
     clearSharedPayloads();
     if (sharedToken) return `/bank-import?bankFileToken=${sharedToken}`;
     if (file) return '/bank-import';
+    const product = value?.match(/https?:\/\/[^\s<>]+/i)?.[0];
+    if (product && parseAmazonLink(product).value) return `/amazon-goal?product=${encodeURIComponent(product)}`;
     return value ? `/on-route?destination=${encodeURIComponent(value)}&handoff=${Date.now()}` : '/on-route';
   } catch { return path; }
 }

@@ -42,6 +42,29 @@ The intended result is a useful daily companion for one person. Reliability, few
 - Common actions are direct: add money to a goal, review a renewal, report a gas price and change a search area.
 - Missing data or platform limitations produce a useful explanation and a fallback.
 
+## October 15 local implementation status
+
+259 logic tests, lint, TypeScript and all-platform JavaScript exports pass. A clean iOS simulator app build also passed; phone and Android acceptance remain separate.
+
+The local implementation now includes Account explanations/reconciliation/hidden-row recovery, statement coverage/reminders, spending insights/budgets/forecasts/exports, multi-file/folder import review, reviewed scanned-PDF OCR code, Wallet capture outcomes/routine links, edited/routed trip planning, Amazon recheck/share handling, a packaged Chrome companion with timed overrides, recoverable account reset and explicit app-data erasure. Private build profiles and capability notes are included. See [local feature details and acceptance](docs/LOCAL_FEATURES.md).
+
+| Roadmap IDs | Current state |
+| --- | --- |
+| ACC-01/ACC-02 | Local review, financial projection, explanations, coverage and date fields implemented; legacy unknown-timezone ambiguity and real statement acceptance remain |
+| ACC-03 | Backup-first single-account switching/reset implemented; concurrent multiple accounts remains optional |
+| IMP-01/IMP-02 | Archive controls, source details, multi-file review and scanned mode implemented; additional bank formats need samples; real OCR/layout acceptance remains |
+| AUTO-01/AUTO-02/AUTO-03 | Native folder candidates, batch review, reminders, sanitized purchase handoff outcomes and user-invoked routine links implemented; actual iOS permissions/Wallet trigger acceptance remain |
+| GAS-02/GAS-03/GAS-04/INS-02 | Combined reports, reviewed OCR, qualifiers, recent filtering and recorded fuel/car statistics implemented; native recognition and device photo restore acceptance remain |
+| DRIVE-01 | Local plan editing, preferences, destinations, partial targets, routed-leg review and detour estimates implemented; real-road/Maps acceptance remains |
+| INS-01 | Spending, classifications, budgets, forecast and CSV/text export implemented; charts can be refined from actual use |
+| PAUSE-01/PAUSE-02 | Timed override, URL fixtures, honest state explanation and versioned Chrome ZIP/install/update handoff implemented; real browser coverage remains |
+| AMZ-01/AMZ-02 | Reviewed existing-goal recheck and product share entry implemented; live-page acceptance remains; images optional |
+| DATA-01/DATA-02/REL-02/REL-03 | Backup/privacy code, reset/erasure, build profiles and capability matrix implemented; installed standalone/offline/signing acceptance remains |
+| REL-01/WID-01/SUB-03 | Physical-device acceptance remains; widgets require compatible signing |
+| REL-04/WID-02/M8 | Optional service/capability decisions, not prerequisites for local personal use |
+
+The baseline table and milestone descriptions below are the original planning reference; the dated progress/status sections supersede their older missing-feature descriptions. Implemented code is not the same as physical-device acceptance.
+
 ## 2. Current baseline: keep completed work out of the backlog
 
 “Implemented” means code exists. It does not imply every native phone flow has been verified.

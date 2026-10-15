@@ -82,7 +82,7 @@ test('Checkout rules block payment routes while allowing browsing, carts, unrela
     assert.deepEqual(rule.condition.resourceTypes, ['main_frame', 'sub_frame', 'xmlhttprequest']);
   }
   const manifest = JSON.parse(readFileSync(new URL('../extensions/spending-pause/manifest.json', import.meta.url)));
-  assert.deepEqual(manifest.permissions, ['declarativeNetRequest', 'storage']);
+  assert.deepEqual(manifest.permissions, ['declarativeNetRequest', 'storage', 'alarms']);
   assert.equal(manifest.host_permissions, undefined); assert.equal(manifest.content_scripts, undefined);
 });
 

@@ -1,3 +1,5 @@
+import { reviewRoutedLegs, detourEconomics } from '@/features/stations/tripReview';
+import { formatMoney } from '@/lib/money';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -27,7 +29,7 @@ import { preferredMapsApp } from '@/features/stations/preferences';
 
 export default function OnRouteScreen() {
   const params = useLocalSearchParams<{ destination?: string; handoff?: string }>();
-  const { cars, selectedCarId, lastDestination, selectCar, setDestination } = useDriveStore();
+  const { cars, selectedCarId, lastDestination, destinations, preferredStationIds, avoidedStationIds, saveDestination, removeDestination, setStationPreference, selectCar, setDestination } = useDriveStore();
   const hydrated = useSyncExternalStore(useDriveStore.persist.onFinishHydration, useDriveStore.persist.hasHydrated, () => false);
   const car = cars.find((item) => item.id === selectedCarId);
   const [destinationInput, setDestinationInput] = useState('');
@@ -37,6 +39,7 @@ export default function OnRouteScreen() {
   const [origin, setOrigin] = useState<RoutePoint | null>(null);
   const [end, setEnd] = useState<RoutePoint | null>(null);
   const [plan, setPlan] = useState<DriveStopPlan | null>(null);
+  const [refillTarget, setRefillTarget] = useState('100'), [alternativePrice, setAlternativePrice] = useState(''), [access, setAccess] = useState<{ message: string; complete: boolean; extraMiles: number; points?: RoutePoint[] } | null>(null);
   const [stops, setStops] = useState<PlannedStop[]>([]);
   const [busy, setBusy] = useState('');
   const [error, setError] = useState('');
@@ -57,12 +60,12 @@ export default function OnRouteScreen() {
   const [priceCheckedAt, setPriceCheckedAt] = useState(() => Date.now());
   useEffect(() => { const timer = setInterval(() => setPriceCheckedAt(Date.now()), 60_000); return () => clearInterval(timer); }, []);
   const mapPins = useMemo(() => stops.map(({ station }, index) => { const price = station.prices.find(item => item.fuelType === fuelType && item.source !== 'sample'); return { id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude, price: price?.price ?? null, sample: false, stopNumber: index + 1, stale: !!price && !isRecentPrice(price, priceCheckedAt) }; }), [stops, fuelType, priceCheckedAt]);
-  const mapRoute = useMemo(() => route ? routeQueryPoints(route.points, 500) : [], [route]);
+  const mapRoute = useMemo(() => route ? routeQueryPoints(access?.points ?? route.points, 500) : [], [route,access]);
   const [selectedStop, setSelectedStop] = useState<string | null>(null);
   const selectPin = useCallback(async (id: string) => setSelectedStop(id), []);
 
   const clearPlan = useCallback(() => {
-    request.current?.abort(); setRoute(null); setOrigin(null); setEnd(null); setPlan(null); setStops([]); setBusy(''); setError(''); setWarning(''); setMapsError(''); setSelectedStop(null);
+    request.current?.abort(); setRoute(null); setOrigin(null); setEnd(null); setPlan(null); setStops([]); setBusy(''); setError(''); setWarning(''); setMapsError(''); setSelectedStop(null); setAccess(null);
   }, []);
   useEffect(() => () => request.current?.abort(), []);
   useEffect(() => {
@@ -91,8 +94,8 @@ export default function OnRouteScreen() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not paste. You can type or paste into the destination field.'); }
   }
 
-  async function loadStops(nextRoute: DriveRoute, initialRange: number, fullRange: number, signal: AbortSignal, forceSearch = false) {
-    setStops([]); setPlan(null); setWarning('');
+  async function loadStops(nextRoute: DriveRoute, initialRange: number, fullRange: number, signal: AbortSignal, forceSearch = false, excludedIds: string[] = []) {
+    setAccess(null); setStops([]); setPlan(null); setWarning('');
     let completedStops = 0;
     const saved = stationsFromSavedLocations(receipts, priceReports);
     const lookup = async (window: StopWindow) => {
@@ -107,9 +110,9 @@ export default function OnRouteScreen() {
         setWarning('Public station search is unavailable. Only locations you saved on this device are being checked.');
       }
       if (signal.aborted) throw new Error('Trip changed.');
-      return stationsOnRoute(withLocalPrices(found, receipts, priceReports, priceQualifier), nextRoute.points, nextRoute.miles);
+      return stationsOnRoute(withLocalPrices(found, receipts, priceReports, priceQualifier), nextRoute.points, nextRoute.miles).filter(station => !excludedIds.includes(station.id) && !useDriveStore.getState().avoidedStationIds.includes(station.id));
     };
-    const result = await planDriveStops({ routeMiles: nextRoute.miles, initialRange, fullRange, fuelType, refillPercent, forceSearch, lookup, onProgress: (progress) => { completedStops = progress.length; if (!signal.aborted) setStops(progress); } });
+    const result = await planDriveStops({ routeMiles: nextRoute.miles, initialRange, fullRange, fuelType, refillPercent, refillTargetPercent: Number(refillTarget), preferredIds: useDriveStore.getState().preferredStationIds, forceSearch, lookup, onProgress: (progress) => { completedStops = progress.length; if (!signal.aborted) setStops(progress); } });
     if (!signal.aborted) { setPlan(result); setStops(result.stops); setBusy(''); }
   }
 
@@ -148,8 +151,26 @@ export default function OnRouteScreen() {
     try { await loadStops(route, range.initialRange, range.fullRange, controller.signal, true); }
     catch (cause) { if (!controller.signal.aborted) { setBusy(''); setError(cause instanceof Error ? cause.message : 'Could not find fuel stops.'); } }
   }
+  async function replan(excludedIds: string[] = []) {
+    if (!route || !range) return;
+    request.current?.abort(); const controller = new AbortController(); request.current = controller;
+    try { await loadStops(route, range.initialRange, range.fullRange, controller.signal, true, excludedIds); }
+    catch (cause) { if (!controller.signal.aborted) { setBusy(''); setError((cause as Error).message); } }
+  }
+  async function verifyAccess() {
+    if (!origin || !end || !route || !range) return;
+    request.current?.abort(); const controller = new AbortController(); request.current = controller; setBusy('Checking road access and fuel legs…'); setAccess(null);
+    try {
+      const checked = await fetchDriveRoute(origin,end,controller.signal,stops.map(stop => stop.station));
+      if (controller.signal.aborted) return;
+      if (!checked.legMiles || checked.legMiles.length !== stops.length + 1) throw Error('The route service did not return every requested stop.');
+      const result = reviewRoutedLegs(checked.legMiles,range.initialRange,range.fullRange,refillPercent,Number(refillTarget));
+      setAccess({ points:checked.points, complete:result.complete, extraMiles:Math.max(0,checked.miles-route.miles), message:`Routed through all ${stops.length} stops: ${Math.round(checked.miles)} miles; ${Math.max(0,Math.round(checked.miles-route.miles))} added miles. ${result.complete ? 'Every routed leg fits the estimated safety range.' : 'At least one routed leg exceeds estimated safety range; change stops before driving.'} Smallest margin: ${Math.floor(Math.min(...result.rows.map(row => row.marginMiles)))} mi.` });
+    } catch (cause) { if (!controller.signal.aborted) setAccess({complete:false,extraMiles:0,message:`Road access unverified: ${(cause as Error).message}`}); }
+    finally { if (!controller.signal.aborted) setBusy(''); }
+  }
   async function openMaps(url: string) { setMapsError(''); try { await Linking.openURL(url); } catch { setMapsError('Could not open Maps on this device.'); } }
-  const googleSegments = end && plan?.complete ? googleMapsTripSegments(end, stops.map((stop) => stop.station)) : [];
+  const googleSegments = end && (access ? access.complete : plan?.complete) ? googleMapsTripSegments(end, stops.map((stop) => stop.station)) : [];
   const modernAppleMaps = Platform.OS === 'ios' && Number.parseFloat(String(Platform.Version)) >= 18.4;
 
   return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}>
@@ -161,8 +182,11 @@ export default function OnRouteScreen() {
         <Text style={styles.heading}>1 · Destination</Text>
         <TextInput style={styles.input} value={destinationInput} onChangeText={(value) => { clearPlan(); setDestinationInput(value); destinationTouched.current = true; }} placeholder="Address, city or coordinates" accessibilityLabel="Trip destination" autoCorrect={false} returnKeyType="done" />
         <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void pasteDestination()}><Text style={styles.link}>Paste an address or Maps link</Text></Pressable>
+        <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => { try { saveDestination(destinationInput); } catch (cause) { setError((cause as Error).message); } }}><Text style={styles.link}>Save this destination</Text></Pressable>
+        {destinations.map(value => <View key={value} style={styles.row}><Pressable accessibilityRole="button" style={styles.choice} onPress={() => { clearPlan(); setDestinationInput(value); destinationTouched.current = true; }}><Text style={styles.choiceText}>{value.slice(0,70)}</Text></Pressable><Pressable accessibilityRole="button" style={styles.textButton} onPress={() => removeDestination(value)}><Text style={styles.link}>Remove saved destination</Text></Pressable></View>)}
         {!!lastDestination && <Text style={styles.note}>Your last destination is remembered. You can change it above.</Text>}
       </View>
+      <View style={styles.card}><Text style={styles.heading}>Refill target</Text><TextInput accessibilityLabel="Refill tank target percentage" keyboardType="number-pad" style={styles.input} value={refillTarget} onChangeText={value => { clearPlan(); setRefillTarget(value); }} /><Text style={styles.note}>Percent of tank after each refill; 100 is full. Keep at least 5% above the safety level. Partial refills require more stops.</Text><TextInput accessibilityLabel="Alternative fuel price for comparison" keyboardType="decimal-pad" placeholder="Optional comparison price per gallon" style={styles.input} value={alternativePrice} onChangeText={setAlternativePrice} />{!!avoidedStationIds.length && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => { avoidedStationIds.forEach(id => setStationPreference(id,'none')); clearPlan(); }}><Text style={styles.link}>Clear {avoidedStationIds.length} avoided stations</Text></Pressable>}</View>
       <View style={styles.card}>
         <View style={styles.headingRow}><Text style={styles.heading}>2 · What are you driving?</Text><Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.textButton}><Text style={styles.link}>Manage cars</Text></Pressable></Link></View>
         <View style={styles.row}>{cars.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === car?.id }} onPress={() => { clearPlan(); selectCar(item.id); }} style={[styles.choice, item.id === car?.id && styles.selected]}><Text style={[styles.choiceText, item.id === car?.id && styles.selectedText]}>{item.name}</Text></Pressable>)}
@@ -188,7 +212,7 @@ export default function OnRouteScreen() {
           {plan?.reason && <Text style={styles.error}>{plan.reason} Check Maps or refuel earlier before driving.</Text>}
           {plan?.complete && !plan.needsFuel && stops.length === 0 && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void searchAnyway()}><Text style={styles.link}>Find gas on this trip anyway</Text></Pressable>}
         </View>
-        {end && plan?.complete && <View style={styles.card}><Text style={styles.heading}>Ready for {mapsName}?</Text>
+        {end && (access ? access.complete : plan?.complete) && <View style={styles.card}><Text style={styles.heading}>Ready for {mapsName}?</Text>
           {mapsApp === 'apple' && modernAppleMaps && <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(appleMapsTrip(end, stops.map((stop) => stop.station)))}><Text style={styles.primaryText}>Open trip in Apple Maps ↗</Text></Pressable>}
           {mapsApp === 'apple' && !modernAppleMaps && (stops.length === 0 ? <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(appleMapsDirections(end))}><Text style={styles.primaryText}>Open destination in Apple Maps ↗</Text></Pressable> : <Text style={styles.note}>All-stop Apple Maps links require iOS 18.4+. Use each stop’s directions below on this iPhone.</Text>)}
           {mapsApp === 'google' && googleSegments.map((segment, index) => <Pressable key={segment.url} accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(segment.url)}><Text style={styles.primaryText}>{googleSegments.length > 1 ? `Google Maps · part ${index + 1}/${googleSegments.length}${segment.firstStop <= segment.lastStop ? ` · stops ${segment.firstStop}–${segment.lastStop}` : ''}${segment.reachesDestination ? ' + destination' : ''}` : `Google Maps · ${stops.length} stops + destination`} ↗</Text></Pressable>)}
@@ -199,13 +223,15 @@ export default function OnRouteScreen() {
         {stops.map(({ station, legMiles }, index) => {
           const price = station.prices.find((item) => item.fuelType === fuelType && item.source !== 'sample');
           return <View key={station.id} style={[styles.card, selectedStop === station.id && styles.stopSelected]}>
-            <Text style={styles.kicker}>STOP {index + 1} · REFILL TO FULL</Text>
+            <Text style={styles.kicker}>STOP {index + 1} · REFILL TO {refillTarget}%</Text>
             <View style={styles.headingRow}><Text style={styles.heading}>{station.name}</Text><Text style={styles.price}>{price ? formatFuelPrice(price.price) : 'Unknown price'}</Text></View>
             <Text style={styles.note}>Mile {Math.round(station.milesAhead)} · ~{Math.round(legMiles)} mi this leg · ~{station.milesOffRoute.toFixed(1)} mi off route</Text>
             <Text style={styles.note}>{station.address}{price ? ` · ${priceDescription(price, false)}` : ` · no saved ${fuelType} price`}</Text>
+            <View style={styles.row}><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => void replan([station.id])}><Text style={styles.choiceText}>Swap stop</Text></Pressable><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => { setStops(current => current.filter(item => item.station.id !== station.id)); setPlan(current => current ? {...current,complete:false,reason:'Stop removed. Verify road access and fuel range before using this edited trip.'} : current); setAccess(null); }}><Text style={styles.choiceText}>Remove stop</Text></Pressable><Pressable accessibilityRole="button" style={styles.choice} onPress={() => setStationPreference(station.id,preferredStationIds.includes(station.id) ? 'none' : 'prefer')}><Text style={styles.choiceText}>{preferredStationIds.includes(station.id) ? 'Unprefer' : 'Prefer station'}</Text></Pressable><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => { setStationPreference(station.id,'avoid'); void replan(); }}><Text style={styles.choiceText}>Avoid & replan</Text></Pressable></View>
             <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void openMaps(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.link}>To this stop · {mapsName} ↗</Text></Pressable>
           </View>;
         })}
+        <View style={styles.card}><Pressable accessibilityRole="button" disabled={!!busy} style={styles.primary} onPress={() => void verifyAccess()}><Text style={styles.primaryText}>Check road access & routed fuel range</Text></Pressable>{access && <><Text style={access.complete ? styles.note : styles.error}>{access.message}</Text>{access.complete && <Text style={styles.note}>Routing checks roads, not opening hours, pump access or current conditions. Verify in Maps.</Text>}{(() => { const prices = stops.map(stop => stop.station.prices.find(price => price.fuelType === fuelType && isRecentPrice(price,priceCheckedAt))?.price); const unitPrice = prices.length && prices.every((price): price is number => price !== undefined) ? prices.reduce((sum,price) => sum+price!,0)/prices.length : 0; const economics = car && range && access.complete ? detourEconomics(access.extraMiles,car.mpg,unitPrice,Math.max(0,route.miles/(car.mpg*.85)-range.gallons),Number(alternativePrice)) : null; return economics ? <Text style={styles.note}>Estimated detour fuel: {formatMoney(economics.detourCents)}. Price savings before detour: {formatMoney(economics.priceSavingsCents)}. Net: {formatMoney(economics.netCents)}. Uses average recent selected-stop prices, your comparison price and car MPG with 15% range allowance; time costs excluded.</Text> : <Text style={styles.note}>Savings comparison needs recent prices for every selected stop, a comparison price, and a verified trip requiring fuel.</Text>; })()}</>}</View>
         {!!mapsError && <Text style={styles.error}>{mapsError}</Text>}
         <Text style={styles.note}>Stops favor nearby saved prices around each refill point; without reports, distance decides. Prices and range are estimates. Station proximity is measured from the route, not verified road access. Confirm exits, opening hours and fuel level in Maps. Routing: OSRM / FOSSGIS · stations/map: © OpenStreetMap contributors.</Text>
       </>}

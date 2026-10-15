@@ -30,6 +30,7 @@ export type SavedBankImport = ImportDetails & {
   contentHash?: string;
 };
 export type ImportArchiveStorage = {
+  erase?: () => Promise<void>;
   list: () => Promise<SavedBankImport[]>;
   read: (entry: SavedBankImport) => Promise<BankFile>;
   write: (entry: SavedBankImport, file: BankFile) => Promise<void>;
@@ -87,7 +88,7 @@ export async function saveImportToArchive(storage: ImportArchiveStorage, file: B
     } catch { /* A missing old file must not prevent saving the selected original. */ }
   }
   const retained = { ...existing }; delete retained.trashedAt; delete retained.missingOriginal;
-  const entry: SavedBankImport = { ...retained, ...details,
+  const entry: SavedBankImport = { ...retained, ...JSON.parse(JSON.stringify(details)),
     id: existing?.id ?? `import-${now.getTime().toString(36)}-${Math.random().toString(36).slice(2, 12)}`,
     name: existing?.name ?? file.name, kind: file.kind, fingerprint, contentHash: digestBytes(strToU8(archiveContent(file))),
     importedAt: existing?.importedAt ?? now.toISOString(), lastImportedAt: now.toISOString(),

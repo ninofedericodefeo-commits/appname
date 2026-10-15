@@ -1,6 +1,8 @@
+import { useDataStatus } from '@/features/data/operationStatus';
+import { useShortcutSetupStore } from '@/stores/shortcutSetupStore';
 import { formatMoney } from '@/lib/money';
 import { colors } from '@/theme';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -8,8 +10,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { parseImportedPurchase } from '@/features/goals/importPurchase';
 import { usePocketStore } from '@/stores/pocketStore';
 
+type ImportParams = { amount?: string; merchant?: string; id?: string; currency?: string };
 export default function ImportPurchaseScreen() {
-  const params = useLocalSearchParams<{ amount?: string; merchant?: string; id?: string; currency?: string }>();
+  const params = useLocalSearchParams<ImportParams>();
+  return <ImportPurchaseContent key={JSON.stringify(params)} params={params} />;
+}
+function ImportPurchaseContent({ params }: {params: ImportParams}) {
+  const { busy, recoveryError } = useDataStatus();
   const [openedAt] = useState(() => new Date());
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const purchases = usePocketStore((state) => state.purchases);
@@ -18,11 +25,15 @@ export default function ImportPurchaseScreen() {
   const parsed = useMemo(() => parseImportedPurchase({ amount, merchant, id, currency }, openedAt), [amount, merchant, id, currency, openedAt]);
   const logged = parsed ? purchases.find((item) => item.id === parsed.id) : undefined;
 
+  const recorded = useRef(false);
   useEffect(() => {
-    if (ready && parsed && !logged) {
-      usePocketStore.getState().addPurchase(parsed.id, parsed.title, parsed.amountCents, undefined, 'shortcut');
-    }
-  }, [ready, parsed, logged]);
+    if (!ready || busy || recoveryError || recorded.current) return;
+    recorded.current = true;
+    let outcome: 'received' | 'repeated' | 'invalid' | 'failed' = !parsed ? 'invalid' : logged ? 'repeated' : 'failed';
+    try { if (parsed && !logged && usePocketStore.getState().addPurchase(parsed.id, parsed.title, parsed.amountCents, undefined, 'shortcut')) outcome = 'received'; }
+    catch { outcome = 'failed'; }
+    useShortcutSetupStore.getState().recordCapture(outcome);
+  }, [ready, busy, recoveryError, parsed, logged]);
 
   const result = !ready ? 'waiting' : !parsed ? 'invalid' : !logged ? 'waiting' : logged.decision === 'saved' ? 'saved' : 'pending';
   const details = parsed ? `${parsed.title} · ${formatMoney(parsed.amountCents)}` : '';

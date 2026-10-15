@@ -1,3 +1,4 @@
+import { transactionDay } from './dates';
 import TransactionDetailsEditor from './TransactionDetailsEditor';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -22,7 +23,7 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
   const outgoing = !adjustment && transaction.amountCents < 0;
   const title = transactionDisplayName(transaction);
   const amount = `${adjustment ? '' : incoming ? '+' : '−'}${formatMoney(Math.abs(transaction.amountCents))}`;
-  const date = new Date(transaction.occurredAt);
+  const date = new Date(`${transactionDay(transaction)}T12:00:00`);
   const shortDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = title.replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 2).toUpperCase();
   return <View style={styles.container}>
@@ -38,7 +39,8 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
     {expanded && <View style={styles.details}>
       <Text style={styles.detailText}>{sourceNames[transaction.source]} · {statusNames[transaction.status]}</Text>
       {transaction.accountLabel ? <Text style={styles.detailText}>{transaction.accountLabel}</Text> : null}
-      <Text style={styles.detailText}>{transaction.title}</Text>
+      <Text style={styles.detailText}>{transaction.rawDescription ?? transaction.title}</Text>
+      {!!transaction.sourceRow && <Text style={styles.detailText}>{transaction.sourcePage ? `PDF page ${transaction.sourcePage}, line ${transaction.sourceLine ?? "unknown"}` : `CSV row ${transaction.sourceRow}`}</Text>}
       {adjustment && <Text style={styles.detailText}>Changes what is set aside. Money stays in your bank account.</Text>}
       {transaction.purchase && (transaction.purchase.title !== transaction.title || transaction.purchase.amountCents !== Math.abs(transaction.amountCents)) && <Text style={styles.detailText}>Savings record: {transaction.purchase.title} · {formatMoney(transaction.purchase.amountCents)}</Text>}
       {transaction.purchase && !incoming && <PurchaseCard purchase={transaction.purchase} history={purchases} goal={activeGoal} compact />}

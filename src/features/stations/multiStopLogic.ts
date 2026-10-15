@@ -20,13 +20,14 @@ export function nextStopWindow(routeMiles: number, fromMiles: number, rangeMiles
   return { fromMiles, targetMiles, searchStartMiles: Math.max(fromMiles, targetMiles - 60), searchEndMiles, rangeMiles };
 }
 
-export function chooseStop(stations: RouteStation[], window: StopWindow, fuelType: string, usedIds: string[], now = Date.now()) {
+export function chooseStop(stations: RouteStation[], window: StopWindow, fuelType: string, usedIds: string[], now = Date.now(), preferredIds: string[] = []) {
   const candidates = stations.filter((station) => !usedIds.includes(station.id) &&
     (window.fromMiles === 0 ? station.milesAhead >= 0 : station.milesAhead > window.fromMiles + 0.1) &&
     station.milesAhead >= window.searchStartMiles && station.milesAhead + station.milesOffRoute * 2 <= window.searchEndMiles);
   if (window.targetMiles <= window.fromMiles) return [...candidates].sort((a, b) => a.milesAhead + a.milesOffRoute * 2 - b.milesAhead - b.milesOffRoute * 2)[0] ?? null;
   const near = candidates.filter((station) => station.milesAhead >= window.targetMiles - 25);
   return [...(near.length ? near : candidates)].sort((a, b) => {
+    const preference = Number(preferredIds.includes(b.id)) - Number(preferredIds.includes(a.id)); if (preference) return preference;
     const price = (station: RouteStation) => station.prices.find((item) => item.fuelType === fuelType && isRecentPrice(item, now))?.price;
     const pa = price(a), pb = price(b);
     if (pa === undefined && pb !== undefined) return 1;
@@ -37,15 +38,18 @@ export function chooseStop(stations: RouteStation[], window: StopWindow, fuelTyp
 }
 
 // Query each next stop from the station actually chosen, rather than from an idealized refill point.
-export async function planDriveStops({ routeMiles, initialRange, fullRange, fuelType, lookup, onProgress, forceSearch = false, refillPercent = 10 }: {
+export async function planDriveStops({ routeMiles, initialRange, fullRange, fuelType, lookup, onProgress, forceSearch = false, refillPercent = 10, preferredIds = [], refillTargetPercent = 100 }: {
   routeMiles: number; initialRange: number; fullRange: number; fuelType: string;
   lookup: (window: StopWindow) => Promise<RouteStation[]>;
   onProgress?: (stops: PlannedStop[]) => void;
   forceSearch?: boolean;
   refillPercent?: number;
+  preferredIds?: string[];
+  refillTargetPercent?: number;
 }): Promise<DriveStopPlan> {
   if (!Number.isFinite(routeMiles) || routeMiles < 0) throw new Error('Invalid route length.');
   safeRange(fullRange, fullRange, refillPercent);
+  if (!Number.isFinite(refillTargetPercent) || refillTargetPercent > 100 || refillTargetPercent < refillPercent + 5) throw Error('Refill target must be at least 5% above your safety level, up to 100%.');
   const needsFuel = routeMiles > safeRange(initialRange, fullRange, refillPercent);
   const stops: PlannedStop[] = [];
   let fromMiles = 0, range = initialRange;
@@ -58,19 +62,19 @@ export async function planDriveStops({ routeMiles, initialRange, fullRange, fuel
     }
     if (index >= 24) return { stops, needsFuel, complete: false, gap: window, reason: 'This trip needs more than 24 fuel stops. Plan the remaining legs separately.' };
     const usedIds = stops.map((stop) => stop.station.id);
-    let station = chooseStop(await lookup(window), window, fuelType, usedIds);
+    let station = chooseStop(await lookup(window), window, fuelType, usedIds, Date.now(), preferredIds);
     // If the ideal refill area has no station, work backward through reachable sections.
     while (!station && window.searchStartMiles > fromMiles) {
       const earlierEnd = window.searchStartMiles;
       window.searchStartMiles = Math.max(fromMiles, earlierEnd - 60);
-      station = chooseStop(await lookup({ ...window, searchEndMiles: earlierEnd }), window, fuelType, usedIds);
+      station = chooseStop(await lookup({ ...window, searchEndMiles: earlierEnd }), window, fuelType, usedIds, Date.now(), preferredIds);
     }
     if (!station) return { stops, needsFuel, complete: false, gap: window, reason: `No reachable stop found before mile ${Math.floor(window.searchEndMiles)}. The remaining trip is not covered.` };
     stops.push({ station, legMiles: station.milesAhead - fromMiles + 2 * station.milesOffRoute, window });
     onProgress?.([...stops]);
     fromMiles = station.milesAhead;
     // Returning from an off-route station consumes some of the full refill.
-    range = fullRange - station.milesOffRoute;
+    range = fullRange * refillTargetPercent / 100 - station.milesOffRoute;
     if (!needsFuel) break;
   }
   return { stops, needsFuel, complete: true, gap: null, reason: null };

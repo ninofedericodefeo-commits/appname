@@ -8,6 +8,6 @@ Recorded cost and per-car views exclude Trash and collapse reports linked to the
 
 Receipt photos persist in app files on native and IndexedDB on web and can be included in encrypted backups. Photo edits write a new physical file. Backup restores remount forms to prevent stale drafts writing over replaced records.
 
-The local receipt-ocr module uses Apple Vision and bundled Android ML Kit. Suggestions require review and never save financial data themselves. Unavailable recognition leaves manual entry usable. Native compilation, real receipt quality and device-to-device photo restore still need phone acceptance. Scanned bank statements are a separate feature and do not use this recognizer.
+The local receipt-ocr module uses Apple Vision and bundled Android ML Kit. Suggestions require review and never save financial data themselves. Unavailable recognition leaves manual entry usable. The OCR module compiles in a clean iOS simulator app build. Android compilation, real receipt quality and native device-to-device photo restore still need acceptance. Synthetic browser photo backup/restore/Undo across separate origins passed. Scanned bank statements are a separate feature and do not use this recognizer.
 
 Verification: 244 logic tests, lint and TypeScript pass. Synthetic browser entry, photo persistence and report-only behavior were checked. No real receipt or payment details were used in browser fixtures.

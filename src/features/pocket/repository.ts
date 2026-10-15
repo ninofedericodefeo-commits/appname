@@ -1,3 +1,4 @@
+import { transactionDay } from './dates.ts';
 import { bankTransactionName } from '../bank/merchantName.ts';
 import type { PocketTransaction } from './transactions.ts';
 import { canonicalJson } from '../data/recovery.ts';
@@ -22,7 +23,7 @@ export function filterHistory(rows: PocketTransaction[], options: { from: string
   if (options.from && options.to && options.from > options.to) throw new Error('Start date must come before end date.');
   const ids = options.importIds ? new Set(options.importIds) : null;
   return rows.filter(row => {
-    const day = row.occurredAt.slice(0, 10);
+    const day = transactionDay(row);
     return (!options.from || day >= options.from) && (!options.to || day <= options.to) && (options.source === 'all' || row.source === options.source) &&
       (options.category === 'all' || (row.details?.category ?? 'Uncategorized') === options.category) && (!ids || ids.has(row.id));
   });

@@ -38,6 +38,7 @@ function base64(bytes: Uint8Array) {
 }
 
 export const archiveStorage: ImportArchiveStorage = {
+  async erase() { const db = await openArchive(); try { await new Promise<void>((resolve,reject) => { const transaction = db.transaction(['imports','files'],'readwrite'); transaction.objectStore('imports').clear(); transaction.objectStore('files').clear(); transaction.oncomplete = () => resolve(); transaction.onerror = transaction.onabort = () => reject(Error('Could not erase saved imports.')); }); } finally { db.close(); } },
   async list() {
     const entries = (await readStore<unknown[]>('imports')).map(parseSavedImport).filter((entry): entry is SavedBankImport => !!entry);
     return Promise.all(entries.map(async entry => { const blob = await readStore<Blob | undefined>('files', entry.storageName ?? entry.id); return { ...entry, storageName: entry.storageName ?? entry.id, missingOriginal: !blob, sizeBytes: blob?.size ?? entry.sizeBytes }; }));

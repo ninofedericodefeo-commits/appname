@@ -1,3 +1,4 @@
+import { transactionDay } from './dates.ts';
 import { accountContains } from '../bank/accountIdentity.ts';
 import type { LinkedBankAccount } from '../bank/accountIdentity.ts';
 import type { LoggedPurchase } from '../goals/logic.ts';
@@ -26,12 +27,12 @@ export function accountBalanceEstimate(state: BalanceEstimateState) {
     .filter(row => belongsToLinkedAccount(row, state.linkedBankAccount));
   const included = new Set(state.balanceIncludedTransactionIds ?? []);
   const checkedAt = state.balanceUpdatedAt ? Date.parse(state.balanceUpdatedAt) : NaN;
-  const snapshotDay = state.balanceSource === 'citizens-pdf' ? state.balanceAsOf : Number.isFinite(checkedAt) ? localDay(state.balanceUpdatedAt!) : null;
-  let deltaCents = 0, newerCount = 0, pendingCount = 0;
+  const snapshotDay = state.balanceSource === 'citizens-pdf' ? state.balanceAsOf : Number.isFinite(checkedAt) ? state.balanceAsOf ?? localDay(state.balanceUpdatedAt!) : null;
+  let deltaCents = 0, newerCount = 0, pendingCount = 0, depositsCents = 0, spendingCents = 0;
   for (const row of rows) {
     if (row.status === 'pending') { pendingCount++; continue; }
     if (confirmedCents === null || !snapshotDay) continue;
-    let newer = localDay(row.purchase?.bankPostedAt ?? row.occurredAt) > snapshotDay;
+    let newer = transactionDay(row) > snapshotDay;
     if (state.balanceSource !== 'citizens-pdf') {
       // A checked balance already incorporates known app records. Bank CSV dates
       // have no time of day: never assume their synthetic noon is a posting time.
@@ -39,8 +40,8 @@ export function accountBalanceEstimate(state: BalanceEstimateState) {
       const localPurchase = row.purchase && row.purchase.source !== 'bank-import' ? row.purchase : null;
       if (row.source === 'manual' || row.source === 'shortcut' || localPurchase) newer = Date.parse(localPurchase?.purchasedAt ?? row.occurredAt) >= checkedAt;
     }
-    if (newer) { deltaCents += row.amountCents; newerCount++; }
+    if (newer) { deltaCents += row.amountCents; newerCount++; if (row.amountCents > 0) depositsCents += row.amountCents; else spendingCents -= row.amountCents; }
   }
   return { confirmedCents, estimatedCents: confirmedCents === null ? null : confirmedCents + deltaCents,
-    deltaCents, newerCount, pendingCount, snapshotDay, canEstimate: !!snapshotDay };
+    deltaCents, depositsCents, spendingCents, newerCount, pendingCount, snapshotDay, canEstimate: !!snapshotDay };
 }

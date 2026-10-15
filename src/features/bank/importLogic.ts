@@ -47,6 +47,13 @@ function detectColumn(headers: string[], names: string[]) {
   return -1;
 }
 
+export function needsAmountDirectionReview(csv: BankCSV, mapping: BankMapping) {
+  return csv.source !== 'citizens-pdf' && mapping.mode === 'signed' && csv.rows.some(row => {
+    const amount = parseBankAmount(row[mapping.amount] ?? '');
+    return amount !== null && amount !== 0 && !statedDirection(row[mapping.type] ?? '');
+  });
+}
+
 export function guessMapping(csv: BankCSV): BankMapping {
   const columns = Object.fromEntries(Object.entries(aliases).map(([key, names]) => [key, detectColumn(csv.headers, names)])) as Pick<BankMapping, keyof typeof aliases>;
   const amounts = csv.rows.slice(0, 50).map((row) => parseBankAmount(row[columns.amount] ?? '')).filter((value) => value !== null && value !== 0);
@@ -289,8 +296,9 @@ export function previewAccountTransactions(csv: BankCSV, mapping: BankMapping, a
     const sourceId = get(mapping.transactionId);
     const key = sourceId ? JSON.stringify([namespace, 'id', sourceId]) : `${base}|${occurrence}`;
     const statusText = normalize(get(mapping.status));
-    rows.push({ id: `account-${identity(key).slice(5)}`, title: description.slice(0, 80), amountCents: delta, occurredAt,
-      source: csv.source ?? 'csv', accountLabel: accountLabel.trim(), rowNumber,
+    rows.push({ id: `account-${identity(key).slice(5)}`, title: description.slice(0, 80), amountCents: delta, occurredAt, sourceDate: dayKey(occurredAt).split('-').map((part, i) => i ? part.padStart(2, '0') : part).join('-'),
+      source: csv.source ?? 'csv', accountLabel: accountLabel.trim(), rowNumber, sourceRow: rowNumber, rawDescription: description.slice(0,500),
+      ...(csv.locations?.[index] ? {sourcePage:csv.locations[index].page,sourceLine:csv.locations[index].line} : {}),
       ...(typeof account !== 'string' ? { accountId: account.id } : {}),
       ...(/\brecurring\b/i.test(`${get(mapping.type)} ${description}`) ? { recurringHint: true } : {}),
       ...(get(mapping.type) ? { transactionType: normalize(get(mapping.type)).slice(0, 60) } : {}),

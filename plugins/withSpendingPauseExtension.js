@@ -34,12 +34,29 @@ function addExtension(project, bundleIdentifier, version, buildNumber, team) {
       PRODUCT_BUNDLE_IDENTIFIER: bundleIdentifier,
       ...(team ? { DEVELOPMENT_TEAM: team } : {}) });
   }
-  if (existing) return; // Refresh settings without duplicating native targets or build phases.
-  project.addBuildPhase([`${TARGET}/SafariWebExtensionHandler.swift`], 'PBXSourcesBuildPhase', 'Sources', target.uuid);
-  project.addBuildPhase([`${TARGET}/Resources`], 'PBXResourcesBuildPhase', 'Resources', target.uuid);
-  for (const reference of Object.values(project.pbxFileReferenceSection())) {
-    if (typeof reference === 'object' && reference.path?.replaceAll('"', '') === `${TARGET}/Resources`) reference.lastKnownFileType = 'folder';
+  // node-xcode only adds dependencies when these sections already exist.
+  // A generated Expo project may have neither, leaving embedding dependent on
+  // implicit scheduling. Repair both fresh and previously generated projects.
+  const objects = project.hash.project.objects;
+  objects.PBXTargetDependency ??= {};
+  objects.PBXContainerItemProxy ??= {};
+  const extensionId = existing ? Object.entries(project.pbxNativeTargetSection()).find(([, value]) => value === existing)?.[0] : target.uuid;
+  const main = project.getFirstTarget();
+  if (!extensionId) throw Error('Could not find the Safari extension target.');
+  const dependencies = main.firstTarget.dependencies ??= [];
+  if (!dependencies.some(reference => objects.PBXTargetDependency[reference.value]?.target === extensionId)) project.addTargetDependency(main.uuid, [extensionId]);
+  const resourceFiles = fs.readdirSync(path.join(__dirname, '../extensions/spending-pause')).filter(name => fs.statSync(path.join(__dirname, '../extensions/spending-pause', name)).isFile()).sort().map(name => `${TARGET}/Resources/${name}`);
+  // A literal Resources/ directory makes CoreFoundation interpret an iOS appex
+  // as a legacy macOS bundle and ignore its root Info.plist. Copy files flat.
+  const resourcePhase = target.pbxNativeTarget.buildPhases.find(ref => objects.PBXResourcesBuildPhase?.[ref.value]);
+  if (existing && resourcePhase) {
+    target.pbxNativeTarget.buildPhases = target.pbxNativeTarget.buildPhases.filter(ref => ref !== resourcePhase);
+    delete objects.PBXResourcesBuildPhase[resourcePhase.value]; delete objects.PBXResourcesBuildPhase[`${resourcePhase.value}_comment`];
   }
+  project.addBuildPhase(resourceFiles, 'PBXResourcesBuildPhase', 'Resources', extensionId);
+  if (existing) return;
+  project.addBuildPhase([`${TARGET}/SafariWebExtensionHandler.swift`], 'PBXSourcesBuildPhase', 'Sources', target.uuid);
+
   project.addBuildPhase([], 'PBXFrameworksBuildPhase', 'Frameworks', target.uuid);
   project.addFramework('SafariServices.framework', { target: target.uuid, link: true });
 }

@@ -1,0 +1,20 @@
+{
+  "cli": { "appVersionSource": "local" },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "0", "EXPO_PUBLIC_BUILD_TRACK": "development" },
+      "android": { "buildType": "apk" }
+    },
+    "personal-preview": {
+      "distribution": "internal",
+      "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "0", "EXPO_PUBLIC_BUILD_TRACK": "personal-preview" },
+      "android": { "buildType": "apk" },
+      "ios": { "buildConfiguration": "Release" }
+    },
+    "personal-stable": { "extends": "personal-preview", "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "0", "EXPO_PUBLIC_BUILD_TRACK": "personal-stable" } },
+    "enrolled-preview": { "extends": "personal-preview", "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "1", "EXPO_PUBLIC_BUILD_TRACK": "enrolled-preview" } },
+    "simulator-preview": { "extends": "personal-preview", "ios": { "simulator": true, "buildConfiguration": "Release" } }
+  }
+}

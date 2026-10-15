@@ -12,6 +12,7 @@ function importsFolder() {
 function savedFile(entry: SavedBankImport) { return new File(importsFolder(), archiveFilename(entry)); }
 
 export const archiveStorage: ImportArchiveStorage = {
+  async erase() { const folder = new Directory(Paths.document, 'Imports'); if (folder.exists) folder.delete(); },
   async list() {
     const metadata = importsFolder().list().filter((file): file is File => file instanceof File && /^import-[a-z0-9-]+\.json$/.test(file.name));
     const entries = await Promise.all(metadata.map(async (file) => {

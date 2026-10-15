@@ -38,6 +38,22 @@ export async function pickBankFile(): Promise<BankFile | null> {
   const result = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: false, copyToCacheDirectory: true, base64: false });
   if (result.canceled) return null;
   const asset = result.assets[0];
+  return readPickedAsset(asset);
+}
+export async function pickBankFiles(): Promise<BankFile[]> {
+  const DocumentPicker = await import('expo-document-picker');
+  const result = await DocumentPicker.getDocumentAsync({ type: '*/*', multiple: true, copyToCacheDirectory: true, base64: false });
+  if (result.canceled) return [];
+  try {
+    if (result.assets.length > 12 || result.assets.reduce((sum, asset) => sum + (asset.size ?? 0), 0) > 30 * 1024 * 1024) throw Error('Choose up to 12 files and 30 MB per batch.');
+    const files: BankFile[] = [];
+    for (const asset of result.assets) files.push(await readPickedAsset(asset));
+    return files;
+  } finally {
+    if (Platform.OS !== 'web') for (const asset of result.assets) { const file = new File(asset.uri); if (file.uri.startsWith(Paths.cache.uri) && file.exists) file.delete(); }
+  }
+}
+async function readPickedAsset(asset: import('expo-document-picker').DocumentPickerAsset): Promise<BankFile> {
   let copied: File | undefined;
   try {
     if (Platform.OS !== 'web') copied = new File(asset.uri);

@@ -40,7 +40,8 @@ function readPause(raw) {
   const delayHours = DELAYS.includes(raw.delayHours) ? raw.delayHours : 24;
   const enabled = raw.enabled === true && sites.length > 0 && Number.isSafeInteger(raw.pausedAt) && raw.pausedAt > 0 &&
     Number.isSafeInteger(raw.reviewAt) && raw.reviewAt === raw.pausedAt + delayHours * 3_600_000;
-  return { enabled, delayHours, sites, pausedAt: enabled ? raw.pausedAt : null, reviewAt: enabled ? raw.reviewAt : null };
+  const override = enabled && raw.override && sites.includes(raw.override.site) && Number.isSafeInteger(raw.override.until) && raw.override.until > 0 ? { site: raw.override.site, until: raw.override.until } : null;
+  return { enabled, delayHours, sites, pausedAt: enabled ? raw.pausedAt : null, reviewAt: enabled ? raw.reviewAt : null, ...(override ? { override } : {}) };
 }
 
 function changePause(state, command, now = Date.now()) {
@@ -56,15 +57,20 @@ function changePause(state, command, now = Date.now()) {
     if (!state.sites.length) throw new Error('Choose at least one shopping website.');
     return { ...state, enabled: true, pausedAt: now, reviewAt: now + state.delayHours * 3_600_000 };
   }
+  if (command.type === 'override') {
+    if (!state.enabled || !state.sites.includes(command.site)) throw Error('Choose a shop in the active pause.');
+    return { ...state, override: { site: command.site, until: now + 10 * 60_000 } };
+  }
+  if (command.type === 'end-override') { const next = { ...state }; delete next.override; return next; }
   if (command.type === 'resume') {
     if (!state.enabled) return state;
     if (now < state.reviewAt) throw new Error('Your cooling-off period is still running.');
-    return { ...state, enabled: false, pausedAt: null, reviewAt: null };
+    const next = { ...state, enabled: false, pausedAt: null, reviewAt: null }; delete next.override; return next;
   }
   throw new Error('This action is not supported.');
 }
 
-function blockingRules(state) {
+function blockingRules(state, now = Date.now()) {
   if (!state.enabled) return [];
   // Match request URLs, not page contents. Product and cart browsing stay available.
   const patterns = [
@@ -77,6 +83,7 @@ function blockingRules(state) {
     condition: { requestDomains: ['amazon.com'], regexFilter: '^https?://[^/]+/(gp/buy|buy)([/?#]|$)', resourceTypes: ['main_frame', 'sub_frame', 'xmlhttprequest'] } });
   if (state.sites.includes('ebay.com')) rules.push({ id: 1101, priority: 1, action: { type: 'block' },
     condition: { requestDomains: ['ebay.com'], regexFilter: '^https?://[^/]+/ck([/?#]|$)', resourceTypes: ['main_frame', 'sub_frame', 'xmlhttprequest'] } });
+  if (state.override && state.override.until > now && state.sites.includes(state.override.site)) rules.push({ id: 1200, priority: 10, action: { type: 'allow' }, condition: { requestDomains: [state.override.site], resourceTypes: ['main_frame', 'sub_frame', 'xmlhttprequest'] } });
   return rules;
 }
 
@@ -86,15 +93,17 @@ function pauseController(api, clock = Date.now) {
   let pending = Promise.resolve();
   async function rules(state) {
     const current = await api.declarativeNetRequest.getDynamicRules();
-    await api.declarativeNetRequest.updateDynamicRules({ removeRuleIds: current.map(rule => rule.id), addRules: blockingRules(state) });
+    await api.declarativeNetRequest.updateDynamicRules({ removeRuleIds: current.map(rule => rule.id), addRules: blockingRules(state, clock()) });
+    if (api.alarms) { try { await api.alarms.clear('pause-override'); if (state.override?.until > clock()) await api.alarms.create('pause-override', { when: state.override.until }); } catch (error) { const strict = { ...state }; delete strict.override; await api.declarativeNetRequest.updateDynamicRules({ removeRuleIds: blockingRules(state, clock()).map(rule => rule.id), addRules: blockingRules(strict, clock()) }); throw error; } }
   }
   async function run(command) {
     if (!command || typeof command !== 'object') throw new Error('This action is not supported.');
+    if (command.type === 'override' && !api.alarms) throw Error('Temporary access is unavailable in this browser build. Keep the pause or use browser settings.');
     const saved = await api.storage.local.get('shoppingPause');
     const previous = readPause(saved.shoppingPause);
     if (command.type === 'get') { await rules(previous); return previous; }
     const next = changePause(previous, command, clock());
-    await rules(next);
+    try { await rules(next); } catch (error) { try { await rules(previous); } catch {} throw error; }
     try { await api.storage.local.set({ shoppingPause: next }); }
     catch {
       // A storage failure must not leave a new, unsaved pause behind.

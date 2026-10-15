@@ -1,3 +1,5 @@
+import { readScannedStatement, scannedReadingAvailable } from '@/features/bank/scannedStatement';
+import { findBatchItem, batchBalanceAllowed, updateBatch, startBatch } from '@/features/bank/batch';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -5,9 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { IconButton } from '@/components/IconButton';
-import { guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '@/features/bank/importLogic';
+import { needsAmountDirectionReview, guessMapping, parseBankCSV, previewAccountTransactions, previewBankCSV } from '@/features/bank/importLogic';
 import type { BankCSV, BankMapping } from '@/features/bank/importLogic';
-import { pickBankFile, readIncomingBankFile } from '@/features/bank/pickBankFile';
+import { pickBankFiles, readIncomingBankFile } from '@/features/bank/pickBankFile';
 import type { BankFile } from '@/features/bank/bankFileTypes';
 import { readBankImport, saveBankImport, saveImportOutcome } from '@/features/bank/importArchive';
 import { recoverableBankOperation } from '@/features/data/backupService';
@@ -49,7 +51,8 @@ function Check({ checked, label, onPress, disabled = false }: { checked: boolean
 }
 
 export default function BankImportScreen() {
-  const { bankFileToken, archiveId } = useLocalSearchParams<{ bankFileToken?: string; archiveId?: string }>();
+  const { bankFileToken, archiveId, batchToken } = useLocalSearchParams<{ bankFileToken?: string; archiveId?: string; batchToken?: string }>();
+  const consumedBatch = useRef('');
   const consumedToken = useRef('');
   const consumedArchive = useRef('');
   const processedPDF = useRef(0);
@@ -79,6 +82,8 @@ export default function BankImportScreen() {
   const [automaticSaving, setAutomaticSaving] = useState(false);
   const [pendingAutomatic, setPendingAutomatic] = useState<{ id: number; statement: CitizensStatement; file: BankFile; accountLabel: string } | null>(null);
   const [error, setError] = useState('');
+  const [directionConfirmed, setDirectionConfirmed] = useState(false);
+  const [scanned, setScanned] = useState(false), [scanReviewed, setScanReviewed] = useState(false);
   const [automaticReview, setAutomaticReview] = useState('');
   const [column, setColumn] = useState<Column | null>(null);
   const [advanced, setAdvanced] = useState(false);
@@ -88,7 +93,8 @@ export default function BankImportScreen() {
   const [excludedLimit, setExcludedLimit] = useState(20);
   const [applyRule, setApplyRule] = useState(false);
   const [saveHistory, setSaveHistory] = useState(true);
-  const [balanceOverride, setBalanceOverride] = useState<boolean | null>(null);
+  const [balanceDraftOverride, setBalanceOverride] = useState<boolean | null>(null);
+  const balanceOverride = batchToken && !batchBalanceAllowed(batchToken) ? false : balanceDraftOverride;
   const [reviewOptions, setReviewOptions] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
@@ -123,16 +129,18 @@ export default function BankImportScreen() {
   const matchedRows = useMemo(() => review.rows.filter((row) => row.duplicate === 'possible' && !selectedIds.has(row.id)), [review.rows, selectedIds]);
   const balanceStatus = statement?.balance ? statementBalanceStatus(pocket, statement.balance, accountRef) : 'invalid';
   const needsBalanceChoice = !!statement?.balance && balanceStatus !== 'invalid';
-  const updateBalance = needsBalanceChoice && balanceStatus !== 'applied' && balanceOverride === true;
+  const updateBalance = (!batchToken || batchBalanceAllowed(batchToken)) && needsBalanceChoice && balanceStatus !== 'applied' && balanceOverride === true;
   const importOptions = useMemo(() => ({ matches: matchedRows, balance: updateBalance ? statement?.balance : null, statementIdentifier: statement?.accountIdentifier }), [matchedRows, updateBalance, statement?.balance, statement?.accountIdentifier]);
   const plan = useMemo(() => accountIdentity.error ? { imported: 0, skipped: 0, savedCents: 0, matched: 0, balanceUpdated: false } : applyAccountImport(pocket, selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions), [pocket, selected, applyRule, accountRef, saveHistory, history, importOptions, accountIdentity.error]);
-  const canImport = sourceFile !== null || selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0 || plan.matched > 0 || plan.balanceUpdated;
+  const directionUnconfirmed = !!csv && !!mapping && needsAmountDirectionReview(csv,mapping) && !directionConfirmed;
+  const scanBlocked = scanned && (!scanReviewed || statement?.reconciliation?.status !== 'matched');
+  const canImport = !directionUnconfirmed && !scanBlocked && (sourceFile !== null || selected.length > 0 || historyPlan.added > 0 || historyPlan.updated > 0 || plan.matched > 0 || plan.balanceUpdated);
   const purchaseRows = useMemo(() => [...review.rows].sort((a, b) => Date.parse(b.purchasedAt) - Date.parse(a.purchasedAt)), [review.rows]);
   const historyRows = useMemo(() => [...historyReview.rows].sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), [historyReview.rows]);
 
   const load = useCallback((text: string, filename: string) => {
     const parsed = parseBankCSV(text);
-    setStatement(null); setBalanceOverride(null); setMismatchReviewed(false);
+    setStatement(null); setBalanceOverride(null); setMismatchReviewed(false); setDirectionConfirmed(false);
     setCSV(parsed); setMapping(guessMapping(parsed)); setName(filename); setReviewOptions(false);
     setLimit(20); setShowExcluded(false); setExcludedLimit(20); setDone(null); setError(''); setApplyRule(false);
     setSelectionOverrides(new Map()); setSaveHistory(true); setShowHistory(false); setHistoryLimit(20);
@@ -140,11 +148,20 @@ export default function BankImportScreen() {
     Keyboard.dismiss();
   }, []);
   const openFile = useCallback((file: BankFile, current: number, shared = false) => {
-    setReviewOptions(false); setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setMismatchReviewed(false); setDone(null);
+    setScanned(false); setScanReviewed(false); setReviewOptions(false); setSourceFile(file); setCSV(null); setMapping(null); setStatement(null); setBalanceOverride(null); setMismatchReviewed(false); setDone(null);
     setAutomaticReview(''); setPendingAutomatic(null);
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
     else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
   }, [load]);
+  useEffect(() => {
+    if (!hydrated || !automationHydrated || !batchToken || consumedBatch.current === batchToken) return;
+    consumedBatch.current = batchToken;
+    const item = findBatchItem(batchToken);
+    void Promise.resolve().then(() => {
+      if (!item) { setError('Batch draft expired. Choose the files again.'); return; }
+      openFile(item.file, ++request.current); setBusy(item.file.kind === 'pdf');
+    });
+  }, [hydrated, automationHydrated, batchToken, openFile]);
   useEffect(() => {
     if (!hydrated || !automationHydrated || !bankFileToken || consumedToken.current === bankFileToken) return;
     const current = ++request.current;
@@ -232,8 +249,10 @@ export default function BankImportScreen() {
     setBusy(true); setError('');
     let readingPDF = false;
     try {
-      const file = await pickBankFile();
-      if (current !== request.current || !file) return;
+      const files = await pickBankFiles();
+      if (current !== request.current || !files.length) return;
+      if (files.length > 1) { startBatch(files); router.push('/bank-batch'); return; }
+      const file = files[0];
       readingPDF = file.kind === 'pdf'; openFile(file, current);
     } catch (cause) {
       if (current !== request.current) return;
@@ -259,13 +278,14 @@ export default function BankImportScreen() {
         const liveState = usePocketStore.getState();
         if (liveState !== reviewedState) throw new Error('Your account changed. Review the updated preview and balance choice before importing.');
         const outcome = permit(() => liveState.importBankPurchases(selected, applyRule && !!pocket.activeGoal, accountRef, saveHistory ? history : [], importOptions));
-        if (saved) await permit(() => saveImportOutcome(saved.id, { importReport: { parser: statement ? 'citizens-pdf-v3' : 'csv-v1', excludedRows: historyReview.excluded.length,
+        if (saved) await permit(() => saveImportOutcome(saved.id, { importReport: { parser: scanned ? 'citizens-scanned-reviewed-v1' : statement ? 'citizens-pdf-v3' : 'csv-v1', excludedRows: historyReview.excluded.length,
           matched: outcome.matched, added: outcome.transactionsAdded, balanceUpdated: outcome.balanceUpdated, savedCents: outcome.savedCents, checks: statement?.reconciliation?.status === 'mismatch' && mismatchReviewed ? 'mismatch acknowledged' : statement?.reconciliation?.status ?? 'unverified' } }));
         permit(() => { const setup = useStatementAutomationStore.getState(); setup.configure(setup.enabled, account);
           if (sourceFile && statement?.balance) useStatementAutomationStore.getState().confirmImport(account, statement.accountIdentifier,
             { name: sourceFile.name, importedAt: new Date().toISOString(), balanceAsOf: statement.balance.asOf, automatic: false }); });
         return outcome;
       });
+      if (batchToken) updateBatch(batchToken, { saved: true });
       setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
     } catch (cause) {
       if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not save the file in Imports. Try again.');
@@ -292,19 +312,21 @@ export default function BankImportScreen() {
         {done.skipped > 0 && <Text style={styles.hint}>{done.skipped.toLocaleString()} duplicate or invalid rows weren’t added.</Text>}
         <Button label="Open Account" onPress={() => router.navigate('/pocket')} />
         <Pressable accessibilityRole="button" style={styles.smallLink} onPress={() => router.push('/bank-imports')}><Text style={styles.linkText}>Saved imports ›</Text></Pressable>
-        <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />
+        {batchToken && <Button label="Back to batch" secondary onPress={() => router.back()} />}
+        {!batchToken && <Button label="Choose another file" secondary onPress={() => { setDone(null); void chooseFile(); }} />}
       </View> : <>
         {(!csv || automaticSaving) && <View style={styles.landing}>
-          <Button label={busy ? (automaticSaving ? 'Saving shared statement…' : pdfJob ? 'Reading PDF…' : 'Opening file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated} />
+          <Button label={busy ? (automaticSaving ? 'Saving shared statement…' : pdfJob ? 'Reading PDF…' : 'Opening file…') : 'Choose bank PDF or CSV'} onPress={() => void chooseFile()} disabled={busy || !hydrated || !!batchToken} />
+          {batchToken && <Button label="Back to batch" secondary onPress={() => router.back()} />}
           <Pressable accessibilityRole="button" style={styles.smallLink} onPress={() => router.push('/bank-imports')}><Text style={styles.linkText}>Saved imports ›</Text></Pressable>
           {busy && <Button label="Cancel" secondary onPress={cancelReading} />}
         </View>}
         {csv && mapping && !automaticSaving && <>
           {automaticReview ? <View style={styles.card}><Text style={styles.section}>A quick review is needed</Text><Text style={styles.body}>{automaticReview}</Text></View> : null}
           <View style={styles.card}>
-            <View style={styles.rowBetween}><Text style={styles.section}>Selected file</Text><Pressable accessibilityRole="button" style={styles.smallLink} disabled={busy} onPress={() => void chooseFile()}><Text style={styles.linkText}>Change file</Text></Pressable></View>
+            <View style={styles.rowBetween}><Text style={styles.section}>Selected file</Text><Pressable accessibilityRole="button" style={styles.smallLink} disabled={busy || !!batchToken} onPress={() => void chooseFile()}><Text style={styles.linkText}>Change file</Text></Pressable></View>
             <Text style={styles.body}>{name}</Text>
-            <Text style={styles.hint}>{account} · {historyReview.rows.length.toLocaleString()} bank transactions · {selected.length.toLocaleString()} new purchases</Text>
+            <Text style={styles.hint}>{account} · {historyReview.rows.length.toLocaleString()} bank transactions · {directionUnconfirmed ? 'confirm amount direction below' : `${selected.length.toLocaleString()} new purchases`}</Text>
             {matchedRows.length > 0 && <Text style={styles.hint}>{matchedRows.length} possible purchase match{matchedRows.length === 1 ? '' : 'es'} will link to existing purchases. Use Import options if these were separate purchases.</Text>}
             {statement && <Text style={styles.hint}>{statement.pages} pages · {statement.periods.join(' · ')}</Text>}
             {statement && statement.warnings.length > 0 && <><Text style={styles.error}>{statement.warnings.length} reading warnings. Review these in the original PDF:</Text>{statement.warnings.slice(0, excludedLimit).map((warning, index) => <Text key={index} style={styles.hint}>Page {warning.page}, line {warning.line}: {warning.reason}</Text>)}{excludedLimit < statement.warnings.length && <Button label="Show more unreadable rows" secondary onPress={() => setExcludedLimit(excludedLimit + 30)} />}</>}
@@ -318,7 +340,7 @@ export default function BankImportScreen() {
               <Text style={styles.transactionTitle}>{formatMoney(statement.balance.amountCents)} · {new Date(`${statement.balance.asOf}T12:00:00`).toLocaleDateString()}</Text>
               <Text style={styles.hint}>Closing balance · PDF page {statement.balance.page}{pocket.reportedBalanceCents !== null ? ` · Saved balance ${formatMoney(pocket.reportedBalanceCents)}` : ''}</Text>
               {needsBalanceChoice && <View style={styles.row}>
-                <Choice label="Use PDF balance" selected={balanceOverride === true} disabled={busy} onPress={() => setBalanceOverride(true)} />
+                <Choice label="Use PDF balance" selected={balanceOverride === true} disabled={busy || !!batchToken && !batchBalanceAllowed(batchToken)} onPress={() => setBalanceOverride(true)} />
                 <Choice label="Keep current balance" selected={balanceOverride === false} disabled={busy} onPress={() => setBalanceOverride(false)} />
               </View>}
               <Text style={styles.hint}>{balanceStatus === 'applied' ? 'Account already has this statement’s closing balance.' : balanceStatus === 'invalid' ? 'This balance cannot be applied. Your saved balance will stay as entered.' : balanceStatus === 'older' ? 'This statement is older than your saved balance. Choose whether to replace it.' : balanceOverride === null ? 'Choose a balance option before saving this PDF.' : updateBalance ? 'Your Account balance will be set to the PDF amount.' : 'Your saved Account balance will stay as entered.'}</Text>
@@ -326,6 +348,7 @@ export default function BankImportScreen() {
               <Text style={styles.hint}>A statement shows the balance on its closing date. Later purchases and deposits may have changed it.</Text>
             </> : <Text style={styles.hint}>No clear closing balance was found. Update your balance manually in Account.</Text>}
           </View>}
+          {needsAmountDirectionReview(csv,mapping) && <View style={styles.card}><Text style={styles.section}>Confirm amount direction</Text><Text style={styles.hint}>An amount column alone cannot prove whether positive values are deposits or spending. Check your original export. Money spent is:</Text><View style={styles.row}><Choice label="Negative (−); positive means deposit" selected={directionConfirmed && mapping.spendingSign === 'negative'} onPress={() => { setMapping({...mapping,spendingSign:'negative'}); setDirectionConfirmed(true); }} /><Choice label="Positive (+); negative means credit" selected={directionConfirmed && mapping.spendingSign === 'positive'} onPress={() => { setMapping({...mapping,spendingSign:'positive'}); setDirectionConfirmed(true); }} /></View></View>}
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: reviewOptions || !!review.error }} disabled={!!review.error} style={styles.optionsToggle} onPress={() => setReviewOptions(!reviewOptions)}><Text style={styles.linkText}>Import options</Text><Text style={styles.linkText}>{reviewOptions || review.error ? '⌄' : '›'}</Text></Pressable>
           {(reviewOptions || !!review.error) && <>
             <View style={styles.card}>
@@ -387,6 +410,7 @@ export default function BankImportScreen() {
           </View>
           </>}
           <View style={styles.card}>
+            {scanned && <><Text style={styles.error}>Scanned statement: compare every direction, date and amount against the original. All available summary totals must reconcile; partial/unavailable/mismatched checks cannot be overridden in this mode.</Text><Choice label={scanReviewed ? '✓ I checked every scanned row against the PDF' : 'I checked every scanned row against the PDF'} selected={scanReviewed} onPress={() => setScanReviewed(!scanReviewed)} /></>}
             <Text style={styles.body}>Your original file will be saved in Imports. Spending helps find subscriptions.</Text>
             {applyRule && <Text style={styles.hint}>{formatMoney(plan.savedCents)} will be added to your set-aside estimate.</Text>}
             <Button label={busy ? 'Saving import…' : 'Save import'} disabled={!canImport || !!review.error || !!accountIdentity.error || statement?.reconciliation?.status === 'mismatch' && !mismatchReviewed || !hydrated || !automationHydrated || busy || !!pendingAutomatic || (needsBalanceChoice && balanceOverride === null)} onPress={() => void importSelected()} />
@@ -394,6 +418,7 @@ export default function BankImportScreen() {
         </>}
       </>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+      {sourceFile?.kind === 'pdf' && !busy && !csv && <View style={styles.card}><Text style={styles.section}>Scanned statement?</Text><Text style={styles.hint}>Optional on-device OCR for up to 12 pages. It requires row-by-row review and matching summary totals. Downloading the original Citizens PDF is preferable when available.</Text><Button label="Read scanned PDF on device" disabled={!scannedReadingAvailable} onPress={() => { const current = ++request.current; setBusy(true); setError(''); void readScannedStatement(sourceFile.base64).then(result => { if (current !== request.current) return; const parsed = parseCitizensStatement(result.pages); setScanned(true); setScanReviewed(false); setStatement(parsed); setCSV(parsed.csv); setMapping(guessMapping(parsed.csv)); setName(sourceFile.name); setBalanceOverride(null); setAutomaticReview(`Scanned statement · ${result.uncertain} uncertain text areas. Compare every row with the original.`); }).catch(cause => { if (current === request.current) setError(cause.message); }).finally(() => { if (current === request.current) setBusy(false); }); }} />{!scannedReadingAvailable && <Text style={styles.hint}>An updated native app build is required. Manual CSV and original text PDFs remain available.</Text>}</View>}
     </FormScrollView>
     {pdfJob && <PDFStatementReader key={pdfJob.id} base64={pdfJob.base64} dom={{ style: { width: 1, height: 1 }, scrollEnabled: false }} onRead={async (pages) => {
       if (request.current !== pdfJob.id || processedPDF.current === pdfJob.id) return;

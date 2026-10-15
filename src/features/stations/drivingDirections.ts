@@ -28,8 +28,9 @@ function waitForSlot(signal: AbortSignal) {
   return slot;
 }
 
-export async function fetchDrivingRoute(start: RoutePoint, destination: RoutePoint, signal: AbortSignal, nativeHeaders: boolean): Promise<DriveRoute> {
-  const coordinates = `${start.longitude.toFixed(6)},${start.latitude.toFixed(6)};${destination.longitude.toFixed(6)},${destination.latitude.toFixed(6)}`;
+export async function fetchDrivingRoute(start: RoutePoint, destination: RoutePoint, signal: AbortSignal, nativeHeaders: boolean, via: RoutePoint[] = []): Promise<DriveRoute> {
+  if (via.length > 24) throw Error('Verify at most 24 fuel stops.');
+  const coordinates = [start,...via,destination].map(point => `${point.longitude.toFixed(6)},${point.latitude.toFixed(6)}`).join(';');
   ensureActive(signal);
   const saved = cache.get(coordinates);
   if (saved && saved.expires > Date.now()) return saved.route;
