@@ -11,6 +11,7 @@ import SubscriptionSettingsPanel from '@/features/subscriptions/SubscriptionSett
 import GoalSettingsPanel from '@/features/goals/GoalSettingsPanel';
 import WidgetSettingsPanel from '@/features/spending/WidgetSettingsPanel';
 import PrivacySettingsPanel from '@/features/privacy/PrivacySettingsPanel';
+import EraseDataPanel from '@/features/data/EraseDataPanel';
 import BuildCapabilities from '@/features/data/BuildCapabilities';
 import { dataStyles as s } from '@/features/data/styles';
 
@@ -45,6 +46,7 @@ export default function SettingsSectionScreen() {
       <SettingsLink href="/account-data" label="Reset or switch bank account" />
       <SettingsLink href="/legacy-investment" label="Legacy demo records" />
       <Text style={s.note}>Legacy records are read-only records from the earlier prototype.</Text>
+      <EraseDataPanel />
     </>}
     {section === 'about' && <>
       <Text style={s.body}>GasFinder {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
