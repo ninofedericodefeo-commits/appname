@@ -7,13 +7,15 @@ import { makeBackup, inspectBackup, restoreBackup, backupSummary, hasRestoreRoll
 import { pickBackupText } from '@/features/data/fileIO';
 import type { ExportLink } from '@/features/data/fileIO';
 import type { BackupPayload } from '@/features/data/backupFormat';
+import { useDataStatus } from '@/features/data/operationStatus';
 import { dataStyles as s } from '@/features/data/styles';
 import { formatMoney } from '@/lib/money';
 
 export default function BackupScreen() {
+  const { notice } = useDataStatus();
   const [password, setPassword] = useState(''), [confirm, setConfirm] = useState(''), [files, setFiles] = useState(true);
   const [restorePassword, setRestorePassword] = useState(''), [file, setFile] = useState<string | null>(null), [preview, setPreview] = useState<BackupPayload | null>(null);
-  const [busy, setBusy] = useState(false), [message, setMessage] = useState(''), [error, setError] = useState('');
+  const [busy, setBusy] = useState(false), [message, setMessage] = useState(notice), [error, setError] = useState('');
   const [download, setDownload] = useState<ExportLink | null>(null), [canUndo, setCanUndo] = useState(false), [undoConfirm, setUndoConfirm] = useState(false);
   useEffect(() => { void hasRestoreRollback().then(setCanUndo).catch(() => undefined); }, []);
   useEffect(() => () => { if (download && Platform.OS === 'web') URL.revokeObjectURL(download.url); }, [download]);

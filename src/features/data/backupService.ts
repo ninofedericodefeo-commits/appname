@@ -12,7 +12,7 @@ import { canonicalJson, recoverableCommit } from './recovery.ts';
 import { setDataWritesBlocked } from './writeBarrier';
 import { BACKUP_LIMIT, decryptBackup, digestBytes, encryptBackup, validateBackup } from './backupFormat';
 import type { BackupAttachment, BackupPayload, StoreRecord } from './backupFormat';
-import { updateDataStatus } from './operationStatus';
+import { updateDataStatus, markDataReplacement } from './operationStatus';
 import { decodeBase64, encodeBase64 } from './encoding';
 import { exportDataFile, readBackupPhoto, writeBackupPhoto } from './fileIO';
 
@@ -29,6 +29,13 @@ async function exclusively<T>(operation: () => Promise<T>) {
     try { const journals = await AsyncStorage.multiGet([journalKey, importJournalKey]); unfinished = journals.some(([, value]) => value ? parseJournal(value).phase === 'prepared' : false); } catch { unfinished = true; }
     setDataWritesBlocked(unfinished); running = false; updateDataStatus({ busy: false, recoveryError: unfinished ? 'Recovery is unfinished. Retry the saved recovery before continuing.' : '' }); }
 }
+function photoReferences(stores: Record<string, StoreRecord>) {
+  return ['gasfinder-receipt-reports', 'gasfinder-local-price-reports'].flatMap((name, index) =>
+    (stores[name]?.state.reports as Record<string, unknown>[] ?? []).filter(row => !!row.photoUri).map(row => ({ row, id: `${index === 0 ? 'receipt' : 'price'}:${String(row.id)}`, legacyId: index === 0 ? String(row.id) : null })));
+}
+function photoAttachment(data: BackupPayload, reference: ReturnType<typeof photoReferences>[number]) {
+  return data.attachments.find(item => item.kind === 'photo' && (item.id === reference.id || item.id === reference.legacyId));
+}
 export async function makeBackup(password: string, includesFiles: boolean) {
   const payload = await exclusively(async () => {
     const stores = captureStores(); await prepareStores(stores);
@@ -44,8 +51,7 @@ export async function makeBackup(password: string, includesFiles: boolean) {
         const file = await archiveStorage.read(entry);
         append({ kind: 'bank', id: entry.id, name: entry.name, base64: file.base64 ?? encodeBase64(strToU8(file.kind === 'csv' ? file.text : '')) });
       }
-      const reports = stores['gasfinder-receipt-reports'].state.reports as { id: string; photoUri: string }[];
-      for (const report of reports) if (report.photoUri) append({ kind: 'photo', id: report.id, name: `receipt.${/\.(png|heic|webp)$/i.exec(report.photoUri)?.[1]?.toLowerCase() ?? 'jpg'}`, base64: await readBackupPhoto(report.photoUri) });
+      for (const reference of photoReferences(stores)) append({ kind: 'photo', id: reference.id, name: `receipt.${/\.(png|heic|webp)$/i.exec(String(reference.row.photoUri))?.[1]?.toLowerCase() ?? 'jpg'}`, base64: await readBackupPhoto(String(reference.row.photoUri)) });
     }
     return validateBackup({ format: 'gasfinder-data', version: 1, createdAt: new Date().toISOString(), appVersion: Constants.expoConfig?.version ?? '1', stores, archives, attachments, includesFiles });
   });
@@ -60,12 +66,18 @@ async function preparePayload(data: BackupPayload) {
   for (const entry of data.archives) if (!parseSavedImport(entry) || !String(entry.id).startsWith('import-')) throw new Error('Backup has invalid source-file metadata.');
   if (new Set(data.archives.map(entry => entry.id)).size !== data.archives.length) throw new Error('Backup has duplicate file IDs.');
   const bankIds = new Set(data.archives.map(entry => entry.id));
-  const photoIds = new Set((data.stores['gasfinder-receipt-reports'].state.reports as { id: string }[]).map(report => report.id));
-  for (const attachment of data.attachments) if (attachment.kind === 'bank' ? !bankIds.has(attachment.id) : !photoIds.has(attachment.id)) throw new Error('Backup has an attachment without a matching record.');
+  const references = photoReferences(data.stores), assigned = new Set<string>();
+  for (const attachment of data.attachments) {
+    if (attachment.kind === 'bank') { if (!bankIds.has(attachment.id)) throw new Error('Backup has a file without metadata.'); }
+    else {
+      const matching = references.filter(reference => attachment.id === reference.id || attachment.id === reference.legacyId);
+      if (matching.length !== 1 || assigned.has(matching[0].id)) throw new Error('Backup photo references are missing, duplicated or ambiguous.');
+      assigned.add(matching[0].id);
+    }
+  }
   if (data.includesFiles) {
     for (const entry of data.archives) if (!entry.missingOriginal && !data.attachments.some(file => file.kind === 'bank' && file.id === entry.id)) throw new Error('Backup is missing a statement attachment.');
-    const reports = data.stores['gasfinder-receipt-reports'].state.reports as { id: string; photoUri: string }[];
-    for (const report of reports) if (report.photoUri && !data.attachments.some(file => file.kind === 'photo' && file.id === report.id)) throw new Error('Backup is missing a receipt photo.');
+    for (const reference of references) if (!photoAttachment(data, reference)) throw new Error('Backup is missing a receipt photo.');
   }
   return data;
 }
@@ -112,7 +124,7 @@ export async function recoverableBankOperation<T>(operation: (permit: <R>(action
 export async function hasRestoreRollback() { return !!await AsyncStorage.getItem(journalKey); }
 export async function undoRestore() {
   const text = await AsyncStorage.getItem(journalKey); if (!text) throw new Error('No previous restore is available.');
-  await exclusively(() => rollBack(parseJournal(text)));
+  await exclusively(() => rollBack(parseJournal(text))); markDataReplacement('Previous records recovered.');
 }
 export async function restoreBackup(payload: BackupPayload) {
   const data = await preparePayload(validateBackup(payload)), records = data.stores;
@@ -136,10 +148,10 @@ export async function restoreBackup(payload: BackupPayload) {
       }
       const ids = new Set(restored.map(entry => entry.id));
       await archiveStorage.setMetadata!([...restored, ...oldArchives.filter(entry => !ids.has(entry.id)).map(entry => ({ ...entry, trashedAt: entry.trashedAt ?? new Date().toISOString() }))]);
-      const reports = records['gasfinder-receipt-reports'].state.reports as Record<string, unknown>[];
-      for (let index = 0; index < reports.length; index++) {
-        const photo = data.attachments.find(item => item.kind === 'photo' && item.id === reports[index].id);
-        reports[index].photoUri = photo ? await writeBackupPhoto(photo.base64, `${runId}-${index}`, photo.name) : '';
+      const references = photoReferences(records);
+      for (let index = 0; index < references.length; index++) {
+        const photo = photoAttachment(data, references[index]);
+        references[index].row.photoUri = photo ? await writeBackupPhoto(photo.base64, `${runId}-${index}`, photo.name) : '';
       }
       applyStores(records); await flushAppStorage(); recordsToVerify = records;
       },
@@ -147,7 +159,7 @@ export async function restoreBackup(payload: BackupPayload) {
       rollback: async copy => { await flushAppStorage().catch(() => undefined); await rollBack(copy); },
     });
     queryClient.clear();
-  });
+  }).then(() => { markDataReplacement('Restore complete. Review Account and reminder status in Settings.'); });
 }
 export function backupSummary(stores: Record<string, StoreRecord>) {
   const pocket = stores['gasfinder-savings-pocket']?.state ?? {};

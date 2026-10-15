@@ -1,6 +1,7 @@
+import type { FuelPurchaseDetails } from './fuelReports';
 import type { FuelType } from '@/types/stations';
 
-export type ReceiptReport = {
+export type ReceiptReport = FuelPurchaseDetails & {
   id: string;
   stationId?: string;
   photoUri: string;

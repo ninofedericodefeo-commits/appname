@@ -1,170 +1,121 @@
-import { FormScrollView as ScrollView } from '@/components/FormScrollView';
-import { colors } from '@/theme';
-import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Image, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import { Stack, router, useLocalSearchParams } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-import { describeLocation, getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
-import { milesBetween } from '@/features/stations/logic';
+import { FormScrollView } from '@/components/FormScrollView';
+import { CalendarDateField } from '@/components/CalendarDateField';
+import StationPicker from '@/features/fuel/StationPicker';
+import { parseFuelDetails, priceQualifiers, receiptAccountCandidates, reportAccountTransaction } from '@/features/fuel/logic';
+import type { PriceQualifier, FuelPurchaseDetails } from '@/types/fuelReports';
+import { saveReceiptPhoto, deleteReceiptPhoto } from '@/features/receipts/photoStorage';
+import ReceiptOcrReview from '@/features/receipts/ReceiptOcrReview';
+import ReceiptPhoto from '@/features/receipts/ReceiptPhoto';
+import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
+import { pocketTransactions, transactionDisplayName } from '@/features/pocket/transactions';
+import { belongsToLinkedAccount } from '@/features/pocket/balanceEstimate';
+import { localDateKey } from '@/features/subscriptions/logic';
+import { recoverableBankOperation } from '@/features/data/backupService';
+import { useReceiptStore } from '@/stores/receiptStore';
 import { usePriceReportStore } from '@/stores/priceReportStore';
+import { usePocketStore } from '@/stores/pocketStore';
+import { useDriveStore } from '@/stores/driveStore';
+import { useSettingsStore } from '@/stores/settingsStore';
 import type { FuelType } from '@/types/stations';
+import { formatAmount, formatMoney } from '@/lib/money';
+import { parseDollars } from '@/features/pocket/logic';
+import { dataStyles as s } from '@/features/data/styles';
+import Button from '@/features/subscriptions/SubscriptionButton';
 
 const fuels: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
-
 export default function ReportPriceScreen() {
-  const params = useLocalSearchParams<{ reportId?: string; stationId?: string; stationName?: string; stationAddress?: string; latitude?: string; longitude?: string; fuelType?: FuelType }>();
-  const saved = usePriceReportStore((state) => state.reports.find((report) => report.id === params.reportId));
-  const saveReport = usePriceReportStore((state) => state.saveReport);
+  const params = useLocalSearchParams<{ reportId?: string; receiptId?: string; stationId?: string; stationName?: string; stationAddress?: string; latitude?: string; longitude?: string; fuelType?: FuelType }>();
+  const savedPrice = usePriceReportStore(state => state.reports.find(report => report.id === params.reportId));
+  const savedReceipt = useReceiptStore(state => state.reports.find(report => report.id === params.receiptId));
+  const saved = savedReceipt ?? savedPrice, pocket = usePocketStore(), { cars, selectedCarId } = useDriveStore();
+  const settings = useSettingsStore();
+  const [draftId] = useState(() => `fuel-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`), id = saved?.id ?? draftId;
   const [stationId, setStationId] = useState(saved?.stationId ?? params.stationId);
-  const [stationName, setStationName] = useState(saved?.stationName ?? params.stationName ?? '');
-  const [stationAddress, setStationAddress] = useState(saved?.stationAddress ?? params.stationAddress ?? '');
-  const [latitude, setLatitude] = useState(saved ? String(saved.latitude) : params.latitude ?? '');
-  const [longitude, setLongitude] = useState(saved ? String(saved.longitude) : params.longitude ?? '');
-  const [locationSource, setLocationSource] = useState<'map' | 'device' | 'entered'>(saved?.locationSource ?? (params.stationId ? 'map' : 'entered'));
-  const [useGps, setUseGps] = useState(saved?.locationSource === 'device');
-  const [fuelType, setFuelType] = useState<FuelType>(saved?.fuelType ?? (params.fuelType && fuels.includes(params.fuelType) ? params.fuelType : 'regular'));
-  const [priceInput, setPriceInput] = useState(saved ? String(saved.price) : '');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  const [detailsOpacity] = useState(() => new Animated.Value(saved?.locationSource === 'device' ? 1 : 0));
-
-  useEffect(() => {
-    Animated.timing(detailsOpacity, { toValue: useGps && latitude && longitude ? 1 : 0, duration: 220, useNativeDriver: true }).start();
-  }, [detailsOpacity, useGps, latitude, longitude]);
-
-  function changeCoordinates(next: string, field: 'latitude' | 'longitude') {
-    if (field === 'latitude') setLatitude(next);
-    else setLongitude(next);
-    setLocationSource('entered');
-    setStationId(undefined);
-  }
-
-  async function attachMyLocation() {
+  const [stationName, setStationName] = useState(saved?.stationName ?? params.stationName ?? ''), [stationAddress, setStationAddress] = useState(saved?.stationAddress ?? params.stationAddress ?? '');
+  const [latitude, setLatitude] = useState(savedReceipt?.coordinates ? String(savedReceipt.coordinates.latitude) : savedPrice ? String(savedPrice.latitude) : params.latitude ?? '');
+  const [longitude, setLongitude] = useState(savedReceipt?.coordinates ? String(savedReceipt.coordinates.longitude) : savedPrice ? String(savedPrice.longitude) : params.longitude ?? '');
+  const [fuelType, setFuelType] = useState<FuelType>(saved?.fuelType ?? (params.fuelType && fuels.includes(params.fuelType) ? params.fuelType : settings.selectedFuelType));
+  const [price, setPrice] = useState(savedReceipt ? String(savedReceipt.pricePerGallon) : savedPrice ? String(savedPrice.price) : '');
+  const [qualifier, setQualifier] = useState<PriceQualifier>(saved?.priceQualifier ?? settings.priceQualifier);
+  const [gallons, setGallons] = useState(saved?.gallons === undefined ? '' : String(saved.gallons));
+  const [total, setTotal] = useState(saved?.totalCents !== undefined ? formatAmount(saved.totalCents).replaceAll(',', '') : savedReceipt?.total !== undefined ? savedReceipt.total.toFixed(2) : '');
+  const initialDate = saved?.observedAt ?? savedReceipt?.purchasedOn ?? savedPrice?.reportedAt;
+  const [observedOn, setObservedOn] = useState(initialDate ? initialDate.length === 10 ? initialDate : localDateKey(new Date(initialDate)) : localDateKey(new Date()));
+  const [observedTime, setObservedTime] = useState(() => { const date = initialDate ? new Date(initialDate.length === 10 ? `${initialDate}T12:00:00` : initialDate) : new Date(); return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`; });
+  const [carId, setCarId] = useState(saved?.carId ?? selectedCarId ?? ''), [odometer, setOdometer] = useState(saved?.odometerMiles === undefined ? '' : String(saved.odometerMiles));
+  const [fullFill, setFullFill] = useState(saved?.fullFill ?? false), [completeFillInterval, setCompleteFillInterval] = useState(saved?.completeFillInterval ?? false);
+  const [acknowledgeAdjustment, setAcknowledgeAdjustment] = useState(false), [linkDifference, setLinkDifference] = useState(false), [confirmNew, setConfirmNew] = useState(false), [applyRule, setApplyRule] = useState(false);
+  const [photoUri, setPhotoUri] = useState(saved?.photoUri ?? ''), [photo, setPhoto] = useState<{ uri: string; mimeType?: string | null } | null>(null);
+  const [picker, setPicker] = useState(false), [locationDetails, setLocationDetails] = useState(false), [refill, setRefill] = useState(!!(saved?.gallons || saved?.totalCents || savedReceipt?.total || saved?.photoUri));
+  const [linkMode, setLinkMode] = useState<'none' | 'existing' | 'new'>(saved?.accountLink ? 'existing' : 'none');
+  const [accountLink, setAccountLink] = useState<FuelPurchaseDetails['accountLink']>(saved?.accountLink);
+  const [busy, setBusy] = useState(false), [error, setError] = useState('');
+  const rows = useMemo(() => pocketTransactions(pocket.accountTransactions, pocket.purchases, [], [], pocket.transactionDirections).filter(row => belongsToLinkedAccount(row, pocket.linkedBankAccount)), [pocket.accountTransactions, pocket.purchases, pocket.transactionDirections, pocket.linkedBankAccount]);
+  const candidates = receiptAccountCandidates(rows, parseDollars(total) ?? undefined, `${observedOn}T12:00:00`);
+  const selectedRow = reportAccountTransaction({ accountLink }, rows);
+  useEffect(() => { void ImagePicker.getPendingResultAsync().then(result => { if (result && 'canceled' in result && !result.canceled && result.assets?.[0]) { setPhoto(result.assets[0]); setRefill(true); } }).catch(() => undefined); }, []);
+  async function choosePhoto(camera: boolean) {
     setError('');
-    setUseGps(true);
-    setBusy(true);
     try {
-      if (!await requestLocationPermission()) {
-        setUseGps(false);
-        setError('Location access was denied. Enter the station details instead.');
-        return;
-      }
-      const coordinates = await getCurrentLocation();
-      setLatitude(String(coordinates.latitude));
-      setLongitude(String(coordinates.longitude));
-      setLocationSource('device');
-      const mapped = { latitude: Number(latitude), longitude: Number(longitude) };
-      const stillLinked = !!stationId && Number.isFinite(mapped.latitude) && Number.isFinite(mapped.longitude) && milesBetween(coordinates, mapped) <= 0.1;
-      if (!stillLinked) setStationId(undefined);
-      try {
-        const place = await describeLocation(coordinates);
-        if (!stillLinked) {
-          setStationName(place.name);
-          setStationAddress(place.address);
+      if (camera && Platform.OS !== 'web' && !(await ImagePicker.requestCameraPermissionsAsync()).granted) throw new Error('Camera access is off. Choose a photo instead.');
+      const result = camera ? await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: .7, allowsEditing: true }) : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: .7, allowsEditing: true });
+      if (!result.canceled && result.assets[0]) { if ((result.assets[0].fileSize ?? 0) > 10 * 1024 * 1024) throw new Error('Choose a receipt photo under 10 MB.'); setPhoto(result.assets[0]); setRefill(true); }
+    } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not choose a photo.'); }
+  }
+  async function locate() {
+    setBusy(true); setError('');
+    try { if (!await requestLocationPermission()) throw new Error('Location is off. Choose a mapped station or enter its address.'); const point = await getCurrentLocation(); setLatitude(String(point.latitude)); setLongitude(String(point.longitude)); setStationId(undefined); setLocationDetails(true); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Location is unavailable.'); }
+    finally { setBusy(false); }
+  }
+  async function save() {
+    if (busy) return;
+    setError(''); setBusy(true); let newPhotoUri = '';
+    try {
+      const parsed = parseFuelDetails({ stationName, stationAddress, latitude, longitude, price, gallons, total, observedOn, observedTime, qualifier, odometer, fullFill, completeFillInterval, acknowledgeAdjustment });
+      if (savedPrice && !parsed.coordinates) throw new Error('Keep a valid station location for this existing price report.');
+      if (linkMode !== 'none' && !parsed.totalCents) throw new Error('Add the actual refill total before linking to Account.');
+      if (linkMode === 'existing' && !selectedRow) throw new Error('Choose the existing Account charge to link.');
+      if (selectedRow && linkMode === 'existing' && -selectedRow.amountCents !== parsed.totalCents && !linkDifference) throw new Error('The receipt and Account amounts differ. Check the selected charge and confirm the difference.');
+      if (linkMode === 'new' && candidates.length && !confirmNew) throw new Error('Similar charges are already saved. Link one, or confirm that this is a separate refill.');
+      if (photo) newPhotoUri = await saveReceiptPhoto(photo.uri, id, photo.mimeType);
+      await recoverableBankOperation(async permit => {
+        let link = linkMode === 'existing' ? accountLink : undefined;
+        if (linkMode === 'new') {
+          const purchaseId = `fuel-purchase-${id}`;
+          if (!permit(() => usePocketStore.getState().addPurchase(purchaseId, parsed.stationName.slice(0, 80), parsed.totalCents!, undefined, 'manual', parsed.observedAt, applyRule))) throw new Error('A purchase for this report is already saved. Link the existing charge instead.');
+          link = { kind: 'purchase', id: purchaseId };
         }
-      } catch {
-        if (!stillLinked) { setStationName('Name not listed'); setStationAddress(''); }
-      }
-    } catch {
-      setUseGps(false);
-      setError('Could not get your location. Enter the station details instead.');
-    } finally {
-      setBusy(false);
-    }
+        if (linkMode === 'existing') {
+          const current = usePocketStore.getState(), liveRows = pocketTransactions(current.accountTransactions, current.purchases, [], [], current.transactionDirections);
+          const live = reportAccountTransaction({ accountLink }, liveRows);
+          if (!live || live.amountCents !== selectedRow?.amountCents) throw new Error('The selected Account charge changed. Review it again.');
+        }
+        const linkedId = linkMode === 'new' ? link?.id : linkMode === 'existing' ? selectedRow?.id : undefined;
+        if (linkedId && !usePocketStore.getState().transactionDetails[linkedId]) permit(() => usePocketStore.getState().editTransactionDetails(linkedId, { merchant: '', category: 'Gas', classification: 'ordinary', note: '' }, false));
+        const details = { ...parsed, accountLink: link, carId: (parsed.gallons !== undefined || parsed.totalCents !== undefined || parsed.odometerMiles !== undefined) ? carId || undefined : undefined, photoUri: newPhotoUri || photoUri };
+        if (savedPrice) permit(() => usePriceReportStore.getState().saveReport({ ...savedPrice, ...details, fuelType, price: parsed.pricePerGallon, latitude: parsed.coordinates!.latitude, longitude: parsed.coordinates!.longitude, stationId, reportedAt: parsed.observedAt }));
+        else permit(() => useReceiptStore.getState().saveReport({ ...savedReceipt, ...details, id, stationId, fuelType, locationSource: stationId ? 'map' : 'entered', savedAt: savedReceipt?.savedAt ?? new Date().toISOString() }));
+      });
+      router.replace('/report-receipt');
+    } catch (cause) { if (newPhotoUri) { try { await deleteReceiptPhoto(newPhotoUri); } catch { /* Retain a staged photo when recovery still owns the data lock. */ } } setError(cause instanceof Error ? cause.message : 'Could not save this report. Your draft is still here.'); }
+    finally { setBusy(false); }
   }
-
-  function submit() {
-    setError('');
-    const price = Number(priceInput.trim());
-    const lat = Number(latitude.trim());
-    const lon = Number(longitude.trim());
-    if (!/^\d+(?:\.\d{1,3})?$/.test(priceInput.trim()) || price <= 0 || price > 30) {
-      setError('Enter a price from $0.001 to $30.000 per gallon.');
-      return;
-    }
-    if (!latitude.trim() || !longitude.trim() || !Number.isFinite(lat) || !Number.isFinite(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180) {
-      setError('Use your location or enter valid latitude and longitude.');
-      return;
-    }
-    saveReport({
-      id: saved?.id ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      stationId,
-      stationName: stationName.trim() || 'Name not listed',
-      stationAddress: stationAddress.trim(),
-      latitude: lat,
-      longitude: lon,
-      locationSource,
-      fuelType,
-      price,
-      reportedAt: new Date().toISOString(),
-    });
-    router.back();
-  }
-
-  return (
-    <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.kicker}>GAS PRICES</Text>
-        <Text style={styles.title}>{saved ? 'Edit price report' : 'Report a price'}</Text>
-        <Text style={styles.intro}>Record the price per gallon you saw. No receipt is needed. Your report stays on this device and is unverified.</Text>
-        <View style={styles.card}>
-          <Text style={styles.label}>Price per gallon</Text>
-          <TextInput style={styles.input} value={priceInput} onChangeText={setPriceInput} keyboardType="decimal-pad" placeholder="3.199" accessibilityLabel="Price per gallon" maxLength={7} />
-          <Text style={styles.label}>Fuel type</Text>
-          <View style={styles.fuelRow}>{fuels.map((fuel) => <Pressable key={fuel} accessibilityRole="button" accessibilityState={{ selected: fuelType === fuel }} style={[styles.choice, fuelType === fuel && styles.choiceSelected]} onPress={() => setFuelType(fuel)}><Text style={[styles.choiceText, fuelType === fuel && styles.choiceTextSelected]}>{fuel}</Text></Pressable>)}</View>
-          <Text style={styles.label}>Use my location?</Text>
-          <View style={styles.fuelRow}>
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: useGps }} style={[styles.choice, useGps && styles.choiceSelected]} onPress={() => void attachMyLocation()} disabled={busy}><Text style={[styles.choiceText, useGps && styles.choiceTextSelected]}>{busy ? 'Locating…' : 'Yes · use GPS'}</Text></Pressable>
-            <Pressable accessibilityRole="button" accessibilityState={{ selected: !useGps }} style={[styles.choice, !useGps && styles.choiceSelected]} onPress={() => { setUseGps(false); if (locationSource === 'device') setLocationSource('entered'); }} disabled={busy}><Text style={[styles.choiceText, !useGps && styles.choiceTextSelected]}>No · enter details</Text></Pressable>
-          </View>
-          {useGps ? <Animated.View style={[styles.locationSummary, { opacity: detailsOpacity }]}>
-            <Text style={styles.summaryLabel}>LOCATION FROM GPS</Text>
-            <Text style={styles.summaryText}>{stationName || 'Name not listed'}</Text>
-            <Text style={styles.note}>{stationAddress || 'Address unavailable'}</Text>
-            <Text style={styles.note}>{latitude || '—'}, {longitude || '—'}</Text>
-            <Text style={styles.note}>GPS finds your position; the place name and address may be approximate. Check you are at the station before saving.</Text>
-          </Animated.View> : <View>
-            {stationId && <Text style={styles.note}>Linked to the mapped station. Its mapped location is filled in below.</Text>}
-            <Text style={styles.label}>Station name (optional)</Text>
-            <TextInput style={styles.input} value={stationName} onChangeText={setStationName} placeholder="Name not listed" accessibilityLabel="Station name" maxLength={120} />
-            <Text style={styles.label}>Address (optional)</Text>
-            <TextInput style={styles.input} value={stationAddress} onChangeText={setStationAddress} placeholder="Street or nearby landmark" accessibilityLabel="Station address" maxLength={180} />
-            <Text style={styles.note}>Changing coordinates removes the mapped station link.</Text>
-            <View style={styles.coordinateRow}>
-              <View style={styles.coordinateField}><Text style={styles.label}>Latitude</Text><TextInput style={styles.input} value={latitude} onChangeText={(value) => changeCoordinates(value, 'latitude')} keyboardType="numbers-and-punctuation" placeholder="40.7128" accessibilityLabel="Latitude" /></View>
-              <View style={styles.coordinateField}><Text style={styles.label}>Longitude</Text><TextInput style={styles.input} value={longitude} onChangeText={(value) => changeCoordinates(value, 'longitude')} keyboardType="numbers-and-punctuation" placeholder="-74.0060" accessibilityLabel="Longitude" /></View>
-            </View>
-          </View>}
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-          <Pressable accessibilityRole="button" style={styles.saveButton} onPress={submit} disabled={busy}><Text style={styles.saveText}>{saved ? 'Save changes' : 'Save price report'}</Text></Pressable>
-        </View>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  const check = (label: string, value: boolean, change: (value: boolean) => void) => <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: value }} aria-checked={value} style={[s.choice, value && s.selected]} onPress={() => change(!value)}><Text style={s.choiceText}>{value ? '✓ ' : ''}{label}</Text></Pressable>;
+  return <SafeAreaView edges={['bottom', 'left', 'right']} style={s.safe}><Stack.Screen options={{ title: 'Fuel report' }} /><FormScrollView contentContainerStyle={s.content}>
+    <Text style={s.title}>{saved ? 'Edit fuel report' : 'Price or refill'}</Text><Text style={s.note}>Record an observed price, with an optional refill and photo. Reports stay on this device.</Text>
+    <View style={s.card}><Text style={s.heading}>Station</Text>{stationId && <Text style={s.note}>Linked to the selected map station.</Text>}<Button label="Choose mapped or saved station" onPress={() => setPicker(true)} /><TextInput accessibilityLabel="Station name" placeholder="Station name" value={stationName} onChangeText={value => { setStationName(value); setStationId(undefined); }} style={s.input} maxLength={120} /><TextInput accessibilityLabel="Station address" placeholder="Address" value={stationAddress} onChangeText={value => { setStationAddress(value); setStationId(undefined); }} style={s.input} maxLength={180} /><View style={s.row}><Button label="Use current location" disabled={busy} onPress={() => void locate()} /><Button label={locationDetails ? 'Hide coordinates' : 'Enter coordinates'} onPress={() => setLocationDetails(!locationDetails)} /></View>{locationDetails && <><TextInput accessibilityLabel="Latitude" placeholder="Latitude" value={latitude} onChangeText={value => { setLatitude(value); setStationId(undefined); }} style={s.input} keyboardType="numbers-and-punctuation" /><TextInput accessibilityLabel="Longitude" placeholder="Longitude" value={longitude} onChangeText={value => { setLongitude(value); setStationId(undefined); }} style={s.input} keyboardType="numbers-and-punctuation" /><Text style={s.note}>Coordinates place your report on the map. Only selecting a mapped station attaches it to that station’s existing pin.</Text></>}</View>
+    <View style={s.card}><Text style={s.heading}>Observed price</Text><TextInput accessibilityLabel="Price per gallon" placeholder="USD per gallon · 3.199" value={price} onChangeText={setPrice} keyboardType="decimal-pad" style={s.input} /><View style={s.row}>{fuels.map(value => <Button key={value} label={value} tone={fuelType === value ? 'primary' : 'secondary'} onPress={() => setFuelType(value)} />)}</View><View style={s.row}>{priceQualifiers.map(value => <Button key={value.id} label={value.label} tone={qualifier === value.id ? 'primary' : 'secondary'} onPress={() => setQualifier(value.id)} />)}</View><Text style={s.note}>Gas search and trip comparisons use the price type selected in Filters.</Text><CalendarDateField label="Price observed on" value={observedOn} maximumDate={localDateKey(new Date())} onChange={setObservedOn} /><TextInput accessibilityLabel="Observation time" placeholder="Time observed · HH:MM" value={observedTime} onChangeText={setObservedTime} keyboardType="numbers-and-punctuation" style={s.input} maxLength={5} /></View>
+    <View style={s.card}><Button label={refill ? 'Hide refill details' : 'Add refill details or receipt'} onPress={() => setRefill(!refill)} />{refill && <><TextInput accessibilityLabel="Gallons purchased" placeholder="Gallons · optional" value={gallons} onChangeText={setGallons} keyboardType="decimal-pad" style={s.input} /><TextInput accessibilityLabel="Refill total" placeholder="Actual total · optional" value={total} onChangeText={setTotal} keyboardType="decimal-pad" style={s.input} />{check('I checked any fees, discounts or difference in the total', acknowledgeAdjustment, setAcknowledgeAdjustment)}<Text style={s.note}>Differences over $0.10 require this check; the exact difference is retained.</Text><View style={s.row}><Button label="Choose receipt photo" onPress={() => void choosePhoto(false)} />{Platform.OS !== 'web' && <Button label="Take photo" onPress={() => void choosePhoto(true)} />}</View><Text style={s.note}>Use a cropped copy to leave out payment details. Photos are optional and can be removed from this report.</Text>{photo ? <Image source={{ uri: photo.uri }} resizeMode="contain" style={{ height: 220, width: '100%' }} accessibilityLabel="Selected receipt preview" /> : !!photoUri && <ReceiptPhoto uri={photoUri} label="Saved receipt" />}{(photo || photoUri) && <ReceiptOcrReview key={photo?.uri ?? photoUri} uri={photo?.uri ?? photoUri} current={{ stationName, price, gallons, total, observedOn, fuelType }} onApply={values => { if (values.stationName) { setStationName(values.stationName); setStationId(undefined); } if (values.price) setPrice(values.price); if (values.gallons) setGallons(values.gallons); if (values.total) setTotal(values.total); if (values.observedOn) setObservedOn(values.observedOn); if (values.fuelType && fuels.includes(values.fuelType as FuelType)) setFuelType(values.fuelType as FuelType); }} />}{(photo || photoUri) && <Button label="Remove photo from report" onPress={() => { setPhoto(null); setPhotoUri(''); }} />}{!!cars.length && <><Text style={s.body}>Car · optional</Text><View style={s.row}><Button label="No car" tone={!carId ? 'primary' : 'secondary'} onPress={() => setCarId('')} />{cars.map(car => <Button key={car.id} label={car.name} tone={carId === car.id ? 'primary' : 'secondary'} onPress={() => setCarId(car.id)} />)}</View>{carId && <><TextInput accessibilityLabel="Odometer miles" placeholder="Odometer miles · optional" value={odometer} onChangeText={setOdometer} style={s.input} keyboardType="decimal-pad" />{check('Filled the tank completely', fullFill, value => { setFullFill(value); if (!value) setCompleteFillInterval(false); })}{fullFill && check('Every fill since the previous full tank is logged', completeFillInterval, setCompleteFillInterval)}</>}</>}
+      <Text style={s.heading}>Account · optional</Text><Text style={s.note}>Link an existing charge to keep one financial record. Logging a new purchase can update the account estimate. Unlinking a report leaves its Account transaction saved.</Text><View style={s.row}>{(['none', 'existing', 'new'] as const).map(value => <Button key={value} label={value === 'none' ? 'Report only' : value === 'existing' ? 'Link charge' : 'Log new purchase'} tone={linkMode === value ? 'primary' : 'secondary'} onPress={() => setLinkMode(value)} />)}</View>
+      {linkMode === 'existing' && <>{selectedRow && <Text style={s.body}>Selected: {transactionDisplayName(selectedRow)} · {formatMoney(-selectedRow.amountCents)}</Text>}{candidates.map(row => <Button key={row.id} label={`${transactionDisplayName(row)} · ${formatMoney(-row.amountCents)} · ${new Date(row.occurredAt).toLocaleDateString()}`} tone={selectedRow?.id === row.id ? 'primary' : 'secondary'} onPress={() => setAccountLink({ kind: ['csv', 'citizens-pdf'].includes(row.source) ? 'transaction' : 'purchase', id: row.id })} />)}{!candidates.length && <Text style={s.note}>Enter the refill total and date to find similar charges within seven days. Choose a charge only after checking it.</Text>}{check('I checked any difference from the Account charge', linkDifference, setLinkDifference)}</>}
+      {linkMode === 'new' && <>{!!candidates.length && check('This is another refill, separate from similar saved charges', confirmNew, setConfirmNew)}{pocket.activeGoal && check('Apply my goal’s set-aside rule to this purchase', applyRule, setApplyRule)}<Text style={s.note}>A future statement can match this logged purchase after review. A pending gas authorization is not the final refill charge.</Text></>}
+    </>}</View>
+    {!!error && <Text accessibilityRole="alert" style={s.danger}>{error}</Text>}{busy && <ActivityIndicator />}<Button label={busy ? 'Saving…' : 'Save fuel report'} disabled={busy} tone="primary" onPress={() => void save()} />
+  </FormScrollView>{picker && <StationPicker onClose={() => setPicker(false)} onChoose={station => { setStationId(station.id); setStationName(station.name); setStationAddress(station.address); setLatitude(String(station.latitude)); setLongitude(String(station.longitude)); }} />}</SafeAreaView>;
 }
-
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.paper },
-  content: { paddingHorizontal: 20, paddingTop: 22, paddingBottom: 48 },
-  kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.6 },
-  title: { color: colors.ink, fontSize: 36, lineHeight: 42, fontWeight: '800', marginTop: 8 },
-  intro: { color: colors.inkSoft, fontSize: 14, lineHeight: 21, marginTop: 8, marginBottom: 18 },
-  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 18 },
-  label: { color: colors.ink, fontSize: 13, fontWeight: '700', marginBottom: 7, marginTop: 14 },
-  input: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, minHeight: 46, paddingHorizontal: 12, color: colors.ink, fontSize: 15 },
-  locationSummary: { marginTop: 14, padding: 14, borderRadius: 7, backgroundColor: colors.paleGreen },
-  summaryLabel: { color: colors.accentDark, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  summaryText: { color: colors.ink, fontSize: 15, fontWeight: '800', marginTop: 6 },
-  note: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 8 },
-  coordinateRow: { flexDirection: 'row', gap: 10 },
-  coordinateField: { flex: 1 },
-  fuelRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
-  choice: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, paddingVertical: 9, paddingHorizontal: 11 },
-  choiceSelected: { backgroundColor: colors.ink, borderColor: colors.ink },
-  choiceText: { color: colors.inkSoft, textTransform: 'capitalize', fontSize: 12, fontWeight: '700' },
-  choiceTextSelected: { color: colors.surface },
-  error: { color: colors.danger, marginTop: 12, fontSize: 13 },
-  saveButton: { backgroundColor: colors.accentDark, borderRadius: 6, minHeight: 48, alignItems: 'center', justifyContent: 'center', marginTop: 22 },
-  saveText: { color: colors.surface, fontWeight: '800' },
-});

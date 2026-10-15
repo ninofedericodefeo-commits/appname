@@ -54,5 +54,13 @@ export function validateStoreState(name: string, state: Record<string, unknown>,
     if (sub.cancellationHistory) requireValue(Array.isArray(sub.cancellationHistory) && sub.cancellationHistory.every(item => object(item) && Number.isFinite(Date.parse(String(item.canceledAt))) && (!item.reactivatedAt || Number.isFinite(Date.parse(String(item.reactivatedAt))))), 'cancellation history');
   }
   if (name === 'gasfinder-drive-profile') for (const car of rows(state, 'cars')) requireValue(typeof car.name === 'string' && typeof car.mpg === 'number' && car.mpg > 0 && typeof car.tankGallons === 'number' && car.tankGallons > 0, 'car');
-  if (name === 'gasfinder-receipt-reports' || name === 'gasfinder-local-price-reports') for (const report of rows(state, 'reports')) requireValue(typeof report.stationName === 'string' && ['regular', 'midgrade', 'premium', 'diesel'].includes(String(report.fuelType)) && (name === 'gasfinder-local-price-reports' ? typeof report.price === 'number' && report.price > 0 : typeof report.photoUri === 'string' && typeof report.pricePerGallon === 'number' && report.pricePerGallon > 0), 'fuel report');
+  if (name === 'gasfinder-receipt-reports' || name === 'gasfinder-local-price-reports') for (const report of rows(state, 'reports')) { requireValue(typeof report.stationName === 'string' && ['regular', 'midgrade', 'premium', 'diesel'].includes(String(report.fuelType)) && (name === 'gasfinder-local-price-reports' ? typeof report.price === 'number' && report.price > 0 : typeof report.photoUri === 'string' && typeof report.pricePerGallon === 'number' && report.pricePerGallon > 0), 'fuel report');
+    requireValue(!report.priceQualifier || ['standard', 'cash', 'card', 'member'].includes(String(report.priceQualifier)), 'price type');
+    requireValue(report.totalCents === undefined || nonnegative(report.totalCents), 'refill total');
+    requireValue(report.gallons === undefined || typeof report.gallons === 'number' && report.gallons > 0 && report.gallons <= 100, 'refill gallons');
+    requireValue(!report.observedAt || Number.isFinite(Date.parse(String(report.observedAt))), 'observation time');
+    requireValue(!report.accountLink || object(report.accountLink) && ['transaction', 'purchase'].includes(String(report.accountLink.kind)) && typeof report.accountLink.id === 'string', 'fuel account link');
+    if (name === 'gasfinder-local-price-reports') requireValue(typeof report.latitude === 'number' && Math.abs(report.latitude) <= 90 && typeof report.longitude === 'number' && Math.abs(report.longitude) <= 180, 'station location');
+  }
+  if (name === 'gasfinder-settings') requireValue(!state.priceQualifier || ['standard', 'cash', 'card', 'member'].includes(String(state.priceQualifier)), 'selected price type');
 }

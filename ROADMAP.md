@@ -64,6 +64,13 @@ The intended result is a useful daily companion for one person. Reliability, few
 
 The current batch reports **223 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
 
+### October 15 fuel implementation progress
+
+- GAS-02/GAS-04: combined station/price/refill form, optional photos, explicit Account linking/logging, cash/card/member qualifiers, recoverable report Trash, recent-price filtering and persistent web photos are implemented.
+- INS-02/DRIVE-01: recorded per-car fuel cost/gallons and conservative full-fill MPG intervals are implemented. Detour/road-access planning remains open.
+- GAS-03: local Vision/ML Kit module and reviewed field suggestions are implemented; native compilation and real-receipt accuracy remain unverified. Scanned bank PDFs are separate.
+- Photo backups cover both legacy price reports and receipts; restore/Undo remount forms. See [Fuel reports](docs/FUEL_REPORTS.md). 244 logic tests, lint and TypeScript pass.
+
 ### October 14 core implementation progress
 
 - DATA-01: encrypted versioned portable backups, optional original/photo attachments, authenticated validation, staged restore, durable rollback, startup recovery and Undo restore are implemented. Synthetic browser export/restore/reload/undo passed. Native cross-install/file-sharing acceptance remains open.

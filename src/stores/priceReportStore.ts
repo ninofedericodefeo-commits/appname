@@ -20,6 +20,6 @@ export const usePriceReportStore = create<PriceReportState>()(
       })),
       removeReport: (id) => set((state) => ({ reports: state.reports.filter((item) => item.id !== id) })),
     }); },
-    { name: 'gasfinder-local-price-reports', storage: createJSONStorage(() => appStorage), version: 1 },
+    { name: 'gasfinder-local-price-reports', storage: createJSONStorage(() => appStorage), version: 2, migrate: state => state },
   ),
 );

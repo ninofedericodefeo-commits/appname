@@ -17,8 +17,9 @@ import StationMap from '@/components/StationMap';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { stationApiBaseUrl } from '@/features/stations/data';
 import { useNearbyStations } from '@/features/stations/hooks';
-import { filterPricedStations, formatFuelPrice, isRecentPrice, prepareStations, recentStationPrice } from '@/features/stations/logic';
-import { withLocalPrices } from '@/features/stations/localPrices';
+import { filterPricedStations, isRecentPrice, prepareStations, recentStationPrice } from '@/features/stations/logic';
+import { priceQualifiers } from '@/features/fuel/logic';
+import { withLocalPrices, stationsFromSavedLocations } from '@/features/stations/localPrices';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { useReceiptStore } from '@/stores/receiptStore';
 import { usePriceReportStore } from '@/stores/priceReportStore';
@@ -26,16 +27,13 @@ import type { FuelType } from '@/types/stations';
 
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
-  const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
+  const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'nearby' | 'online'>('nearby');
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const receiptReports = useReceiptStore((state) => state.reports);
   const priceReports = usePriceReportStore((state) => state.reports);
-  const removePriceReport = usePriceReportStore((state) => state.removeReport);
-  const receiptCount = receiptReports.length;
-  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
-  const [reportsOpen, setReportsOpen] = useState(false);
+  const receiptCount = receiptReports.filter(report => !report.trashedAt).length + priceReports.filter(report => !report.trashedAt).length;
   const [filtersOpen, setFiltersOpen] = useState(false);
   const location = useGasSearchStore(state => state.lastArea);
   const ready = useSyncExternalStore(useGasSearchStore.persist.onFinishHydration, useGasSearchStore.persist.hasHydrated, () => false);
@@ -94,11 +92,11 @@ export default function GasScreen() {
     sortOrder,
   });
   const allStations = useMemo(() => {
-    const found = data?.stations ?? [];
+    const found = [...new Map([...stationsFromSavedLocations(receiptReports, priceReports), ...(data?.stations ?? [])].map(station => [station.id, station])).values()];
     if (!location) return found;
-    return prepareStations(withLocalPrices(found, receiptReports, priceReports), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder }, now);
-  }, [data?.stations, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder, now]);
-  const stations = useMemo(() => filterPricedStations(allStations, selectedFuelType, hideUnpricedStations), [allStations, selectedFuelType, hideUnpricedStations]);
+    return prepareStations(withLocalPrices(found, receiptReports, priceReports, priceQualifier), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder }, now);
+  }, [data?.stations, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder, priceQualifier, now]);
+  const stations = useMemo(() => filterPricedStations(allStations, selectedFuelType, hideUnpricedStations, recentPricesOnly, now), [allStations, selectedFuelType, hideUnpricedStations, recentPricesOnly, now]);
   const cheapest = stations.reduce<(typeof stations)[number] | undefined>((best, station) => {
     const price = recentStationPrice(station, selectedFuelType, now);
     const bestPrice = best ? recentStationPrice(best, selectedFuelType, now) : Infinity;
@@ -131,13 +129,15 @@ export default function GasScreen() {
         {(locationStatus === 'loading' || canShowResults && (isLoading || isFetching)) && <View style={styles.loadingBox}><ActivityIndicator size="small" color={colors.accent} /><Text style={styles.loadingText}>{locationStatus === 'loading' ? 'Getting GPS. You can also search an area.' : isCached ? 'Showing saved stations · refreshing…' : isPartial ? `Stations within ${coveredRadius} mi · searching out to ${selectedRadius} mi…` : 'Finding stations in this area…'}</Text></View>}
         {canShowResults && isCached && <View style={styles.statusBox}><Text style={styles.statusTitle}>{refreshFailed ? 'Station refresh unavailable' : 'Saved station results'}</Text><Text style={styles.statusText}>Saved {fetchedAt ? new Date(fetchedAt).toLocaleString() : 'earlier'}{coveredRadius < selectedRadius ? ` · covers ${coveredRadius} mi` : ''}. Distances are from your search center. Prices keep their original report dates.</Text>{refreshFailed && <SubscriptionButton label="Retry search" onPress={() => void refetch()} />}</View>}
         {canShowResults && expansionFailed && <Text style={styles.noPriceNote}>Wider search unavailable. Showing stations within {coveredRadius} mi.</Text>}
-        {canShowResults && isError && <View style={styles.statusBox}><Text style={styles.statusTitle}>Station search unavailable</Text><Text style={styles.statusText}>{searchError instanceof Error ? searchError.message : 'Check your connection and try again.'} Your search area is kept.</Text><SubscriptionButton label="Retry search" onPress={() => void refetch()} /></View>}
+        {canShowResults && isError && <View style={styles.statusBox}><Text style={styles.statusTitle}>Station search unavailable</Text><Text style={styles.statusText}>{searchError instanceof Error ? searchError.message : 'Check your connection and try again.'} Your search area is kept. Saved report locations can still appear below.</Text><SubscriptionButton label="Retry search" onPress={() => void refetch()} /></View>}
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
-            <View style={{ flex: 1 }}><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {selectedRadius} mi · {sortOrder}{hideUnpricedStations ? ' · prices only' : ''}</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {priceQualifier} · {selectedRadius} mi · {sortOrder}{recentPricesOnly ? ' · last 24h' : hideUnpricedStations ? ' · prices only' : ''}</Text></View>
             <Text style={styles.filterChevron}>{filtersOpen ? '−' : '+'}</Text>
           </Pressable>
           {filtersOpen && <>
+          <View style={styles.pillRow}>{priceQualifiers.map(value => <Pressable key={value.id} accessibilityRole="button" accessibilityState={{ selected: priceQualifier === value.id }} style={[styles.pill, priceQualifier === value.id && styles.activePill]} onPress={() => setPriceQualifier(value.id)}><Text style={[styles.pillText, priceQualifier === value.id && styles.activePillText]}>{value.label}</Text></Pressable>)}</View>
+          <Pressable accessibilityRole="checkbox" accessibilityLabel="Recent prices only" accessibilityState={{ checked: recentPricesOnly }} aria-checked={recentPricesOnly} onPress={() => setRecentPricesOnly(!recentPricesOnly)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Only prices reported in the last 24 hours</Text><Text style={styles.filterChevron}>{recentPricesOnly ? '☑' : '☐'}</Text></Pressable>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Hide stations without a price</Text><Text style={styles.filterChevron}>{hideUnpricedStations ? '☑' : '☐'}</Text></Pressable>
           <Text style={styles.noPriceNote}>Applies to {selectedFuelType} prices on the map and in the list. N/A means no price saved.</Text>
           {!!stationApiBaseUrl && <View style={styles.pillRow}><Pressable accessibilityRole="button" style={styles.pill} onPress={() => setMode('nearby')}><Text style={styles.pillText}>Nearby map</Text></Pressable><Pressable accessibilityRole="button" style={styles.pill} onPress={() => { setViewMode('list'); setMode('online'); }}><Text style={styles.pillText}>Google prices</Text></Pressable></View>}
@@ -187,9 +187,9 @@ export default function GasScreen() {
 
         {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>{hideUnpricedStations && allStations.length > 0 ? `No saved ${selectedFuelType} prices` : isCached ? 'No saved stations in this area' : 'No stations found in this radius'}</Text>
-            <Text style={styles.emptyText}>{hideUnpricedStations && allStations.length > 0 ? 'Nearby stations are hidden until a price is reported.' : 'Try expanding your search radius.'}</Text>
-            {hideUnpricedStations && allStations.length > 0 && <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => setHideUnpricedStations(false)}><Text style={styles.retryText}>Show all stations</Text></Pressable>}
+            <Text style={styles.emptyTitle}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? `No saved ${selectedFuelType} prices` : isCached ? 'No saved stations in this area' : 'No stations found in this radius'}</Text>
+            <Text style={styles.emptyText}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? 'Stations are hidden by your price filters. Try another price type or include older/unpriced stations.' : 'Try expanding your search radius.'}</Text>
+            {(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 && <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => { setHideUnpricedStations(false); setRecentPricesOnly(false); }}><Text style={styles.retryText}>Show all stations</Text></Pressable>}
           </View>
         )}
 
@@ -206,10 +206,10 @@ export default function GasScreen() {
         </>}
 
         <View style={styles.quickActions}>
-          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report a price</Text></Pressable></Link>
+          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report price / refill</Text></Pressable></Link>
           <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
         </View>
-        {viewMode === 'list' && canShowResults && !isLoading && !isError && stations.length > 0 && (
+        {viewMode === 'list' && canShowResults && !isLoading && stations.length > 0 && (
           <View style={styles.listSection}>
             <Text style={styles.sectionEyebrow}>Stations</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
@@ -225,21 +225,11 @@ export default function GasScreen() {
         <Text style={styles.sectionEyebrow}>Your gas reports</Text>
         <Link href="/report-receipt" asChild>
           <Pressable accessibilityRole="button" style={styles.receiptCard}>
-            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Gas receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Save a receipt and its price on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
+            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Fuel reports & receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Add a price, refill or receipt on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
             <Text style={styles.receiptArrow}>›</Text>
           </Pressable>
         </Link>
-        {priceReports.length > 0 && <View style={styles.reportList}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: reportsOpen }} onPress={() => setReportsOpen(!reportsOpen)} style={styles.reportListToggle}><Text style={styles.reportListTitle}>My price reports ({priceReports.length})</Text><Text style={styles.reportListChevron}>{reportsOpen ? '−' : '+'}</Text></Pressable>
-          {reportsOpen && priceReports.map((report) => <View key={report.id} style={styles.savedReport}>
-            <View style={styles.savedReportTop}><Text style={styles.savedReportName}>{report.stationName}</Text><Text style={styles.savedReportPrice}>{formatFuelPrice(report.price)}</Text></View>
-            <Text style={styles.savedReportMeta}>{report.fuelType} · {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)} · {new Date(report.reportedAt).toLocaleDateString()}</Text>
-            <View style={styles.savedReportActions}>
-              <Link href={{ pathname: '/report-price', params: { reportId: report.id } }} asChild><Pressable accessibilityRole="button"><Text style={styles.savedReportAction}>Edit</Text></Pressable></Link>
-              {pendingDelete === report.id ? <><Pressable accessibilityRole="button" onPress={() => { removePriceReport(report.id); setPendingDelete(null); }}><Text style={styles.savedReportDelete}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" onPress={() => setPendingDelete(null)}><Text style={styles.savedReportAction}>Cancel</Text></Pressable></> : <Pressable accessibilityRole="button" onPress={() => setPendingDelete(report.id)}><Text style={styles.savedReportAction}>Delete</Text></Pressable>}
-            </View>
-          </View>)}
-        </View>}
+
       </ScrollView>
       {areaSearchOpen && <AreaSearchSheet onChoose={chooseArea} onClose={() => setAreaSearchOpen(false)} />}
     </SafeAreaView>

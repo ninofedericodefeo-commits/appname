@@ -45,7 +45,7 @@ export default function OnRouteScreen() {
   const request = useRef<AbortController | null>(null);
   const destinationTouched = useRef(false);
   const previousCar = useRef<string | null>(null);
-  const { selectedFuelType: fuelType, mapsPreference, refillPercent } = useSettingsStore();
+  const { selectedFuelType: fuelType, mapsPreference, refillPercent, priceQualifier } = useSettingsStore();
   const mapsApp = preferredMapsApp(mapsPreference, Platform.OS);
   const mapsName = mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps';
   const receipts = useReceiptStore((state) => state.reports);
@@ -81,7 +81,7 @@ export default function OnRouteScreen() {
     clearPlan();
     if (previousCar.current !== (car?.id ?? null)) setFuelRemaining('');
     previousCar.current = car?.id ?? null;
-  }, [car?.id, car?.mpg, car?.tankGallons, fuelType, refillPercent, clearPlan]);
+  }, [car?.id, car?.mpg, car?.tankGallons, fuelType, refillPercent, priceQualifier, clearPlan]);
 
   async function pasteDestination() {
     try {
@@ -107,7 +107,7 @@ export default function OnRouteScreen() {
         setWarning('Public station search is unavailable. Only locations you saved on this device are being checked.');
       }
       if (signal.aborted) throw new Error('Trip changed.');
-      return stationsOnRoute(withLocalPrices(found, receipts, priceReports), nextRoute.points, nextRoute.miles);
+      return stationsOnRoute(withLocalPrices(found, receipts, priceReports, priceQualifier), nextRoute.points, nextRoute.miles);
     };
     const result = await planDriveStops({ routeMiles: nextRoute.miles, initialRange, fullRange, fuelType, refillPercent, forceSearch, lookup, onProgress: (progress) => { completedStops = progress.length; if (!signal.aborted) setStops(progress); } });
     if (!signal.aborted) { setPlan(result); setStops(result.stops); setBusy(''); }

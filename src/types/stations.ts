@@ -1,3 +1,4 @@
+import type { PriceQualifier } from './fuelReports';
 export type FuelType = 'regular' | 'midgrade' | 'premium' | 'diesel';
 export type SortOption = 'price' | 'distance';
 export type PriceFreshness = 'fresh' | 'recent' | 'stale' | 'unknown';
@@ -5,6 +6,7 @@ export type PriceFreshness = 'fresh' | 'recent' | 'stale' | 'unknown';
 export type GasPrice = {
   fuelType: FuelType;
   price: number;
+  qualifier?: PriceQualifier;
   currency: 'USD';
   reportedAt: string;
   source: string;

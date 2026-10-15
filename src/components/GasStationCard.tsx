@@ -38,6 +38,7 @@ export function GasStationCard({
   distanceLabel?: string;
   onReported?: () => void;
 }) {
+  const priceQualifier = useSettingsStore(state => state.priceQualifier);
   const mapsPreference = useSettingsStore((state) => state.mapsPreference);
   const favorites = useGasSearchStore(state => state.favorites);
   const favorite = favorites.some(item => item.id === station.id);
@@ -105,9 +106,8 @@ export function GasStationCard({
         <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.mapButtonText}>{mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'} ↗</Text></Pressable>
         {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
       </View>}
-      {canAddReceipt && <Link href={{ pathname: '/report-receipt', params: { stationId: station.id, stationName: station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Add receipt for this station ↗</Text></Pressable></Link>}
-      {canAddReceipt && <Link href={{ pathname: '/report-price', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Report price without receipt ↗</Text></Pressable></Link>}
-      {canAddReceipt && <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, fuelType, source: 'local' } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>View saved price history ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/report-price', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Report price or refill ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, fuelType, qualifier: priceQualifier, source: 'local' } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>View saved price history ↗</Text></Pressable></Link>}
       {canReport && (
         <View style={styles.reportArea}>
           <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>

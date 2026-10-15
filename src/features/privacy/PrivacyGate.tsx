@@ -9,6 +9,7 @@ export function PrivacyGate({ children }: { children: ReactNode }) {
   const { unlocked } = usePrivacySession();
   const hydrated = useSyncExternalStore(useDevicePrivacy.persist.onFinishHydration, useDevicePrivacy.persist.hasHydrated, () => false);
   const [inactive, setInactive] = useState(AppState.currentState !== 'active'), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const protectionEnabled = useRef(false);
   const authenticating = useRef(false), leftAt = useRef<number | null>(null);
   useEffect(() => {
     if (Platform.OS === 'web') return;
@@ -21,13 +22,14 @@ export function PrivacyGate({ children }: { children: ReactNode }) {
     return () => listener.remove();
   }, [enabled, relockSeconds]);
   useEffect(() => {
-    if (Platform.OS === 'web' || !hydrated) return;
+    if (Platform.OS === 'web' || !hydrated || !hidePreview && !protectionEnabled.current) return;
     let active = true;
     const sync = async () => {
       try {
         const ScreenCapture = await import('expo-screen-capture');
         if (Platform.OS === 'ios') { if (hidePreview) await ScreenCapture.enableAppSwitcherProtectionAsync(1); else await ScreenCapture.disableAppSwitcherProtectionAsync(); }
         else { if (hidePreview) await ScreenCapture.preventScreenCaptureAsync('privacy'); else await ScreenCapture.allowScreenCaptureAsync('privacy'); }
+        protectionEnabled.current = hidePreview;
         if (active) usePrivacySession.setState({ warning: '' });
       } catch { if (active) usePrivacySession.setState({ warning: 'Preview protection could not be enabled. Update the native build and retry this setting.' }); }
     };

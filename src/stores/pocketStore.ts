@@ -64,7 +64,7 @@ type PocketState = {
   deleteGoal: () => boolean;
   reserveForGoal: (cents: number, purchaseId?: string) => boolean;
   releaseFromGoal: (cents: number) => boolean;
-  addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string, source?: 'manual' | 'shortcut') => boolean;
+  addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string, source?: 'manual' | 'shortcut', occurredAt?: string, applyRule?: boolean) => boolean;
   updatePurchase: (id: string, title: string, amountCents: number) => boolean;
   skipPurchase: (id: string) => void;
   removePurchase: (id: string) => void;
@@ -209,15 +209,16 @@ export const usePocketStore = create<PocketState>()(
         set({ reservedCents: state.reservedCents - cents, activeGoal: { ...goal, savedCents: goal.savedCents - cents }, entries: [entry('release', cents, goal.id), ...state.entries] });
         return true;
       },
-      addPurchase: (id, title, amountCents, sourcePauseId, source = 'manual') => {
+      addPurchase: (id, title, amountCents, sourcePauseId, source = 'manual', occurredAt, applyRule = true) => {
         const state = get();
         if (!canLogPurchase(id, title, amountCents, sourcePauseId, state.purchases)) return false;
         const goal = state.activeGoal;
-        const purchasedAt = new Date().toISOString();
+        const purchasedAt = occurredAt ?? new Date().toISOString();
+        if (!Number.isFinite(Date.parse(purchasedAt)) || Date.parse(purchasedAt) > Date.now() + 5 * 60_000) return false;
         const purchase: LoggedPurchase = { id, title: title.trim(), amountCents, purchasedAt, sourcePauseId, source, decision: 'pending',
           ...(state.linkedBankAccount ? { bankAccountId: state.linkedBankAccount.id, bankAccountLabel: state.linkedBankAccount.nickname } : {}) };
         const afterPurchase = accountBalanceEstimate({ ...state, purchases: [purchase, ...state.purchases] }).estimatedCents;
-        const savedCents = automaticSetAsideCents(amountCents, goal, afterPurchase, state.reservedCents);
+        const savedCents = applyRule ? automaticSetAsideCents(amountCents, goal, afterPurchase, state.reservedCents) : 0;
         purchase.decision = savedCents > 0 ? 'saved' : 'pending';
         if (savedCents > 0) purchase.savedCents = savedCents;
         set({

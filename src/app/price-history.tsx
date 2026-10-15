@@ -11,6 +11,7 @@ import { localPriceHistory } from '@/features/stations/localPrices';
 import { formatFuelPrice } from '@/features/stations/logic';
 import { usePriceReportStore } from '@/stores/priceReportStore';
 import { useReceiptStore } from '@/stores/receiptStore';
+import type { PriceQualifier } from '@/types/fuelReports';
 import type { FuelType } from '@/types/stations';
 
 const ranges: { value: HistoryRange; label: string }[] = [
@@ -22,10 +23,11 @@ const ranges: { value: HistoryRange; label: string }[] = [
 const validFuels: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 
 export default function PriceHistoryScreen() {
-  const params = useLocalSearchParams<{ stationId?: string; stationName?: string; fuelType?: string; source?: string }>();
+  const params = useLocalSearchParams<{ stationId?: string; stationName?: string; fuelType?: string; source?: string; qualifier?: string }>();
   const stationId = typeof params.stationId === 'string' ? params.stationId : '';
   const stationName = typeof params.stationName === 'string' ? params.stationName : 'Station';
   const fuelType: FuelType = validFuels.includes(params.fuelType as FuelType) ? params.fuelType as FuelType : 'regular';
+  const qualifier: PriceQualifier = ['standard', 'cash', 'card', 'member'].includes(params.qualifier ?? '') ? params.qualifier as PriceQualifier : 'standard';
   const [range, setRange] = useState<HistoryRange>(30);
   const [now] = useState(() => Date.now());
   const isLocal = params.source === 'local';
@@ -37,7 +39,7 @@ export default function PriceHistoryScreen() {
     queryFn: ({ signal }) => fetchPriceHistory(stationId, fuelType, range, signal),
     staleTime: 15_000,
   });
-  const reports = isLocal ? localPriceHistory(stationId, fuelType, range, receipts, priceReports, now) : remoteReports;
+  const reports = isLocal ? localPriceHistory(stationId, fuelType, range, receipts, priceReports, now, qualifier) : remoteReports;
   const latest = reports.at(-1);
   const first = reports[0];
   const difference = latest && first ? latest.price - first.price : 0;
@@ -47,7 +49,7 @@ export default function PriceHistoryScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.kicker}>PRICE HISTORY</Text>
         <Text style={styles.title}>{stationName}</Text>
-        <Text style={styles.subtitle}>{fuelType} · USD per gallon</Text>
+        <Text style={styles.subtitle}>{fuelType} · {qualifier} · USD per gallon</Text>
         {isLocal && <Text style={styles.localNote}>Only reports saved on this device appear here.</Text>}
         <View style={styles.ranges}>
           {ranges.map((option) => <Pressable key={option.label} accessibilityRole="button" accessibilityState={{ selected: range === option.value }} onPress={() => setRange(option.value)} style={[styles.range, range === option.value && styles.rangeActive]}><Text style={[styles.rangeText, range === option.value && styles.rangeTextActive]}>{option.label}</Text></Pressable>)}
