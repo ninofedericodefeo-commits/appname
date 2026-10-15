@@ -68,7 +68,8 @@ function ReadyLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="spending" options={{ headerShown: false, animation: 'none' }} />
           <Stack.Screen name="activity" options={{ headerShown: false, animation: 'none' }} />
-          <Stack.Screen name="settings" options={{ headerRight: () => null }} />
+          <Stack.Screen name="settings/index" options={{ headerRight: () => null }} />
+          <Stack.Screen name="settings/[section]" options={{ headerRight: () => null, headerBackTitle: 'Settings' }} />
         </Stack>
         <SubscriptionCancellationNotice />
       </View>
