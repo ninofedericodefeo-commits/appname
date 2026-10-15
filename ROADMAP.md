@@ -72,6 +72,12 @@ The current batch reports **223 passing logic tests**, passing lint/TypeScript a
 - ACC-01/ACC-02: raw evidence stays intact while merchant aliases, categories, transfer/refund/reversal annotations, notes and correction history/Undo are stored separately. Full history includes date/category/source/file filters. Time-zone/source-calendar-date migration and broader match review remain open.
 - Verification for this milestone: 232 logic tests, lint, TypeScript and iOS/Android/web JS exports pass. Native builds and the remaining roadmap milestones are not marked complete by these exports.
 
+### October 14 subscription implementation progress
+
+- SUB-01: real active 7/30-day costs, annual run rate/monthly equivalent, list/calendar views, optional trial end dates and categories are implemented. Bank schedule review requires three newer posted charges, tolerates short posting delays and requires an explicit edit/save.
+- SUB-02: billing channel selection, checked Apple/Google/Spotify/Netflix starting points, associated-app fallbacks, persistent cancellation due dates, future phone follow-ups, canceled-on confirmation/history and possible-refund context are implemented. Older plans migrate without changing record IDs or amounts. Provider sign-in/native handoff acceptance remains open; custom cadence remains conditional on a concrete need.
+- Acceptance: synthetic sample trial/category/billing edits, calendar date filtering and explicit cancellation were checked in the browser. Costs retained the real subscription total while samples changed. 239 logic tests, lint, TypeScript and all-platform JS exports pass. Phone notification delivery remains a physical-device gate.
+
 ### October 14 implementation progress
 
 **UX-04 / GAS-01:** Gas now shows area/GPS/error state and Filters above the retained map, accepts submitted city/ZIP/address or coordinates without GPS permission, and offers explicit Search this area after panning. Recent areas, station favorites and dated OpenStreetMap result snapshots persist locally. Cached results keep price ages and report partial coverage; late GPS results cannot overwrite a manual choice. My cars is compact, with selection in Manage/trip planning. See [Gas area search](docs/GAS_AREA_SEARCH.md) for service limits, cache behavior and remaining physical-device checks. Financial records, native capabilities and dependencies are unchanged.

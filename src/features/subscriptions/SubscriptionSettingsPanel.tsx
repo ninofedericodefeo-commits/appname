@@ -47,8 +47,8 @@ export default function SubscriptionSettingsPanel() {
   const description = status ? describeReminderStatus(remindersEnabled, status) : null;
   return <>
     <View style={styles.card}><Text style={styles.heading}>Phone reminders</Text>
-      <View style={styles.row}><Text style={styles.label}>Subscription renewal preference</Text><Switch accessibilityLabel="Phone reminders for subscription renewals" value={remindersEnabled} disabled={!ready || busy || Platform.OS === 'web'} onValueChange={value => void toggle(value)} trackColor={{ true: colors.primary, false: colors.lineStrong }} /></View>
-      <Text style={styles.note}>At 9 AM the day before a real subscription renews. Test samples never schedule phone notifications.</Text>
+      <View style={styles.row}><Text style={styles.label}>Subscription reminders</Text><Switch accessibilityLabel="Phone reminders for subscriptions" value={remindersEnabled} disabled={!ready || busy || Platform.OS === 'web'} onValueChange={value => void toggle(value)} trackColor={{ true: colors.primary, false: colors.lineStrong }} /></View>
+      <Text style={styles.note}>At 9 AM the day before a real renewal and on a future cancellation follow-up date. Due or overdue follow-ups remain in the app. Test samples never schedule phone notifications.</Text>
       <Text accessibilityLiveRegion="polite" style={styles.status}>{busy ? 'Updating reminders…' : description?.label ?? 'Checking phone reminders…'}</Text>
       {Platform.OS !== 'web' && <View style={styles.actions}>
         {status?.permission === 'denied' ? <SubscriptionButton grow disabled={busy} label="Open phone settings" onPress={() => { void Linking.openSettings().catch(() => setMessage('Open your phone settings and find GasFinder → Notifications.')); }} />
@@ -59,7 +59,7 @@ export default function SubscriptionSettingsPanel() {
     </View>
     <View style={styles.card}><Text style={styles.heading}>Test subscriptions</Text>
       <View style={styles.row}><Text style={styles.label}>Show sample subscriptions</Text><Switch accessibilityLabel="Test subscriptions mode" disabled={!ready} value={sampleMode} onValueChange={setSampleMode} trackColor={{ true: colors.primary, false: colors.lineStrong }} /></View>
-      <Text style={styles.note}>Invented services for testing in-app reviews. Turning this off hides their renewals and totals. Your real subscriptions and balance stay the same.</Text>
+      <Text style={styles.note}>Invented services for testing in-app reviews. Turning this off hides their test cards and renewals. Cost totals always exclude samples. Your real subscriptions and balance stay the same.</Text>
       <View style={styles.actions}><SubscriptionButton grow disabled={!ready} label={subscriptions.some(item => item.isSample) ? 'Reset samples' : 'Add samples'} onPress={resetSamples} />{subscriptions.some(item => item.isSample) && <SubscriptionButton grow disabled={!ready} label="Remove samples" onPress={removeSamples} />}</View>
       <Text style={styles.note}>Resetting turns on test mode and makes Music Plus renew tomorrow.</Text>
     </View>

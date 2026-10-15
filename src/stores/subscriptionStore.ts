@@ -4,12 +4,13 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { replaceSampleSubscriptions } from '@/features/subscriptions/samples';
 
+import { dateFromKey, localDateKey, validateSubscription, plannedCancellationDate, migrateSubscriptionPlanning } from '@/features/subscriptions/logic';
 import { bankMerchant } from '@/features/subscriptions/bankSuggestions';
 import type { Subscription } from '@/features/subscriptions/logic';
 import { clearSampleSnoozes, migrateReviewPreferences, snoozeRenewalReviews } from '@/features/subscriptions/reviewPreferences';
 import type { RenewalSnoozes } from '@/features/subscriptions/reviewPreferences';
 
-type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' | 'day' | 'month' | 'bankMerchantKey' | 'associatedApp'>;
+type SubscriptionInput = Pick<Subscription, 'name' | 'amountCents' | 'cadence' | 'day' | 'month' | 'bankMerchantKey' | 'associatedApp' | 'category' | 'trialEndsOn' | 'billingChannel'>;
 
 type SubscriptionState = {
   subscriptions: Subscription[];
@@ -30,7 +31,8 @@ type SubscriptionState = {
   restoreBankSuggestions: () => void;
   setRemindersEnabled: (enabled: boolean) => void;
   saveSubscription: (input: SubscriptionInput, id?: string) => void;
-  setActive: (id: string, active: boolean) => void;
+  setActive: (id: string, active: boolean, canceledOn?: string) => void;
+  setCancelBy: (id: string, dueOn: string) => void;
   review: (id: string, renewalDate: string, decision: 'keep' | 'plan-to-cancel') => void;
   removeSubscription: (id: string) => void;
 };
@@ -56,13 +58,14 @@ export const useSubscriptionStore = create<SubscriptionState>()(
       restoreBankSuggestions: () => set({ dismissedBankSuggestions: [] }),
       setRemindersEnabled: (remindersEnabled) => set({ remindersEnabled }),
       saveSubscription: (input, id) => set((state) => {
+        validateSubscription(input);
         if (id) {
           return {
             subscriptions: state.subscriptions.map((subscription) => {
               if (subscription.id !== id) return subscription;
               const reviewChanged = subscription.name !== input.name || subscription.amountCents !== input.amountCents ||
-                subscription.cadence !== input.cadence || subscription.day !== input.day || subscription.month !== input.month;
-              return { ...subscription, ...input, ...(subscription.amountCents !== input.amountCents ? { amountUpdatedAt: new Date().toISOString() } : {}), lastReview: reviewChanged ? undefined : subscription.lastReview };
+                subscription.cadence !== input.cadence || subscription.day !== input.day || subscription.month !== input.month || subscription.trialEndsOn !== input.trialEndsOn;
+              return { ...subscription, ...input, ...(subscription.amountCents !== input.amountCents ? { amountUpdatedAt: new Date().toISOString() } : {}), ...(reviewChanged ? { scheduleUpdatedAt: new Date().toISOString() } : {}), lastReview: reviewChanged ? undefined : subscription.lastReview };
             }),
           };
         }
@@ -71,21 +74,30 @@ export const useSubscriptionStore = create<SubscriptionState>()(
           ...input,
           id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
           active: true,
-          createdAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(), scheduleUpdatedAt: new Date().toISOString(),
         };
         return { subscriptions: [subscription, ...state.subscriptions] };
       }),
-      setActive: (id, active) => set((state) => ({
-        subscriptions: state.subscriptions.map((subscription) =>
-          subscription.id === id ? { ...subscription, active, canceledAt: active ? undefined : new Date().toISOString(), ...(active ? { amountUpdatedAt: new Date().toISOString() } : {}) } : subscription,
-        ),
-      })),
-      review: (id, renewalDate, decision) => set((state) => ({
-        subscriptions: state.subscriptions.map((subscription) =>
-          subscription.id === id
-            ? { ...subscription, lastReview: { renewalDate, decision, decidedAt: new Date().toISOString() } }
-            : subscription,
-        ),
+      setActive: (id, active, canceledOn) => set(state => {
+        const canceledAt = canceledOn ? dateFromKey(canceledOn) : new Date();
+        if (!active && (!canceledAt || localDateKey(canceledAt) > localDateKey(new Date()))) throw new Error('Choose a cancellation date on or before today.');
+        return { subscriptions: state.subscriptions.map(subscription => {
+          if (subscription.id !== id || subscription.active === active) return subscription;
+          const now = new Date().toISOString(), history = subscription.cancellationHistory ?? [];
+          return { ...subscription, active, canceledAt: active ? undefined : canceledAt!.toISOString(), cancelBy: undefined,
+            cancellationHistory: active ? history.map((item, index) => index === history.length - 1 ? { ...item, reactivatedAt: now } : item) : [...history, { canceledAt: canceledAt!.toISOString() }],
+            ...(active ? { amountUpdatedAt: now, scheduleUpdatedAt: now, lastReview: undefined } : {}) };
+        }) };
+      }),
+      setCancelBy: (id, dueOn) => {
+        if (!dateFromKey(dueOn)) throw new Error('Choose a valid cancellation follow-up date.');
+        set(state => ({ subscriptions: state.subscriptions.map(item => item.id === id && item.active ? { ...item, cancelBy: dueOn } : item) }));
+      },
+      review: (id, renewalDate, decision) => set(state => ({
+        subscriptions: state.subscriptions.map(subscription => subscription.id !== id ? subscription : { ...subscription,
+          lastReview: { renewalDate, decision, decidedAt: new Date().toISOString() },
+          cancelBy: decision === 'keep' ? undefined : plannedCancellationDate({ cancelBy: subscription.cancelBy, lastReview: { renewalDate, decision, decidedAt: new Date().toISOString() } }),
+        }),
       })),
       removeSubscription: (id) => set((state) => ({
         subscriptions: state.subscriptions.filter((subscription) => subscription.id !== id),
@@ -94,13 +106,13 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     {
       name: 'gasfinder-subscriptions',
       storage: createJSONStorage(() => appStorage),
-      version: 5,
+      version: 6,
       migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
         ...migrateReviewPreferences(persisted as SubscriptionState),
         dismissedBankSuggestions: version < 2 ? [] : (persisted as SubscriptionState).dismissedBankSuggestions ?? [],
         samplesInitialized: (persisted as SubscriptionState).samplesInitialized ?? false,
         dismissedBankAlerts: (persisted as SubscriptionState).dismissedBankAlerts ?? [],
-        subscriptions: ((persisted as SubscriptionState).subscriptions ?? []).map(subscription => ({ ...subscription,
+        subscriptions: ((persisted as SubscriptionState).subscriptions ?? []).map(subscription => ({ ...migrateSubscriptionPlanning(subscription),
           createdAt: subscription.createdAt ?? (/^\d{13}-/.test(subscription.id) ? new Date(Number(subscription.id.split('-')[0])).toISOString() : new Date().toISOString()),
         })),
       }),

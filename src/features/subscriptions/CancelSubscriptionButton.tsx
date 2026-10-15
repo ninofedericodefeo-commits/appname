@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View, Platform } from 'react-native';
 import * as Linking from 'expo-linking';
 import { create } from 'zustand';
 import type { Subscription } from './logic';
-import { openSubscriptionApp } from './providerApps';
+import { openCancellationDestination } from './billing';
 import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { colors } from '@/theme';
 import SubscriptionButton from './SubscriptionButton';
@@ -27,9 +27,9 @@ export default function CancelSubscriptionButton({ subscription, renewalDate, la
     try {
       // Record the intention even when the provider app isn't installed.
       useSubscriptionStore.getState().review(subscription.id, renewalDate, 'plan-to-cancel');
-      const result = await openSubscriptionApp(subscription.associatedApp, Linking.openURL, Platform.OS);
+      const result = await openCancellationDestination(subscription, Linking.openURL, Platform.OS);
       useCancellationNotice.getState().setMessage(result.message);
-    } finally { opening.current = false; setBusy(false); }
+    } catch { useCancellationNotice.getState().setMessage('Could not save this cancellation plan. Try again.'); } finally { opening.current = false; setBusy(false); }
   }
   return <SubscriptionButton label={busy ? 'Opening…' : label} accessibilityLabel={`${label} ${subscription.name}`}
     tone="primary" disabled={busy} grow={grow} onPress={() => void plan()} />;

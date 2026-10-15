@@ -6,5 +6,5 @@ export function describeReminderStatus(enabled: boolean, status: ReminderStatus)
   if (status.permission === 'denied') return { label: 'Blocked by your phone’s notification settings. Your reminder preference is saved.', needsRefresh: false };
   if (status.permission === 'undetermined') return { label: 'Phone permission has not been granted. Reminders cannot be delivered yet.', needsRefresh: false };
   if (status.scheduledCount !== status.expectedCount) return { label: 'Your reminder schedule needs a refresh.', needsRefresh: true };
-  return { label: `${status.permission === 'quiet' ? 'Allowed quietly. ' : ''}${status.scheduledCount ? `${status.scheduledCount} renewal reminder${status.scheduledCount === 1 ? '' : 's'} scheduled.` : 'No upcoming renewal reminders to schedule.'}`, needsRefresh: false };
+  return { label: `${status.permission === 'quiet' ? 'Allowed quietly. ' : ''}${status.scheduledCount ? `${status.scheduledCount} subscription reminder${status.scheduledCount === 1 ? '' : 's'} scheduled.` : 'No upcoming subscription reminders to schedule.'}`, needsRefresh: false };
 }

@@ -58,7 +58,7 @@ test('Test-mode migration preserves existing sample testing and clearing/resetti
 
 test('Reminder descriptions distinguish permission, actual scheduling and off preferences with uncleared entries', () => {
   const scheduled = { permission: 'granted', scheduledCount: 3, expectedCount: 3 };
-  assert.match(describeReminderStatus(true, scheduled).label, /3 renewal reminders scheduled/);
+  assert.match(describeReminderStatus(true, scheduled).label, /3 subscription reminders scheduled/);
   assert.equal(describeReminderStatus(true, { ...scheduled, scheduledCount: 2 }).needsRefresh, true);
   assert.equal(describeReminderStatus(false, scheduled).needsRefresh, true);
   assert.match(describeReminderStatus(true, { ...scheduled, permission: 'denied' }).label, /Blocked/);

@@ -1,5 +1,7 @@
 import { validateDetails } from '../pocket/repository.ts';
 import type { TransactionDetails } from '../pocket/repository.ts';
+import { dateFromKey, validateSubscription } from '../subscriptions/logic.ts';
+import type { Subscription } from '../subscriptions/logic.ts';
 import { validSetAsideRule } from '../goals/logic.ts';
 import type { SetAsideRule } from '../goals/logic.ts';
 import { validateJson } from './backupFormat.ts';
@@ -36,9 +38,21 @@ export function validateStoreState(name: string, state: Record<string, unknown>,
     if (state.transactionDirections) requireValue(object(state.transactionDirections) && Object.values(state.transactionDirections).every(value => value === 'in' || value === 'out'), 'direction corrections');
     if (state.transactionDetails) { requireValue(object(state.transactionDetails), 'transaction details'); Object.values(state.transactionDetails).forEach(value => validateDetails(value as TransactionDetails)); }
     if (state.merchantAliases) requireValue(object(state.merchantAliases) && Object.values(state.merchantAliases).every(value => typeof value === 'string' && value.length <= 80), 'merchant aliases');
-    if (state.correctionHistory) rows(state, 'correctionHistory');
+    if (state.correctionHistory) for (const revision of rows(state, 'correctionHistory')) {
+      requireValue(typeof revision.transactionId === 'string' && Number.isFinite(Date.parse(String(revision.createdAt))) && object(revision.before) && object(revision.after), 'correction history');
+      for (const change of [revision.before, revision.after]) {
+        if ('details' in change && change.details !== null) validateDetails(change.details as TransactionDetails);
+        if ('direction' in change) requireValue(change.direction === null || change.direction === 'in' || change.direction === 'out', 'correction direction');
+        if (change.alias) requireValue(object(change.alias) && typeof change.alias.key === 'string' && (change.alias.value === null || typeof change.alias.value === 'string'), 'alias correction');
+      }
+    }
   }
-  if (name === 'gasfinder-subscriptions') for (const sub of rows(state, 'subscriptions')) requireValue(typeof sub.name === 'string' && nonnegative(sub.amountCents) && typeof sub.active === 'boolean' && ['monthly', 'yearly'].includes(String(sub.cadence)) && Number.isInteger(sub.day) && Number(sub.day) >= 1 && Number(sub.day) <= 31 && Number.isInteger(sub.month) && Number(sub.month) >= 1 && Number(sub.month) <= 12, 'subscription');
+  if (name === 'gasfinder-subscriptions') for (const sub of rows(state, 'subscriptions')) { validateSubscription(sub as Subscription); requireValue(typeof sub.name === 'string' && nonnegative(sub.amountCents) && typeof sub.active === 'boolean' && ['monthly', 'yearly'].includes(String(sub.cadence)) && Number.isInteger(sub.day) && Number(sub.day) >= 1 && Number(sub.day) <= 31 && Number.isInteger(sub.month) && Number(sub.month) >= 1 && Number(sub.month) <= 12, 'subscription');
+    requireValue(!sub.cancelBy || typeof sub.cancelBy === 'string' && dateFromKey(sub.cancelBy), 'cancellation follow-up date');
+    requireValue(!sub.canceledAt || Number.isFinite(Date.parse(String(sub.canceledAt))), 'cancellation date');
+    if (sub.lastReview) requireValue(object(sub.lastReview) && ['keep', 'plan-to-cancel'].includes(String(sub.lastReview.decision)) && typeof sub.lastReview.renewalDate === 'string' && dateFromKey(sub.lastReview.renewalDate), 'renewal review');
+    if (sub.cancellationHistory) requireValue(Array.isArray(sub.cancellationHistory) && sub.cancellationHistory.every(item => object(item) && Number.isFinite(Date.parse(String(item.canceledAt))) && (!item.reactivatedAt || Number.isFinite(Date.parse(String(item.reactivatedAt))))), 'cancellation history');
+  }
   if (name === 'gasfinder-drive-profile') for (const car of rows(state, 'cars')) requireValue(typeof car.name === 'string' && typeof car.mpg === 'number' && car.mpg > 0 && typeof car.tankGallons === 'number' && car.tankGallons > 0, 'car');
   if (name === 'gasfinder-receipt-reports' || name === 'gasfinder-local-price-reports') for (const report of rows(state, 'reports')) requireValue(typeof report.stationName === 'string' && ['regular', 'midgrade', 'premium', 'diesel'].includes(String(report.fuelType)) && (name === 'gasfinder-local-price-reports' ? typeof report.price === 'number' && report.price > 0 : typeof report.photoUri === 'string' && typeof report.pricePerGallon === 'number' && report.pricePerGallon > 0), 'fuel report');
 }

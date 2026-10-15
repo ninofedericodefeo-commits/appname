@@ -4,7 +4,7 @@ import type { Subscription } from './logic.ts';
 export type RenewalSnoozes = Record<string, { until: string; fingerprint: string }>;
 export const subscriptionsForMode = (subscriptions: Subscription[], sampleMode: boolean) => subscriptions.filter(item => sampleMode || !item.isSample);
 export const renewalReviewKey = (id: string, renewal: Date) => JSON.stringify([id, localDateKey(renewal)]);
-const fingerprint = (subscription: Subscription) => JSON.stringify([subscription.name, subscription.amountCents, subscription.cadence, subscription.day, subscription.month, !!subscription.isSample]);
+const fingerprint = (subscription: Subscription) => JSON.stringify([subscription.name, subscription.amountCents, subscription.cadence, subscription.day, subscription.month, subscription.trialEndsOn ?? null, !!subscription.isSample]);
 
 export function renewalSnoozeUntil(subscription: Subscription, renewal: Date, snoozes: RenewalSnoozes, now: Date) {
   const entry = snoozes[renewalReviewKey(subscription.id, renewal)];

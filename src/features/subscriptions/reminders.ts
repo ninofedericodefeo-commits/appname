@@ -49,8 +49,8 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
     const count = group.names.length;
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: count === 1 ? 'Review a subscription tomorrow' : `Review ${count} subscriptions tomorrow`,
-        body: `Estimated renewal total: ${formatMoney(group.totalCents)}. Open GasFinder to decide what to keep.`,
+        title: group.cancelNames?.length ? 'Follow up on subscription cancellation' : count === 1 ? 'Review a subscription tomorrow' : `Review ${count} subscriptions tomorrow`,
+        body: group.cancelNames?.length ? `You planned to cancel ${group.cancelNames.length} subscription${group.cancelNames.length === 1 ? "" : "s"}. Open GasFinder to follow up.` : `Estimated renewal total: ${formatMoney(group.totalCents)}. Open GasFinder to decide what to keep.`,
         data: { kind: notificationKind, url: '/subscriptions' },
       },
       trigger: {
