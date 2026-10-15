@@ -1,8 +1,8 @@
 # GasFinder future roadmap
 
-**Updated:** October 13, 2026
+**Updated:** October 14, 2026
 
-**Baseline:** `a9de911` data foundations, followed by the October 13 daily-actions batch below
+**Baseline:** `a9de911` data foundations, `e9beeea` daily actions, followed by the October 14 Gas batch below
 
 **Purpose:** a dependable personal app, installed privately; no App Store launch is planned.
 
@@ -55,14 +55,18 @@ The intended result is a useful daily companion for one person. Reliability, few
 | Statement handoff | Signed iPhone shortcut and native file opening; optional quick import of matching clean shared PDFs | Cold/warm launch and interrupted-save checks on the installed phone; simpler repeat setup |
 | Goals | One active goal, deadlines/rules, assignments, direct shared money sheet, separate editor, named goal actions and universal preferences | Physical-phone keyboard/accessibility checks; optional setup checklist and appearance polish |
 | Subscriptions | Renewal banner, persistent snoozes, explicit sample mode, app picker, bank evidence/alerts and reminder permission/schedule status | Device permission/delivery checks, upcoming-cost summaries and billing destinations |
-| Gas | Free station discovery, restored map/list, local reports, newest-price precedence, Old pins and recent-price ranking | Manual location search, compact filters/cars, reporting consolidation, useful personal price coverage |
+| Gas | Free station discovery, manual/search-this-area center, recent areas/saved stations, dated result cache, adjacent controls, compact cars and existing price freshness | Physical-phone/offline acceptance, reporting consolidation and useful personal price coverage |
 | Cars and drives | Saved cars, editable MPG/capacity estimates, successive stops and Maps handoff | Better road-access/detour evidence, range calibration and saved trip conveniences |
 | Amazon goals | Public direct/short-link name and USD price lookup, editable draft, provenance and fallback | Successful live extraction on the phone; optional image/share convenience |
 | Checkout pause | Safari extension, desktop Chrome source/package builder, recognized checkout URL interruption | Real browser coverage tests, easy desktop handoff and honest pause-state reporting |
 | Widgets | Account/goal widget code and native capability configuration | Enrolled-team signing and device verification for current integration; no active replacement Live Activity |
 | Data and delivery | Local persisted stores, original-import archive, versioned migrations, development builds | Complete backup/restore, app lock/encryption decisions, private standalone builds and update recovery |
 
-The current batch reports **215 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
+The current batch reports **223 passing logic tests**, passing lint/TypeScript and successful iOS/Android/web exports. These are development checks, not a substitute for physical-device acceptance. See [current handoff](docs/PROJECT_HANDOFF.md), [app audit](docs/APP_REVIEW.md) and [phone checks](docs/PHONE_SMOKE_TEST.md).
+
+### October 14 implementation progress
+
+**UX-04 / GAS-01:** Gas now shows area/GPS/error state and Filters above the retained map, accepts submitted city/ZIP/address or coordinates without GPS permission, and offers explicit Search this area after panning. Recent areas, station favorites and dated OpenStreetMap result snapshots persist locally. Cached results keep price ages and report partial coverage; late GPS results cannot overwrite a manual choice. My cars is compact, with selection in Manage/trip planning. See [Gas area search](docs/GAS_AREA_SEARCH.md) for service limits, cache behavior and remaining physical-device checks. Financial records, native capabilities and dependencies are unchanged.
 
 ### October 13 implementation progress
 
@@ -195,6 +199,8 @@ Build a personal-use installation process; details are in section 13. Keep the s
 
 ### UX-04 · Gas controls where they are needed · P1 / S–M
 
+**Status:** implemented and checked at 390/320 px. Native keyboard, safe-area, large-text and map-gesture acceptance remain in REL-01.
+
 - Show location/search state above the map, with fuel/radius/price-only controls adjacent to it.
 - Compact My cars into selected car + Manage; expand vehicle details only when planning or editing.
 - Show useful loading, denied-location, empty-price and offline states in the first viewport.
@@ -295,6 +301,8 @@ The UI currently combines bank movements, local purchases and savings entries. C
 ## 8. M4 — Make gas useful with personal data
 
 ### GAS-01 · Search without GPS · P1 / M
+
+**Status:** implemented with submitted Photon place lookup, direct coordinates, explicit map-area search, recent areas, saved stations and dated local result caching. GPS-unavailable/manual selection and restart were checked in the browser. Airplane-mode cold launch and native permission/gesture acceptance remain in REL-01; offline basemap downloads remain out of scope.
 
 - Add city/ZIP/address or explicit map-area search, with a visible search center and distance measured from it.
 - Keep current location as an option; permission denial must not strand the search.
@@ -543,7 +551,7 @@ These are concrete batches, not approval to deploy services or purchase accounts
 | 1 | Native checks + backup/first restore + private bundled installation | REL-01, DATA-01, REL-02, REL-03 | Validate the accounting, protect data and remove Metro dependence |
 | 2 | Direct goal money actions + one universal gear | UX-01, UX-02 | Core cleanup implemented; optional checklist/appearance remain |
 | 3 | Durable renewal snooze + explicit sample mode + permission status | UX-03, SUB-03 | Code implemented; phone permission/delivery checks remain |
-| 4 | Gas location/error placement + manual area search | UX-04, GAS-01 | Makes Gas usable when GPS is denied or you want another area |
+| 4 | Gas location/error placement + manual area search | UX-04, GAS-01 | Code implemented; native/offline acceptance remains |
 | 5 | Saved-import management + source-linked transaction details | IMP-01, ACC-02 | Makes existing files/history easier to inspect and recover |
 | 6 | Canonical ledger/recoverable imports | ACC-01, IMP-02 | Foundation for more capture methods and corrections; after restore works |
 | 7 | Subscription cost summaries + billing/cancellation paths | SUB-01, SUB-02 | Completes the practical renewal-management loop |

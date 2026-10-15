@@ -1,5 +1,16 @@
 # Physical phone smoke test
 
+## Gas area-search checks — October 14, 2026
+
+Browser/logic checks pass; these native checks remain open. Use disposable/public search locations and record device/build/OS and outcome.
+
+- Deny GPS on first launch. Search near and a working Search an area action must be above the map, alongside a clear GPS explanation. Search a city/ZIP/address, compare ambiguous results and choose explicitly. Test no results, invalid coordinates, service failure, cancellation, editing during a pending lookup and Search online again on saved results. Place text is submitted only after Find area; no typing/GPS bias requests.
+- Choose an area while GPS is still pending. The late GPS result must not replace it. Deny/fail Use GPS with an area already chosen: that area/results remain. Reopen/relaunch: the saved center returns without claiming an old GPS check is a new current location. Native GPS success/accuracy still needs verification.
+- Pan/zoom locally, verify no station request until Search this area, then check the new center/label/radius and distances. Change fuel/price-only filter and Map/List without losing the selected search center. Report/trip actions stay below the map and above List rows. Check Search this area through the native DOM WebView, pinch/pan/page scroll, safe areas, large text and screen reader.
+- Fetch a public area once, quit, turn on airplane mode and cold launch. Saved stations must appear with the original date, correct center/coverage and a refresh warning/retry; prices retain original age/Old state. A new uncached area must not display the previous area's results. Choose a recent area or direct coordinates without place lookup. Map tiles may be unavailable; List is the fallback. Reconnect/Retry and verify current results replace/merge cached coverage without duplicate IDs.
+- Save/unsave an OpenStreetMap station; relaunch and find it in Change area → Saved stations. Search around it. Deleting a local report must not leave a price copied into favorites. Google results must not enter persistent favorites/caches. Verify five recent areas, bounded snapshots and the 50-station limit with synthetic data.
+- With prices-only enabled and no saved price for the selected fuel, the explanation and Show all stations action must appear above the map. My cars shows the selected car and Manage; switch cars in Manage or trip planning and confirm the correct one is used, with full details available there.
+
 ## Current daily-action checks — October 13, 2026
 
 These supplement the earlier checks below. Browser checks at 390/320 px and 215 logic tests passed; the following native checks remain open.

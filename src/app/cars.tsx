@@ -12,7 +12,7 @@ import { colors } from '@/theme';
 
 const popular = ['Subaru Crosstrek', 'Toyota RAV4', 'Honda CR-V', 'Toyota Corolla', 'Honda Civic', 'Ford F150'];
 export default function CarsScreen() {
-  const { cars, saveCar, deleteCar } = useDriveStore();
+  const { cars, selectedCarId, selectCar, saveCar, deleteCar } = useDriveStore();
   const [query, setQuery] = useState('');
   const [draft, setDraft] = useState<CarProfile | null>(null);
   const [mpg, setMpg] = useState('');
@@ -41,7 +41,7 @@ export default function CarsScreen() {
       {!draft && <>
         {cars.map((car) => <View key={car.id} style={styles.card}>
           <Text style={styles.heading}>{car.name}</Text><Text style={styles.description}>{car.model} · {car.mpg} MPG · {car.tankGallons} gal tank</Text>
-          <View style={styles.row}><Pressable accessibilityRole="button" onPress={() => edit(car)} style={styles.smallButton}><Text style={styles.link}>Edit</Text></Pressable>
+          <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel={`Use ${car.name} for next drive`} accessibilityState={{ selected: selectedCarId === car.id }} onPress={() => selectCar(car.id)} style={styles.smallButton}><Text style={styles.link}>{selectedCarId === car.id ? '✓ Selected' : 'Use for next drive'}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => edit(car)} style={styles.smallButton}><Text style={styles.link}>Edit</Text></Pressable>
             {deleting === car.id ? <><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => { deleteCar(car.id); setDeleting(null); }}><Text style={styles.error}>Confirm delete</Text></Pressable><Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => setDeleting(null)}><Text style={styles.link}>Cancel</Text></Pressable></> : <Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => setDeleting(car.id)}><Text style={styles.link}>Delete</Text></Pressable>}
           </View>
         </View>)}

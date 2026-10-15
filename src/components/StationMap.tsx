@@ -8,12 +8,14 @@ import './station-map.css';
 type Point = { latitude: number; longitude: number };
 export type MapPin = Point & { id: string; name: string; price: number | null; sample: boolean; stopNumber?: number; stale?: boolean };
 
-export default function StationMap({ pins, center, selectedId, route = [], onSelect }: {
+export default function StationMap({ pins, center, centerLabel = 'Your location', selectedId, route = [], onSelect, onSearchArea }: {
   pins: MapPin[];
   center: Point | null;
   selectedId?: string | null;
   route?: Point[];
   onSelect: (id: string) => Promise<void>;
+  centerLabel?: string;
+  onSearchArea?: (point: Point) => Promise<void>;
   dom?: import('expo/dom').DOMProps;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -22,8 +24,24 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
   const tiles = useRef<Leaflet.TileLayer | null>(null);
   const library = useRef<typeof Leaflet | null>(null);
   const initialView = useRef('');
+  const fitting = useRef(false);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [searchPoint, setSearchPoint] = useState<Point | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!ready || !instance || !onSearchArea) return;
+    const moved = () => {
+      if (fitting.current) { setSearchPoint(null); return; }
+      const point = instance.getCenter().wrap();
+      if (instance.getZoom() < 8 || center && instance.distance(point, [center.latitude, center.longitude]) < 160) { setSearchPoint(null); return; }
+      setSearchPoint({ latitude: point.lat, longitude: point.lng });
+    };
+    instance.on('moveend', moved);
+    return () => { instance.off('moveend', moved); };
+  }, [ready, center, onSearchArea]);
 
   useEffect(() => {
     let canceled = false;
@@ -49,7 +67,7 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
     if (!ready || !instance || !L || !group) return;
     group.clearLayers();
     if (route.length > 1) L.polyline(route.map((point) => [point.latitude, point.longitude]), { color: '#245A4B', weight: 5 }).addTo(group);
-    if (center) L.circleMarker([center.latitude, center.longitude], { radius: 7, color: '#FFFEF9', weight: 3, fillColor: '#2373CE', fillOpacity: 1 }).bindTooltip('Your location').addTo(group);
+    if (center) L.circleMarker([center.latitude, center.longitude], { radius: 7, color: '#FFFEF9', weight: 3, fillColor: '#2373CE', fillOpacity: 1 }).bindTooltip(centerLabel).addTo(group);
     for (const pin of pins) {
       const label = document.createElement('span');
       label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}${pin.stale ? ' stale' : ''}`;
@@ -67,16 +85,19 @@ export default function StationMap({ pins, center, selectedId, route = [], onSel
     const viewState = `${viewKey}:${pins.length ? 'results' : 'empty'}`;
     if (initialView.current !== viewState) {
       const points = route.length > 1 ? route : [...pins, ...(center ? [center] : [])];
-      if (points.length) instance.fitBounds(L.latLngBounds(points.map((point) => [point.latitude, point.longitude])), { padding: [42, 42], maxZoom: 14 });
+      fitting.current = true;
+      if (points.length) instance.fitBounds(L.latLngBounds(points.map((point) => [point.latitude, point.longitude])), { padding: [42, 42], maxZoom: 14, animate: false });
+      fitting.current = false;
       initialView.current = viewState;
     }
-    instance.invalidateSize();
-  }, [ready, pins, center, route, selectedId, onSelect]);
+    instance.invalidateSize({ pan: false });
+  }, [ready, pins, center, centerLabel, route, selectedId, onSelect]);
 
   return <div className="station-map-shell">
     <div className="station-map" ref={container} aria-label="Gas station map. Select a price marker to view station details." />
     {!ready && !error && <div className="map-message">Opening map…</div>}
     {error && <div className="map-message" role="status">{error} <button onClick={() => { setError(''); tiles.current?.redraw(); }}>Retry</button></div>}
+    {onSearchArea && searchPoint && (!center || Math.abs(searchPoint.latitude - center.latitude) + Math.abs(searchPoint.longitude - center.longitude) > 0.001) && <button className="map-search-area" disabled={searching} onClick={() => { setSearching(true); void onSearchArea(searchPoint).catch(() => setError('Could not search this area. Try again.')).finally(() => setSearching(false)); }}>{searching ? 'Searching…' : 'Search this area'}</button>}
     {pins.some((pin) => pin.sample) && <div className="map-legend">* Sample price</div>}
     {pins.some(pin => pin.stale) && <div className="map-legend">Old: over 24h or report time unavailable</div>}
   </div>;

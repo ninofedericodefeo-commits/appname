@@ -1,13 +1,18 @@
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { colors } from '@/theme';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GasStationCard } from '@/components/GasStationCard';
 import { PageToolbar } from '@/components/SettingsButton';
 import MyCarsSection from '@/features/vehicles/MyCarsSection';
+import AreaSearchSheet from '@/features/location/AreaSearchSheet';
+import { coordinateLabel } from '@/features/location/areaSearch';
+import type { SearchArea } from '@/features/location/areaSearch';
+import { useGasSearchStore } from '@/stores/gasSearchStore';
+import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import StationMap from '@/components/StationMap';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { stationApiBaseUrl } from '@/features/stations/data';
@@ -32,8 +37,13 @@ export default function GasScreen() {
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
   const [reportsOpen, setReportsOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('loading');
+  const location = useGasSearchStore(state => state.lastArea);
+  const ready = useSyncExternalStore(useGasSearchStore.persist.onFinishHydration, useGasSearchStore.persist.hasHydrated, () => false);
+  const [areaSearchOpen, setAreaSearchOpen] = useState(false);
+  const locationRequest = useRef(0);
+  const invalidateLocation = useCallback(() => { locationRequest.current++; }, []);
+  useEffect(() => invalidateLocation, [invalidateLocation]);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'loading' | 'denied' | 'unavailable'>('idle');
   const initialSearchStarted = useRef(false);
   const [now, setNow] = useState(() => Date.now());
 
@@ -42,33 +52,40 @@ export default function GasScreen() {
     return () => clearInterval(timer);
   }, []);
 
-  const startLocationSearch = useCallback(async (nextMode: 'nearby' | 'online') => {
-    setMode(nextMode);
-    if (selectedRadius > 25) setSelectedRadius(25);
+  const chooseArea = useCallback((area: SearchArea) => {
+    invalidateLocation(); setLocationStatus('idle'); setSelectedStationId(null);
+    useGasSearchStore.getState().chooseArea(area);
+  }, [invalidateLocation]);
+  const searchMapArea = useCallback(async (point: { latitude: number; longitude: number }) => {
+    chooseArea({ ...point, label: `Map area · ${coordinateLabel(point)}`, kind: 'map' });
+  }, [chooseArea]);
+  const startLocationSearch = useCallback(async () => {
+    const request = ++locationRequest.current;
     setLocationStatus('loading');
     try {
-      const granted = await requestLocationPermission();
-      if (!granted) {
-        setLocation(null);
-        setLocationStatus('denied');
+      if (Platform.OS !== 'web' && !await requestLocationPermission()) {
+        if (request === locationRequest.current) setLocationStatus('denied');
         return;
       }
       const current = await getCurrentLocation();
-      setLocation(current);
-      setLocationStatus('idle');
+      if (request !== locationRequest.current) return;
+      chooseArea({ ...current, kind: 'gps', label: `GPS check ${new Date().toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}` });
     } catch {
-      setLocation(null);
-      setLocationStatus('unavailable');
+      if (request === locationRequest.current) setLocationStatus('unavailable');
     }
-  }, [selectedRadius, setSelectedRadius]);
-
+  }, [chooseArea]);
   useEffect(() => {
-    if (initialSearchStarted.current) return;
-    initialSearchStarted.current = true;
-    void startLocationSearch('nearby');
-  }, [startLocationSearch]);
+    if (!ready || initialSearchStarted.current) return;
+    let canceled = false;
+    void Promise.resolve().then(() => {
+      if (canceled || initialSearchStarted.current) return;
+      initialSearchStarted.current = true;
+      if (!useGasSearchStore.getState().lastArea) return startLocationSearch();
+    });
+    return () => { canceled = true; };
+  }, [ready, startLocationSearch]);
 
-  const { data, isLoading, isFetching, isError, isPartial, expansionFailed, error: searchError, refetch } = useNearbyStations({
+  const { data, isLoading, isFetching, isError, isPartial, expansionFailed, error: searchError, refetch, isCached, fetchedAt, refreshFailed, coveredRadius } = useNearbyStations({
     mode,
     latitude: location?.latitude,
     longitude: location?.longitude,
@@ -87,7 +104,7 @@ export default function GasScreen() {
     const bestPrice = best ? recentStationPrice(best, selectedFuelType, now) : Infinity;
     return Number.isFinite(price) && price < bestPrice ? station : best;
   }, undefined);
-  const canShowResults = (location !== null && locationStatus !== 'denied' && locationStatus !== 'unavailable');
+  const canShowResults = location !== null;
   const selectedStation = stations.find((station) => station.id === selectedStationId);
   const mapPins = useMemo(() => stations.map((station) => ({
     id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude,
@@ -105,47 +122,32 @@ export default function GasScreen() {
           <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
         </View>
 
-        {(locationStatus === 'loading' || canShowResults && (isLoading || isFetching)) && (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="small" color={colors.accent} />
-            <Text style={styles.loadingText}>{isPartial ? `Showing stations within 2 mi · searching out to ${selectedRadius} mi…` : 'Finding nearby stations…'}</Text>
-          </View>
-        )}
-
-        <View style={styles.viewToggle}>
-          {(['map', 'list'] as const).map((view) => <Pressable key={view} accessibilityRole="button" accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.activePill]}><Text style={[styles.pillText, viewMode === view && styles.activePillText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}
-          <Text style={styles.mapCount}>{stations.length} station{stations.length === 1 ? '' : 's'}</Text>
+        <View style={styles.areaCard}>
+          <Text style={styles.areaLabel}>SEARCH NEAR</Text>
+          <Text numberOfLines={2} style={styles.areaName}>{location?.label ?? 'Choose a search area'}</Text>
+          <View style={styles.areaActions}><SubscriptionButton grow label={location ? 'Change area' : 'Search an area'} disabled={!ready} onPress={() => setAreaSearchOpen(true)} /><SubscriptionButton grow label={locationStatus === 'loading' ? 'Getting GPS…' : 'Use GPS'} disabled={!ready || locationStatus === 'loading'} onPress={() => void startLocationSearch()} /></View>
         </View>
-        {mode === 'online' && <Text style={styles.noPriceNote}>Google results are available in List. Choose Nearby map in Filters for the free map.</Text>}
-        {viewMode === 'map' && <>
-          <View style={styles.mapFrame}>
-            <StationMap key={`${mode}-${selectedRadius}`} pins={canShowResults ? mapPins : []} center={location} selectedId={selectedStationId} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: 370 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} />
-          </View>
-          {selectedStation ? <GasStationCard key={selectedStation.id} station={selectedStation} fuelType={selectedFuelType} isCheapest={selectedStation.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt onReported={() => void refetch()} /> : <Text style={styles.noPriceNote}>Tap a station marker for directions, reports and price history. Map locations are from OpenStreetMap; reported prices are unverified.</Text>}
-        </>}
-
-        <View style={styles.quickActions}>
-          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report a price</Text></Pressable></Link>
-          <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
-        </View>
-        <MyCarsSection />
-
+        {(locationStatus === 'denied' || locationStatus === 'unavailable') && <View style={styles.statusBox}><Text style={styles.statusTitle}>{locationStatus === 'denied' ? 'Location access is off' : 'Could not get GPS location'}</Text><Text style={styles.statusText}>{location ? 'Your selected search area is still in use. ' : ''}Search by city or ZIP, choose a saved area, or pan the map and tap Search this area.</Text></View>}
+        {(locationStatus === 'loading' || canShowResults && (isLoading || isFetching)) && <View style={styles.loadingBox}><ActivityIndicator size="small" color={colors.accent} /><Text style={styles.loadingText}>{locationStatus === 'loading' ? 'Getting GPS. You can also search an area.' : isCached ? 'Showing saved stations · refreshing…' : isPartial ? `Stations within ${coveredRadius} mi · searching out to ${selectedRadius} mi…` : 'Finding stations in this area…'}</Text></View>}
+        {canShowResults && isCached && <View style={styles.statusBox}><Text style={styles.statusTitle}>{refreshFailed ? 'Station refresh unavailable' : 'Saved station results'}</Text><Text style={styles.statusText}>Saved {fetchedAt ? new Date(fetchedAt).toLocaleString() : 'earlier'}{coveredRadius < selectedRadius ? ` · covers ${coveredRadius} mi` : ''}. Distances are from your search center. Prices keep their original report dates.</Text>{refreshFailed && <SubscriptionButton label="Retry search" onPress={() => void refetch()} />}</View>}
+        {canShowResults && expansionFailed && <Text style={styles.noPriceNote}>Wider search unavailable. Showing stations within {coveredRadius} mi.</Text>}
+        {canShowResults && isError && <View style={styles.statusBox}><Text style={styles.statusTitle}>Station search unavailable</Text><Text style={styles.statusText}>{searchError instanceof Error ? searchError.message : 'Check your connection and try again.'} Your search area is kept.</Text><SubscriptionButton label="Retry search" onPress={() => void refetch()} /></View>}
         <View style={styles.filters}>
           <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
-            <View><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {selectedRadius} mi · {sortOrder}{hideUnpricedStations ? ' · prices only' : ''}</Text></View>
+            <View style={{ flex: 1 }}><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {selectedRadius} mi · {sortOrder}{hideUnpricedStations ? ' · prices only' : ''}</Text></View>
             <Text style={styles.filterChevron}>{filtersOpen ? '−' : '+'}</Text>
           </Pressable>
           {filtersOpen && <>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Hide stations without a price</Text><Text style={styles.filterChevron}>{hideUnpricedStations ? '☑' : '☐'}</Text></Pressable>
           <Text style={styles.noPriceNote}>Applies to {selectedFuelType} prices on the map and in the list. N/A means no price saved.</Text>
-          {!!stationApiBaseUrl && <View style={styles.pillRow}><Pressable accessibilityRole="button" style={styles.pill} onPress={() => void startLocationSearch('nearby')}><Text style={styles.pillText}>Nearby map</Text></Pressable><Pressable accessibilityRole="button" style={styles.pill} onPress={() => { setViewMode('list'); void startLocationSearch('online'); }}><Text style={styles.pillText}>Google prices</Text></Pressable></View>}
+          {!!stationApiBaseUrl && <View style={styles.pillRow}><Pressable accessibilityRole="button" style={styles.pill} onPress={() => setMode('nearby')}><Text style={styles.pillText}>Nearby map</Text></Pressable><Pressable accessibilityRole="button" style={styles.pill} onPress={() => { setViewMode('list'); setMode('online'); }}><Text style={styles.pillText}>Google prices</Text></Pressable></View>}
           <View style={styles.filterPanel}>
             <Text style={styles.sectionTitle}>Fuel</Text>
             <View style={styles.pillRow}>
               {fuelOptions.map((fuel) => (
                 <Pressable
                   key={fuel}
-                  style={[styles.pill, selectedFuelType === fuel && styles.activePill]}
+                  accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} style={[styles.pill, selectedFuelType === fuel && styles.activePill]}
                   onPress={() => setSelectedFuelType(fuel)}
                 >
                   <Text style={[styles.pillText, selectedFuelType === fuel && styles.activePillText]}>{fuel}</Text>
@@ -158,7 +160,7 @@ export default function GasScreen() {
             <Text style={styles.sectionTitle}>Sort</Text>
             <View style={styles.pillRow}>
               {(['price', 'distance'] as const).map((sort) => (
-                <Pressable key={sort} style={[styles.pill, sortOrder === sort && styles.activePill]} onPress={() => setSortOrder(sort)}>
+                <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: sortOrder === sort }} style={[styles.pill, sortOrder === sort && styles.activePill]} onPress={() => setSortOrder(sort)}>
                   <Text style={[styles.pillText, sortOrder === sort && styles.activePillText]}>{sort}</Text>
                 </Pressable>
               ))}
@@ -171,6 +173,7 @@ export default function GasScreen() {
               {[5, 10, 25].map((radius) => (
                 <Pressable
                   key={radius}
+                  accessibilityRole="button" accessibilityState={{ selected: selectedRadius === radius }}
                   style={[styles.pill, selectedRadius === radius && styles.activePill]}
                   onPress={() => setSelectedRadius(radius)}
                 >
@@ -182,48 +185,42 @@ export default function GasScreen() {
           </>}
         </View>
 
-        {locationStatus === 'denied' && (
+        {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && (
           <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Location access was denied</Text>
-            <Text style={styles.emptyText}>Enable location for GasFinder in your device settings, then try again.</Text>
-            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startLocationSearch(mode)}><Text style={styles.retryText}>Try location again</Text></Pressable>
-          </View>
-        )}
-        {locationStatus === 'unavailable' && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Location unavailable</Text>
-            <Text style={styles.emptyText}>Check your device location service and try again.</Text>
-            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void startLocationSearch(mode)}><Text style={styles.retryText}>Try again</Text></Pressable>
-          </View>
-        )}
-        {canShowResults && expansionFailed && <View style={styles.emptyCard}><Text style={styles.emptyTitle}>Wider search unavailable</Text><Text style={styles.emptyText}>Showing stations found within 2 mi. You can try the wider search again.</Text><Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry wider search</Text></Pressable></View>}
-
-        {canShowResults && isError && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>Station search failed</Text>
-            <Text style={styles.emptyText}>{searchError instanceof Error ? `${searchError.message} Check your connection and try again.` : 'Could not load stations. Check your connection and try again.'}</Text>
-            <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => void refetch()}><Text style={styles.retryText}>Retry search</Text></Pressable>
+            <Text style={styles.emptyTitle}>{hideUnpricedStations && allStations.length > 0 ? `No saved ${selectedFuelType} prices` : isCached ? 'No saved stations in this area' : 'No stations found in this radius'}</Text>
+            <Text style={styles.emptyText}>{hideUnpricedStations && allStations.length > 0 ? 'Nearby stations are hidden until a price is reported.' : 'Try expanding your search radius.'}</Text>
+            {hideUnpricedStations && allStations.length > 0 && <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => setHideUnpricedStations(false)}><Text style={styles.retryText}>Show all stations</Text></Pressable>}
           </View>
         )}
 
+        <View style={styles.viewToggle}>
+          {(['map', 'list'] as const).map((view) => <Pressable key={view} accessibilityRole="button" accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.activePill]}><Text style={[styles.pillText, viewMode === view && styles.activePillText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}
+          <Text style={styles.mapCount}>{stations.length} station{stations.length === 1 ? '' : 's'}</Text>
+        </View>
+        {mode === 'online' && <Text style={styles.noPriceNote}>Google results are available in List. Choose Nearby map in Filters for the free map.</Text>}
+        {viewMode === 'map' && <>
+          <View style={styles.mapFrame}>
+            <StationMap key={`${mode}-${selectedRadius}`} pins={canShowResults ? mapPins : []} center={location} centerLabel="Search center" onSearchArea={searchMapArea} selectedId={selectedStationId} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: 370 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} />
+          </View>
+          {selectedStation ? <GasStationCard key={selectedStation.id} station={selectedStation} fuelType={selectedFuelType} isCheapest={selectedStation.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} /> : <Text style={styles.noPriceNote}>Tap a station marker for directions, reports and price history. Map locations are from OpenStreetMap; reported prices are unverified.</Text>}
+        </>}
+
+        <View style={styles.quickActions}>
+          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report a price</Text></Pressable></Link>
+          <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
+        </View>
         {viewMode === 'list' && canShowResults && !isLoading && !isError && stations.length > 0 && (
           <View style={styles.listSection}>
             <Text style={styles.sectionEyebrow}>Stations</Text>
             {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
             {!cheapest && <Text style={styles.noPriceNote}>No recent {selectedFuelType} prices in these results. Older saved prices may still be shown.</Text>}
             {stations.map((station) => (
-              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt onReported={() => void refetch()} />
+              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} />
             ))}
           </View>
         )}
 
-        {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>{hideUnpricedStations && allStations.length > 0 ? `No saved ${selectedFuelType} prices` : 'No stations found in this radius'}</Text>
-            <Text style={styles.emptyText}>{hideUnpricedStations && allStations.length > 0 ? 'Nearby stations are hidden until a price is reported.' : 'Try expanding your search radius.'}</Text>
-            {hideUnpricedStations && allStations.length > 0 && <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => setHideUnpricedStations(false)}><Text style={styles.retryText}>Show all stations</Text></Pressable>}
-          </View>
-        )}
+        <MyCarsSection />
 
         <Text style={styles.sectionEyebrow}>Your gas reports</Text>
         <Link href="/report-receipt" asChild>
@@ -244,11 +241,15 @@ export default function GasScreen() {
           </View>)}
         </View>}
       </ScrollView>
+      {areaSearchOpen && <AreaSearchSheet onChoose={chooseArea} onClose={() => setAreaSearchOpen(false)} />}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  areaCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, gap: 8, marginBottom: 10 },
+  areaLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 }, areaName: { color: colors.ink, fontSize: 15, fontWeight: '700', lineHeight: 21 }, areaActions: { flexDirection: 'row', gap: 8 },
+  statusBox: { padding: 12, borderRadius: 10, backgroundColor: colors.paleOrange, gap: 7, marginBottom: 10 }, statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, statusText: { color: colors.inkSoft, fontSize: 13, lineHeight: 19 },
   viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   viewButton: { minHeight: 44, minWidth: 70, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7 },
   mapCount: { marginLeft: 'auto', color: colors.muted, fontSize: 12 },
@@ -256,7 +257,7 @@ const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56 },
-  headerRow: { marginBottom: 20 },
+  headerRow: { marginBottom: 12 },
   brand: { fontSize: 11, fontWeight: '800', letterSpacing: 2.1, color: colors.accentDark, marginBottom: 12 },
   title: { fontSize: 39, lineHeight: 44, letterSpacing: -1.7, fontWeight: '800', color: colors.ink },
   headerNote: { fontSize: 15, color: colors.muted, marginTop: 7 },
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
   savedReportDelete: { color: colors.danger, fontSize: 12, fontWeight: '800' },
   sourceText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
   sectionEyebrow: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 14 },
-  filters: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.line, padding: 16, marginBottom: 21 },
+  filters: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 10 },
   filterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 },
   filterToggleTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   filterSummary: { color: colors.muted, fontSize: 12, textTransform: 'capitalize', marginTop: 3 },
@@ -296,12 +297,12 @@ const styles = StyleSheet.create({
   activePill: { backgroundColor: colors.ink, borderColor: colors.ink },
   pillText: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize', color: colors.inkSoft },
   activePillText: { color: colors.surface },
-  loadingBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 18, alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
-  loadingText: { color: colors.muted, fontSize: 14 },
+  loadingBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 12, alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
+  loadingText: { flex: 1, color: colors.muted, fontSize: 14 },
   listSection: { marginTop: 4 },
   googleLogo: { width: 98, height: 18, marginVertical: 9 },
   noPriceNote: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  emptyCard: { marginTop: 12, backgroundColor: colors.surface, borderRadius: 8, padding: 18, alignItems: 'center' },
+  emptyCard: { marginBottom: 12, backgroundColor: colors.surface, borderRadius: 8, padding: 12, alignItems: 'center' },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
   emptyText: { marginTop: 8, color: colors.muted },
   retryButton: { marginTop: 14, backgroundColor: colors.ink, borderRadius: 6, paddingVertical: 11, paddingHorizontal: 16 },

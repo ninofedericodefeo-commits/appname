@@ -1,4 +1,5 @@
 import { colors } from '@/theme';
+import { useGasSearchStore } from '@/stores/gasSearchStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { preferredMapsApp } from '@/features/stations/preferences';
 import { useState } from 'react';
@@ -21,6 +22,8 @@ export function GasStationCard({
   canReport = false,
   canOpenMaps = false,
   canAddReceipt = false,
+  canFavorite = false,
+  distanceLabel,
   onReported,
 }: {
   station: GasStation;
@@ -31,9 +34,13 @@ export function GasStationCard({
   canReport?: boolean;
   canOpenMaps?: boolean;
   canAddReceipt?: boolean;
+  canFavorite?: boolean;
+  distanceLabel?: string;
   onReported?: () => void;
 }) {
   const mapsPreference = useSettingsStore((state) => state.mapsPreference);
+  const favorites = useGasSearchStore(state => state.favorites);
+  const favorite = favorites.some(item => item.id === station.id);
   const mapsApp = preferredMapsApp(mapsPreference, Platform.OS);
   const price = station.prices.find((item) => item.fuelType === fuelType);
   const queryClient = useQueryClient();
@@ -80,7 +87,7 @@ export function GasStationCard({
           {isCheapest && <Text style={styles.bestLabel}>LOWEST RECENT REPORT</Text>}
           <Text style={styles.name}>{station.name === 'Gas station' ? 'Name not listed' : station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
-          <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi · {priceDescription(price, isDemo, now)}</Text>
+          <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi{distanceLabel ? ` ${distanceLabel}` : ''} · {priceDescription(price, isDemo, now)}</Text>
           {station.attributions?.map((attribution, index) => attribution.providerUri ? (
             <Pressable key={`${attribution.provider}-${index}`} accessibilityRole="link" onPress={() => void Linking.openURL(attribution.providerUri!)}>
               <Text style={styles.attribution}>{attribution.provider} ↗</Text>
@@ -93,6 +100,7 @@ export function GasStationCard({
           <Text style={styles.priceLabel}>{price ? '/gal' : 'No price yet'}</Text>
         </View>
       </View>
+      {canFavorite && <Pressable accessibilityRole="button" accessibilityLabel={`${favorite ? 'Unsave' : 'Save'} station ${station.name}`} accessibilityState={{ selected: favorite }} style={styles.receiptLink} onPress={() => { if (!favorite && favorites.length >= 50) { setMapsError('You can save up to 50 stations. Unsave one to add another.'); return; } useGasSearchStore.getState().toggleFavorite(station); setMapsError(''); }}><Text style={styles.editText}>{favorite ? '★ Saved station' : '☆ Save station'}</Text></Pressable>}
       {canOpenMaps && <View style={styles.mapActions}>
         <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.mapButtonText}>{mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'} ↗</Text></Pressable>
         {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
