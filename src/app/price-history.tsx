@@ -1,6 +1,6 @@
-import { colors } from '@/theme';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useLocalSearchParams } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -23,6 +23,7 @@ const ranges: { value: HistoryRange; label: string }[] = [
 const validFuels: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 
 export default function PriceHistoryScreen() {
+  useThemeRevision();
   const params = useLocalSearchParams<{ stationId?: string; stationName?: string; fuelType?: string; source?: string; qualifier?: string }>();
   const stationId = typeof params.stationId === 'string' ? params.stationId : '';
   const stationName = typeof params.stationName === 'string' ? params.stationName : 'Station';
@@ -48,7 +49,7 @@ export default function PriceHistoryScreen() {
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.kicker}>PRICE HISTORY</Text>
-        <Text style={styles.title}>{stationName}</Text>
+        <Text accessibilityRole="header" style={styles.title}>{stationName}</Text>
         <Text style={styles.subtitle}>{fuelType} · {qualifier} · USD per gallon</Text>
         {isLocal && <Text style={styles.localNote}>Only reports saved on this device appear here.</Text>}
         <View style={styles.ranges}>
@@ -77,7 +78,7 @@ export default function PriceHistoryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 48 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
@@ -101,4 +102,4 @@ const styles = StyleSheet.create({
   chartCard: { backgroundColor: colors.surface, borderRadius: 9, padding: 18 },
   chartTitle: { color: colors.ink, fontSize: 19, fontWeight: '800', marginBottom: 17 },
   footnote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 19 },
-});
+}));

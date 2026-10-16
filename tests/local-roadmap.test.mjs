@@ -61,6 +61,7 @@ test('coverage merges adjacent periods and exposes an actual missing day', () =>
 });
 test('batch keeps one balance candidate locked after the first reviewed save', () => {
  const items = startBatch([{kind:'csv',name:'one',text:'1'},{kind:'csv',name:'two',text:'2'}]);
+ updateBatch(items[1].token,{balance:{amountCents:1234,asOf:'2026-10-07'}});
  chooseBatchBalance(items[1].token);assert.equal(batchBalanceAllowed(items[1].token),true);
  updateBatch(items[0].token,{saved:true});chooseBatchBalance(items[0].token);assert.equal(batchBalanceAllowed(items[0].token),false);
  assert.equal(getBatch()[0].saved,true);clearBatch();assert.equal(getBatch().length,0);

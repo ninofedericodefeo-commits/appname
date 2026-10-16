@@ -1,3 +1,4 @@
+import { useThemeRevision } from '@/theme';
 import { useRef, useState } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, Text, TextInput, View } from 'react-native';
@@ -6,6 +7,7 @@ import { eraseAllAppRecords } from './backupService';
 import { useDataStatus } from './operationStatus';
 
 export default function EraseDataPanel({ disabled = false }: { disabled?: boolean }) {
+  useThemeRevision();
   const [open, setOpen] = useState(false), [acknowledged, setAcknowledged] = useState(false);
   const [confirmation, setConfirmation] = useState(''), [finalReview, setFinalReview] = useState(false);
   const [busy, setBusy] = useState(false), [error, setError] = useState('');

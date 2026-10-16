@@ -2,6 +2,14 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
+## Current finish batch — October 16, 2026
+
+R06–R30 have local implementations; see [finish status](FINISH_STATUS.md) for exact scope, evidence and remaining acceptance. Pocket schema **15** supports reviewed manual credit/refund rows; Settings schema **4** adds appearance, start/view preferences and reminder timing; device privacy schema **2** adds amount hiding. All migrate additively. Appearance uses `themedStyles` factories and `useThemeRevision` so switching theme does not remount forms. Financial privacy is a cover in PrivacyGate, not conditional unmounting of form content. Long drafts live in app-owned storage/IndexedDB, outside portable backups, with clear/reset/restore/wipe integration.
+
+290 tests, lint/TypeScript, all-platform JS export and iOS simulator Debug/Release builds pass. `scripts/benchmark-local.mjs` measures 10,000 synthetic movements and the supported 5,000-row CSV limit. Browser checks include narrow layouts, recurrence/draft prompts, report draft resume, a manual refund updating an isolated negative balance, amount privacy, and a generated backup reopened for inspection. No actual installation was erased or personal statements uploaded. Current logs/artifacts are listed in FINISH_STATUS.md.
+
+**Remaining work is installed-device acceptance and fixes it reveals**: R31 private Release/offline/update/restore; R32 Citizens/Wallet phone handoff; R33 native privacy/reminder/OCR/checkout/widgets; VoiceOver, large-text/keyboard sweep and device-scale file/performance tests. Do not reimplement completed feature tickets or claim physical checks passed from compilation. Historical sections below describe earlier checkpoints.
+
 ## Latest correctness batch — October 15, 2026
 
 Final-roadmap **R01–R05 are implemented locally**. See [batch notes](ACCOUNT_REVIEW_FIXES.md). Pocket schema **14** adds persistent separate-purchase decisions with evidence fingerprints and Undo; review and saves respect direction corrections; negative manual bank snapshots have a phone-friendly sign control; calendar validation is shared/strict; all review/hidden/Undo sections are paged and searchable. Original evidence and set-aside contributions stay intact. ID repair remaps review references. Full history and Settings → Account & statements link directly to review.

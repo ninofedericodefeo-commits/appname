@@ -1,3 +1,4 @@
+import { useThemeRevision } from '@/theme';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { CalendarDateField } from '@/components/CalendarDateField';
@@ -7,6 +8,7 @@ import type { Subscription } from './logic';
 import SubscriptionButton from './SubscriptionButton';
 import { dataStyles as s } from '@/features/data/styles';
 export default function CancellationControls({ subscription, managing }: { subscription: Subscription; managing: boolean }) {
+  useThemeRevision();
   const [confirm, setConfirm] = useState(false), [date, setDate] = useState(localDateKey(new Date())), [error, setError] = useState('');
   const { setActive, setCancelBy, review } = useSubscriptionStore();
   if (!subscription.active) return <Text style={s.note}>Canceled on {subscription.canceledAt ? new Date(subscription.canceledAt).toLocaleDateString() : 'an earlier date'}. Reactivate only if you resubscribed with the provider.</Text>;

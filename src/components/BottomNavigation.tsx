@@ -1,8 +1,8 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { colors } from '@/theme';
 
 export type Tab = 'index' | 'investment' | 'pocket' | 'subscriptions';
 
@@ -14,6 +14,7 @@ const tabs = [
 ] as const;
 
 export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSelect: (tab: Tab) => void }) {
+  useThemeRevision();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
 
   useEffect(() => {
@@ -36,11 +37,11 @@ export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSe
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line },
-  row: { flexDirection: 'row', paddingTop: 8, paddingHorizontal: 8, gap: 4 },
+  row: { flexWrap: 'wrap', flexDirection: 'row', paddingTop: 8, paddingHorizontal: 8, gap: 4 },
   tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
   activeTab: { backgroundColor: colors.paleGreen },
   label: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   activeLabel: { color: colors.ink, fontWeight: '800' },
-});
+}));

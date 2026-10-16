@@ -1,8 +1,9 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import AmazonPriceReview from '@/features/goals/AmazonPriceReview';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Clipboard from 'expo-clipboard';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityIndicator, Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
@@ -12,15 +13,16 @@ import AmazonProductLookup from '@/features/goals/AmazonProductLookup';
 import GoalEditor from '@/features/goals/GoalEditor';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
-import { colors } from '@/theme';
 
 function Button({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}>
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text>
   </Pressable>;
 }
 
 export default function AmazonGoalScreen() {
+  useThemeRevision();
   const params = useLocalSearchParams<{ product?: string }>();
   const { activeGoal, reservedCents, createGoal, updateGoal, endGoal } = usePocketStore();
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
@@ -73,11 +75,11 @@ export default function AmazonGoalScreen() {
   return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}>
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>SAVINGS GOALS</Text>
-      <Text style={styles.title}>Goal from link</Text>
+      <Text accessibilityRole="header" style={styles.title}>Goal from link</Text>
       <Text style={styles.body}>Paste an Amazon link to fill in the product name and price.</Text>
       {!ready ? <View style={styles.row}><ActivityIndicator color={colors.primary} /><Text style={styles.body}>Loading your goals…</Text></View> : activeGoal ? <>
         <View style={styles.card}>
-          <Text style={styles.heading}>You have an active goal</Text>
+          <Text accessibilityRole="header" style={styles.heading}>You have an active goal</Text>
           <Text style={styles.body}>{activeGoal.title} · {formatMoney(activeGoal.savedCents)} saved</Text>
           <Text style={styles.hint}>Edit it, or finish and archive it before creating a product goal.</Text>
           <View style={styles.row}>
@@ -85,7 +87,7 @@ export default function AmazonGoalScreen() {
             <Button label="Finish and archive" onPress={() => { setConfirmArchive(true); setEditingCurrent(false); }} />
           </View>
           {confirmArchive && <View style={styles.warning}>
-            <Text style={styles.heading}>Finish {activeGoal.title}?</Text>
+            <Text accessibilityRole="header" style={styles.heading}>Finish {activeGoal.title}?</Text>
             <Text style={styles.hint}>Its progress will stay in Past goals. Its {formatMoney(activeGoal.savedCents)} stays in your set-aside balance, ready to assign to a new goal.</Text>
             <View style={styles.row}><Button label="Confirm archive" onPress={() => { endGoal(); setConfirmArchive(false); }} /><Button label="Keep current goal" secondary onPress={() => setConfirmArchive(false)} /></View>
           </View>}
@@ -98,7 +100,7 @@ export default function AmazonGoalScreen() {
         }} />}
       </> : <>
         {!draft ? <View style={styles.card}>
-          <Text style={styles.heading}>Paste an Amazon product link</Text>
+          <Text accessibilityRole="header" style={styles.heading}>Paste an Amazon product link</Text>
           <TextInput accessibilityLabel="Amazon product link" value={link} onChangeText={(text) => { request.current++; setBusy(false); setLookup(null); setLink(text); setError(''); }} style={styles.input} placeholder="https://www.amazon.com/dp/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" maxLength={2048} onSubmitEditing={() => review(link)} />
           <View style={styles.row}><Button label={busy ? 'Reading clipboard…' : 'Paste link'} secondary disabled={busy || !!lookup} onPress={() => void paste()} /><Button label="Get product details" disabled={busy || !!lookup} onPress={() => review(link)} /></View>
           {lookup && <View style={styles.notice}>
@@ -110,7 +112,7 @@ export default function AmazonGoalScreen() {
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
         </View> : <>
           <View style={styles.notice}>
-            <Text style={styles.heading}>{draft.priceSource === 'amazon-page' ? 'Product details filled in' : 'Check the product details'}</Text>
+            <Text accessibilityRole="header" style={styles.heading}>{draft.priceSource === 'amazon-page' ? 'Product details filled in' : 'Check the product details'}</Text>
             <Text accessibilityLiveRegion="polite" style={styles.hint}>{lookupMessage || 'Review the name, selected option and full USD price before saving. Tax and shipping are not included.'}</Text>
             <View style={styles.row}><Button label="Change link" secondary onPress={() => { request.current++; setDraft(null); setError(''); }} /><Button label="Retry lookup" secondary onPress={() => review(link)} /></View>
           </View>
@@ -131,7 +133,7 @@ export default function AmazonGoalScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper }, content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 36, gap: 16 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 40, letterSpacing: -1 },
   heading: { color: colors.ink, fontSize: 19, lineHeight: 26, fontWeight: '800' }, body: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 }, hint: { color: colors.muted, fontSize: 13, lineHeight: 19 },
@@ -139,4 +141,4 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.surface, color: colors.ink, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, padding: 12, minHeight: 48, fontSize: 15 },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 }, button: { backgroundColor: colors.accentDark, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 13, minHeight: 46, justifyContent: 'center', alignSelf: 'flex-start' }, buttonText: { color: colors.surface, fontWeight: '800', fontSize: 13 },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.lineStrong }, secondaryText: { color: colors.ink }, disabled: { opacity: 0.45 }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
-});
+}));

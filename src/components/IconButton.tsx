@@ -1,7 +1,7 @@
-import { Pressable, StyleSheet } from 'react-native';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
+import { Pressable } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
-import { colors } from '@/theme';
 
 export type ActionIcon = 'edit' | 'delete' | 'settings' | 'activity' | 'upload' | 'close';
 
@@ -17,7 +17,8 @@ const paths: Record<ActionIcon, string> = {
 export function IconButton({ icon, label, onPress, inverse = false, selected = false }: {
   icon: ActionIcon; label: string; onPress: () => void; inverse?: boolean; selected?: boolean;
 }) {
-  const stroke = inverse ? colors.surface : colors.ink;
+  useThemeRevision();
+  const stroke = inverse ? '#FFFEF9' : colors.ink;
   return <Pressable accessibilityRole="button" accessibilityLabel={label}
     accessibilityState={{ selected }} onPress={onPress}
     style={({ pressed }) => [styles.button, inverse && styles.inverse, selected && styles.selected, pressed && styles.pressed]}>
@@ -30,9 +31,9 @@ export function IconButton({ icon, label, onPress, inverse = false, selected = f
   </Pressable>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   button: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
   inverse: { backgroundColor: 'rgba(255,255,255,0.08)' },
   selected: { backgroundColor: colors.paleGreen },
   pressed: { opacity: 0.6 },
-});
+}));

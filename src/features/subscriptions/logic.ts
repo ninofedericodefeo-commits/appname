@@ -106,11 +106,13 @@ export function subscriptionCosts(subscriptions: Subscription[], now: Date) {
   return { annualCents, monthlyEquivalentCents: Math.round(annualCents / 12), next30Cents: next30.reduce((sum, item) => sum + item.amountCents, 0), next7Cents: next30.filter(item => item.dateKey < next7End).reduce((sum, item) => sum + item.amountCents, 0), activeCount: real.length };
 }
 
-export function upcomingReminderGroups(subscriptions: Subscription[], now: Date): ReminderGroup[] {
+export function upcomingReminderGroups(subscriptions: Subscription[], now: Date, options: { hour?: number; leadDays?: number } = {}): ReminderGroup[] {
+  const hour = options.hour ?? 9, lead = options.leadDays ?? 1;
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23 || ![0,1,2,3,7].includes(lead)) throw Error('Choose a valid reminder hour and lead.');
   const groups = new Map<string, ReminderGroup>();
   const members = new Map<string, Set<string>>();
   function add(subscription: Subscription, date: Date, renewalDate: string, cancellation: boolean) {
-    const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), 9);
+    const at = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour);
     if (at.getTime() <= now.getTime() || at.getTime() > addCalendarDays(now, 400).getTime()) return;
     const key = localDateKey(date), group = groups.get(key) ?? { at, renewalDate, names: [], totalCents: 0, cancelNames: [] };
     const ids = members.get(key) ?? new Set<string>();
@@ -119,7 +121,7 @@ export function upcomingReminderGroups(subscriptions: Subscription[], now: Date)
     groups.set(key, group);
   }
   for (const { subscription, date, dateKey } of upcomingCharges(subscriptions, now, 400)) {
-    if (subscription.lastReview?.renewalDate !== dateKey) add(subscription, addCalendarDays(date, -1), dateKey, false);
+    if (subscription.lastReview?.renewalDate !== dateKey) add(subscription, addCalendarDays(date, -lead), dateKey, false);
   }
   for (const subscription of subscriptions.filter(item => item.active && !item.isSample && item.cancelBy)) {
     const due = dateFromKey(subscription.cancelBy!); if (due) add(subscription, due, subscription.cancelBy!, true);

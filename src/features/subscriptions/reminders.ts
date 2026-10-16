@@ -1,3 +1,5 @@
+import { useSettingsStore } from '@/stores/settingsStore';
+import { useDevicePrivacy } from '@/features/privacy/deviceStore';
 import { formatMoney } from '@/lib/money';
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
@@ -45,12 +47,12 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
   if (!enabled || !permissionAllowsAlerts(await Notifications.getPermissionsAsync())) return;
   await ensureChannel();
 
-  for (const group of upcomingReminderGroups(subscriptions, new Date())) {
+  for (const group of upcomingReminderGroups(subscriptions, new Date(), { hour: useSettingsStore.getState().reminderHour, leadDays: useSettingsStore.getState().reminderLeadDays })) {
     const count = group.names.length;
     await Notifications.scheduleNotificationAsync({
       content: {
-        title: group.cancelNames?.length ? 'Follow up on subscription cancellation' : count === 1 ? 'Review a subscription tomorrow' : `Review ${count} subscriptions tomorrow`,
-        body: group.cancelNames?.length ? `You planned to cancel ${group.cancelNames.length} subscription${group.cancelNames.length === 1 ? "" : "s"}. Open GasFinder to follow up.` : `Estimated renewal total: ${formatMoney(group.totalCents)}. Open GasFinder to decide what to keep.`,
+        title: group.cancelNames?.length ? 'Follow up on subscription cancellation' : count === 1 ? 'Upcoming subscription renewal' : `${count} upcoming subscription renewals`,
+        body: useDevicePrivacy.getState().hideAmounts ? 'Open GasFinder to review your subscriptions.' : group.cancelNames?.length ? `You planned to cancel ${group.cancelNames.length} subscription${group.cancelNames.length === 1 ? "" : "s"}. Open GasFinder to follow up.` : `Estimated renewal total: ${formatMoney(group.totalCents)}. Open GasFinder to decide what to keep.`,
         data: { kind: notificationKind, url: '/subscriptions' },
       },
       trigger: {
@@ -77,5 +79,5 @@ export async function getSubscriptionReminderStatus(subscriptions: Subscription[
     : settings.ios?.status === Notifications.IosAuthorizationStatus.DENIED || settings.status === 'denied' ? 'denied'
     : permissionAllowsAlerts(settings) ? 'granted' : 'undetermined';
   return { permission, scheduledCount: scheduled.filter(item => item.content.data?.kind === notificationKind).length,
-    expectedCount: enabled && permissionAllowsAlerts(settings) ? upcomingReminderGroups(subscriptions, new Date()).length : 0 };
+    expectedCount: enabled && permissionAllowsAlerts(settings) ? upcomingReminderGroups(subscriptions, new Date(), { hour: useSettingsStore.getState().reminderHour, leadDays: useSettingsStore.getState().reminderLeadDays }).length : 0 };
 }

@@ -1,10 +1,17 @@
+import { StatusBar } from 'expo-status-bar';
+import { isDarkTheme , themedStyles, useThemeRevision , colors } from '@/theme';
+import DataCompletionNotice from '@/features/data/DataCompletionNotice';
+import { configureBatchStorage } from '@/features/bank/batch';
+import { draftStorage } from '@/features/drafts/storage';
+import { saveDraft } from '@/features/drafts/persistence';
+import AppearanceBridge from '@/features/preferences/AppearanceBridge';
+import { useReducedMotion } from '@/components/useReducedMotion';
 import { StatementReminderSync } from '@/features/bank/StatementReminder';
 import { useDataStatus } from '@/features/data/operationStatus';
 import { PrivacyGate } from '@/features/privacy/PrivacyGate';
 import { DataGate } from '@/features/data/DataGate';
-import { colors } from '@/theme';
 import { useEffect } from 'react';
-import { AppState, Platform, StyleSheet, View } from 'react-native';
+import { AppState, Platform, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
@@ -18,6 +25,8 @@ import { useWidgetSettingsStore } from '@/stores/widgetSettingsStore';
 import { queryClient } from '@/lib/queryClient';
 import { usePocketStore } from '@/stores/pocketStore';
 
+configureBatchStorage({ read: draftStorage.read, save: saveDraft });
+
 if (Platform.OS !== 'web') {
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -29,10 +38,13 @@ if (Platform.OS !== 'web') {
   });
 }
 
-export default function RootLayout() { return <DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate>; }
+export default function RootLayout() {
+  useThemeRevision(); return <><AppearanceBridge /><DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate></>; }
 
 function ReadyLayout() {
+  useThemeRevision();
   const { busy } = useDataStatus();
+  const reduced = useReducedMotion();
   useEffect(() => {
     const refresh = () => { void syncAccountWidget().catch(error => console.warn('Could not update account widget', error)); };
     const retire = () => { void endRetiredPurchaseActivities().catch(error => console.warn('Could not dismiss retired purchase activity', error)); };
@@ -56,9 +68,10 @@ function ReadyLayout() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <View style={styles.appShell}>
+      <View style={styles.appShell}><StatusBar style={isDarkTheme() ? 'light' : 'dark'} animated={!reduced} />
         <Stack screenOptions={{
-          headerTitle: '',
+          title: 'GasFinder',
+          animation: reduced ? 'none' : 'default',
           headerRight: () => <SettingsButton />,
           headerTintColor: colors.ink,
           headerStyle: { backgroundColor: colors.paper },
@@ -71,11 +84,11 @@ function ReadyLayout() {
           <Stack.Screen name="settings/index" options={{ headerRight: () => null }} />
           <Stack.Screen name="settings/[section]" options={{ headerRight: () => null, headerBackTitle: 'Settings' }} />
         </Stack>
-        <SubscriptionCancellationNotice />
+        <SubscriptionCancellationNotice /><DataCompletionNotice />
       </View>
       <SubscriptionReminderSync /><StatementReminderSync />
     </QueryClientProvider>
   );
 }
 
-const styles = StyleSheet.create({ appShell: { flex: 1, backgroundColor: colors.paper } });
+const styles = themedStyles(() => ({ appShell: { flex: 1, backgroundColor: colors.paper } }));

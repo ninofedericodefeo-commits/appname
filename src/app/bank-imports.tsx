@@ -1,3 +1,4 @@
+import { useThemeRevision , colors } from '@/theme';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
 import { ActivityIndicator, FlatList, Platform, Pressable, Text, TextInput, View } from 'react-native';
@@ -7,9 +8,9 @@ import { exportBankImports, listBankImports, shareBankImport, updateBankImport, 
 import { pickBankFile } from '@/features/bank/pickBankFile';
 import { formatMoney } from '@/lib/money';
 import { dataStyles as s } from '@/features/data/styles';
-import { colors } from '@/theme';
 
 export default function BankImportsScreen() {
+  useThemeRevision();
   const [entries, setEntries] = useState<SavedBankImport[]>([]), [loading, setLoading] = useState(true), [busy, setBusy] = useState(false);
   const [error, setError] = useState(''), [query, setQuery] = useState(''), [trash, setTrash] = useState(false), [sort, setSort] = useState<'recent' | 'name' | 'period'>('recent');
   const [selected, setSelected] = useState<string[]>([]), [editing, setEditing] = useState(''), [name, setName] = useState('');
@@ -37,7 +38,7 @@ export default function BankImportsScreen() {
     ListEmptyComponent={!loading ? <Text style={s.note}>{trash ? 'Trash is empty.' : 'No files match. Confirm a PDF or CSV import to save its original here.'}</Text> : null}
     renderItem={({ item }) => <View style={s.card}>
       <View style={s.row}><Pressable accessibilityRole="checkbox" accessibilityLabel={`Select ${item.name}`} accessibilityState={{ checked: selected.includes(item.id) }} aria-checked={selected.includes(item.id)} style={s.choice} onPress={() => setSelected(ids => ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id])}><Text style={s.choiceText}>{selected.includes(item.id) ? '✓ Selected' : 'Select'}</Text></Pressable><Text style={s.note}>{item.kind.toUpperCase()} · {item.accountLabel}</Text></View>
-      <Text style={s.heading}>{item.name}</Text><Text style={s.note}>Saved {new Date(item.importedAt).toLocaleDateString()} · {item.transactionCount} transactions{item.sizeBytes !== undefined ? ` · ${(item.sizeBytes / 1024).toFixed(1)} KB` : ''}</Text>
+      <Text accessibilityRole="header" style={s.heading}>{item.name}</Text><Text style={s.note}>Saved {new Date(item.importedAt).toLocaleDateString()} · {item.transactionCount} transactions{item.sizeBytes !== undefined ? ` · ${(item.sizeBytes / 1024).toFixed(1)} KB` : ''}</Text>
       {!!item.periods?.length && <Text style={s.note}>Period {item.periods.join(', ')}</Text>}
       {item.balanceCents !== undefined && <Text style={s.body}>Closing balance {formatMoney(item.balanceCents)}{item.balanceAsOf ? ` · ${item.balanceAsOf}` : ''}</Text>}
       {item.importReport && <Text style={s.note}>{item.importReport.parser.startsWith('citizens') ? 'Citizens PDF' : 'CSV'} · {item.importReport.checks === 'matched' ? 'Totals match' : item.importReport.checks}{'\n'}{item.importReport.added} added · {item.importReport.matched} matched · {item.importReport.excludedRows} excluded{'\n'}{item.importReport.balanceUpdated ? 'Statement balance accepted' : 'Existing balance kept'} · {formatMoney(item.importReport.savedCents)} set aside</Text>}

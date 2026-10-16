@@ -1,24 +1,25 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { transactionDay } from './dates';
 import TransactionDetailsEditor from './TransactionDetailsEditor';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 
 import PurchaseCard from '@/features/goals/PurchaseCard';
 import { usePocketStore } from '@/stores/pocketStore';
 import { formatMoney } from '@/lib/money';
-import { colors } from '@/theme';
 import type { PocketTransaction } from './transactions';
 import { transactionDisplayName } from './transactions';
 
 const sourceNames = { 'citizens-pdf': 'Citizens statement', csv: 'Bank CSV', manual: 'Manually logged', shortcut: 'Apple Pay Shortcut', savings: 'Savings adjustment' };
 const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported', logged: 'Logged', adjustment: 'Local only' };
 
-export function TransactionRow({ transaction, onRemove }: { transaction: PocketTransaction; onRemove: (transaction: PocketTransaction) => void }) {
+export function TransactionRow({ transaction, onRemove, initiallyExpanded = false }: { transaction: PocketTransaction; initiallyExpanded?: boolean; onRemove: (transaction: PocketTransaction) => void }) {
+  useThemeRevision();
   const purchases = usePocketStore((state) => state.purchases);
   const activeGoal = usePocketStore((state) => state.activeGoal);
   const correctDirection = usePocketStore(state => state.correctTransactionDirection);
   const adjustment = transaction.source === 'savings';
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const incoming = !adjustment && transaction.amountCents > 0;
   const outgoing = !adjustment && transaction.amountCents < 0;
   const title = transactionDisplayName(transaction);
@@ -27,10 +28,10 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
   const shortDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = title.replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 2).toUpperCase();
   return <View style={styles.container}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${title}, ${amount}, ${shortDate}. ${expanded ? 'Hide' : 'Show'} transaction details`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${incoming ? transaction.transactionType === 'refund' ? 'Refund' : 'Deposit' : outgoing ? 'Withdrawal' : 'Savings adjustment'}: ${title}, ${amount}, ${shortDate}. ${expanded ? 'Hide' : 'Show'} transaction details`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
       <View style={[styles.avatar, incoming && styles.creditAvatar, outgoing && styles.debitAvatar]}><Text style={[styles.initials, outgoing && styles.debit]}>{adjustment ? '↔' : incoming ? '+' : initials || '↗'}</Text></View>
       <View style={styles.main}>
-        <Text style={styles.title} numberOfLines={2}>{title}</Text>
+        <Text style={styles.title} >{title}</Text>
         <Text style={styles.meta}>{shortDate}{adjustment ? ' · Savings' : transaction.status === 'pending' ? ' · Pending' : transaction.purchase?.decision === 'pending' ? ' · Savings review' : ''}</Text>
       </View>
       <Text style={[styles.amount, incoming && styles.credit, outgoing && styles.debit]}>{amount}</Text>
@@ -44,7 +45,7 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
       {adjustment && <Text style={styles.detailText}>Changes what is set aside. Money stays in your bank account.</Text>}
       {transaction.purchase && (transaction.purchase.title !== transaction.title || transaction.purchase.amountCents !== Math.abs(transaction.amountCents)) && <Text style={styles.detailText}>Savings record: {transaction.purchase.title} · {formatMoney(transaction.purchase.amountCents)}</Text>}
       {transaction.purchase && !incoming && <PurchaseCard purchase={transaction.purchase} history={purchases} goal={activeGoal} compact />}
-      {transaction.status === 'recorded' && <Text style={styles.detailText}>Posting status wasn’t included in the export.</Text>}
+      {transaction.status === 'recorded' && transaction.source !== 'manual' && <Text style={styles.detailText}>Posting status wasn’t included in the export.</Text>}
       {['csv', 'citizens-pdf'].includes(transaction.source) && <>
         <Text style={styles.detailText}>{transaction.directionCorrected ? 'Direction corrected on this device' : 'Wrong direction?'}</Text>
         <View style={styles.corrections}><Pressable accessibilityRole="button" accessibilityLabel={`Mark ${title} as ${incoming ? 'withdrawal' : 'deposit'}`} style={styles.directionButton} onPress={() => correctDirection(transaction.id, incoming ? 'out' : 'in')}><Text style={styles.directionText}>{incoming ? 'Mark as withdrawal' : 'Mark as deposit'}</Text></Pressable>
@@ -52,19 +53,19 @@ export function TransactionRow({ transaction, onRemove }: { transaction: PocketT
         </View>
         <Text style={styles.detailText}>Corrects this history row and newer-activity estimates. Your confirmed bank balance, set-asides and original import stay unchanged.</Text>
       </>}
-      <Text style={styles.detailText}>Remove from history hides this row. It keeps the financial record, duplicate protection and balance estimate.</Text>
+      <Text style={styles.detailText}>Hide from history hides this row. It keeps the financial record, duplicate protection and balance estimate.</Text>
       <TransactionDetailsEditor row={transaction} />
-      <Pressable accessibilityRole="button" accessibilityLabel={`Remove ${title} from history`} onPress={() => onRemove(transaction)} style={styles.removeButton}><Text style={styles.removeText}>Remove from history</Text></Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel={`Hide ${title} from history`} onPress={() => onRemove(transaction)} style={styles.removeButton}><Text style={styles.removeText}>Hide from history</Text></Pressable>
     </View>}
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: { backgroundColor: colors.surface },
-  row: { minHeight: 86, paddingVertical: 16, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  row: { minHeight: 86, paddingVertical: 16, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
   avatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
   creditAvatar: { backgroundColor: colors.paleGreen }, debitAvatar: { backgroundColor: colors.dangerPale }, initials: { color: colors.primary, fontSize: 13, fontWeight: '800' },
-  main: { flex: 1, gap: 5 }, title: { color: colors.ink, fontSize: 15, fontWeight: '600', lineHeight: 20 },
+  main: { flex: 1, minWidth: 100, gap: 5 }, title: { color: colors.ink, fontSize: 15, fontWeight: '600', lineHeight: 20 },
   meta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   amount: { color: colors.ink, fontSize: 15, fontWeight: '700', fontVariant: ['tabular-nums'], flexShrink: 0 },
   credit: { color: colors.primary }, debit: { color: colors.danger }, chevron: { color: colors.primary, fontSize: 23 }, pressed: { opacity: 0.65 },
@@ -72,4 +73,4 @@ const styles = StyleSheet.create({
   detailText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
   corrections: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, directionButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 8 }, directionText: { color: colors.primary, fontWeight: '700', fontSize: 13 },
   removeButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start', paddingHorizontal: 8 }, removeText: { color: colors.danger, fontWeight: '700', fontSize: 13 },
-});
+}));

@@ -1,7 +1,8 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
 import { Link, router } from 'expo-router';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
@@ -9,11 +10,11 @@ import { installStatementShortcut } from '@/features/bank/installStatementShortc
 import { STATEMENT_SHORTCUT_NAME, statementShortcutURL } from '@/features/bank/statementAutomation';
 import { usePocketStore } from '@/stores/pocketStore';
 import { useStatementAutomationStore } from '@/stores/statementAutomationStore';
-import { colors } from '@/theme';
 
 function Button({ label, onPress, disabled = false, secondary = false }: {
   label: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
 }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}
     style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}>
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text>
@@ -21,6 +22,7 @@ function Button({ label, onPress, disabled = false, secondary = false }: {
 }
 
 export default function StatementAutomationScreen() {
+  useThemeRevision();
   const settings = useStatementAutomationStore();
   const hydrated = useSyncExternalStore(useStatementAutomationStore.persist.onFinishHydration,
     useStatementAutomationStore.persist.hasHydrated, () => false);
@@ -125,7 +127,7 @@ export default function StatementAutomationScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper }, content: { padding: 20, paddingBottom: 36, gap: 16 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.3 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 37, fontWeight: '800', letterSpacing: -0.7 },
@@ -141,4 +143,4 @@ const styles = StyleSheet.create({
   check: { width: 25, height: 25, borderRadius: 5, borderWidth: 1, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' }, checked: { backgroundColor: colors.ink, borderColor: colors.ink }, checkText: { color: colors.surface, fontWeight: '800' },
   saved: { color: colors.primary, fontSize: 13, fontWeight: '700' }, receipt: { padding: 12, borderRadius: 7, backgroundColor: colors.paleGreen, gap: 8 },
   helpButton: { minHeight: 48, justifyContent: 'center' }, link: { color: colors.accentDark, fontSize: 13, fontWeight: '800' }, error: { color: colors.danger, fontSize: 13, lineHeight: 20 },
-});
+}));

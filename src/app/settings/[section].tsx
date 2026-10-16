@@ -1,3 +1,8 @@
+import { useThemeRevision } from '@/theme';
+import GeneralSettings from '@/features/preferences/GeneralSettings';
+import DataHealth from '@/features/data/DataHealth';
+import { useInvestmentStore } from '@/stores/investmentStore';
+import { useDataStatus } from '@/features/data/operationStatus';
 import Constants from 'expo-constants';
 import { Link, useLocalSearchParams } from 'expo-router';
 import type { Href } from 'expo-router';
@@ -16,13 +21,19 @@ import BuildCapabilities from '@/features/data/BuildCapabilities';
 import { dataStyles as s } from '@/features/data/styles';
 
 function SettingsLink({ href, label }: { href: Href; label: string }) {
+  useThemeRevision();
   return <Link href={href} asChild><Pressable accessibilityRole="button" style={s.choice}><Text style={s.choiceText}>{label} ›</Text></Pressable></Link>;
 }
 
 export default function SettingsSectionScreen() {
+  useThemeRevision();
   const { section } = useLocalSearchParams<{ section: string }>();
+  const { notice } = useDataStatus();
+  const legacy = useInvestmentStore();
   const category = settingsSections.find(item => item.id === section);
   return <SettingsPage title={category?.title ?? 'Settings'}>
+    {!!notice && <Text accessibilityLiveRegion="polite" style={s.body}>{notice}</Text>}
+    {section === 'general' && <GeneralSettings />}
     {section === 'account' && <>
       <AccountSettingsPanel />
       <SettingsLink href="/account-review" label="Review matches & hidden history" />
@@ -45,8 +56,8 @@ export default function SettingsSectionScreen() {
       <SettingsLink href="/backup" label="Backup & restore" />
       <SettingsLink href="/insights" label="Insights & transaction export" />
       <SettingsLink href="/account-data" label="Reset or switch bank account" />
-      <SettingsLink href="/legacy-investment" label="Legacy demo records" />
-      <Text style={s.note}>Legacy records are read-only records from the earlier prototype.</Text>
+      {(legacy.payments.length > 0 || legacy.withdrawals.length > 0) && <SettingsLink href="/legacy-investment" label="Legacy demo records" />}
+      <DataHealth />
       <EraseDataPanel />
     </>}
     {section === 'about' && <>

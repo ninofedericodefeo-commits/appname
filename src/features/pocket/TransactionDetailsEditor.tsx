@@ -1,3 +1,4 @@
+import { useThemeRevision } from '@/theme';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { Platform, Pressable, Text, TextInput, View } from 'react-native';
@@ -11,6 +12,7 @@ import type { SavedBankImport } from '@/features/bank/archiveLogic';
 import { dataStyles as s } from '@/features/data/styles';
 
 export default function TransactionDetailsEditor({ row }: { row: PocketTransaction }) {
+  useThemeRevision();
   const [editing, setEditing] = useState(false), [alias, setAlias] = useState(false), [error, setError] = useState('');
   const [draft, setDraft] = useState<TransactionDetails>(row.details ?? { merchant: transactionDisplayName(row), category: 'Uncategorized', classification: 'ordinary', note: '' });
   const [sources, setSources] = useState<SavedBankImport[]>([]), [download, setDownload] = useState<{ name: string; url: string } | null>(null);

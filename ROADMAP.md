@@ -1,6 +1,6 @@
 # GasFinder final roadmap
 
-**Updated:** October 15, 2026 · **Audited baseline:** `b7c27a3` · **Scope:** a private personal app; no App Store launch.
+**Updated:** October 16, 2026 · **Audited baseline:** `b7c27a3` · **Scope:** a private personal app; no App Store launch.
 
 This is the single current backlog. It replaces the earlier milestone plan, preserved in [roadmap history](docs/ROADMAP_HISTORY.md). The [final audit](docs/APP_AUDIT_FINAL.md) records evidence, reproduction details and limitations. [Flowcharts](docs/APP_FLOWS.md) describe the intended journeys.
 
@@ -31,20 +31,20 @@ The final phase is correctness, simpler flows, accessibility and a small set of 
 
 These are maintenance/acceptance responsibilities, not features to build again.
 
-| Area | Existing implementation | Remaining responsibility |
+| Area | Existing implementation | Remaining acceptance |
 | --- | --- | --- |
-| Settings | Nine category rows and separate subsection screens; multi-confirmation wipe in Data & backups and Backup | Improve destinations/copy, success feedback and accessibility |
-| Account | Confirmed snapshot, newer-activity estimate, set-aside subtraction, explanation, pending exclusion, corrections/aliases/notes | Fix review consistency and edge cases below; prove real statements |
-| History/imports | Unified history, filters, hide/Undo, original archive/Trash/relink/export, reconciliation, source evidence, batch/folder review | Reach all records, validate dates, improve batch/draft handling |
-| Recovery/privacy | Encrypted backup/restore, durable recovery/Undo, reset/switch, app lock, preview protection, interrupted erasure marker | Installed-device acceptance, attachment preflight and completion reporting |
-| Goals | One active goal, direct savings sheet, rule/target/date editing, archive/delete, suggestions | Draft/focus/large-text acceptance and simpler wording |
-| Subscriptions | Costs/calendar, samples, bank evidence/alerts, billing/app destinations, cancellation follow-ups, local reminders | Monthly-day selector, contextual links, native permission/delivery checks |
-| Gas/cars | GPS/manual area, favorites/cache, price qualifiers/freshness, combined refill/photo/OCR review, statistics | Shorter common flow, accessible alternatives, device/offline quality |
-| Drives | Saved destinations, selected car/fuel, stop changes/preferences, routed-leg verification and Maps handoff | Progressive disclosure and real road/Maps acceptance |
+| Settings | Nine category rows and separate subsection screens; multi-confirmation wipe in Data & backups and Backup | Phone navigation, focus and large-text acceptance |
+| Account | Confirmed snapshot, newer-activity estimate, set-aside subtraction, explanation, pending exclusion, corrections/aliases/notes | Real statement/phone acceptance and regressions from daily use |
+| History/imports | Unified history, filters, hide/Undo, original archive/Trash/relink/export, reconciliation, source evidence, batch/folder review | Phone interruption/storage-failure acceptance |
+| Recovery/privacy | Encrypted backup/restore, durable recovery/Undo, reset/switch, app lock, preview protection, interrupted erasure marker | Installed-device backup/restore/update and privacy acceptance |
+| Goals | One active goal, direct savings sheet, rule/target/date editing, archive/delete, suggestions | Phone draft/focus/large-text acceptance |
+| Subscriptions | Costs/calendar, samples, bank evidence/alerts, billing/app destinations, cancellation follow-ups, local reminders | Native permission/delivery and accessibility checks |
+| Gas/cars | GPS/manual area, favorites/cache, price qualifiers/freshness, combined refill/photo/OCR review, statistics | Device/offline/real-photo quality checks |
+| Drives | Saved destinations, selected car/fuel, stop changes/preferences, routed-leg verification and Maps handoff | Real road/Maps handoff and range acceptance |
 | Convenience | Amazon lookup/share/recheck, Safari and desktop Chrome package/override, account/goal widgets behind capabilities | Real source/browser checks and honest capability-specific setup |
-| Delivery | Private build profiles and a previous clean iOS simulator build | Installed standalone Release and upgrade/recovery proof |
+| Delivery | Private build profiles and passing simulator Debug/Release builds | Installed standalone Release and upgrade/recovery proof |
 
-**Audit verification:** 259 logic tests passed at the audit checkpoint; the first correctness batch now passes 273. Lint and TypeScript also passed during this documentation batch. Previous native build success is historical evidence, not a new phone test. Browser/code checks cannot close phone-only gates.
+**Audit verification:** 259 logic tests passed at the audit checkpoint; the first correctness batch now passes 290 after the local finish batch. Lint and TypeScript also pass. New iOS simulator Debug and Release builds pass; neither is a physical-phone test. Browser/code checks cannot close phone-only gates.
 
 ## 3. Priority and evidence rules
 
@@ -55,11 +55,11 @@ These are maintenance/acceptance responsibilities, not features to build again.
 
 **S/M/L** mean contained / several connected components / migration or native integration. They are relative scope, not delivery dates. “Observed” means reproduced in the browser; “Source” means established by current code; “Proposal” is an improvement; “Device” requires installed-device testing. Never promote a suspected risk into a confirmed bug without evidence.
 
-**R01–R05 are implemented and locally verified** in the first correctness batch: 273 tests, lint, TypeScript, all-platform JS exports, and synthetic restart/Undo checks pass. See [batch details](docs/ACCOUNT_REVIEW_FIXES.md). R06–R34 remain open/planned, with preferences/additions still optional as described. Implemented work is not an open feature ticket just because phone acceptance remains.
+**R01–R30 now have local implementations.** R01–R05 shipped in the first correctness batch; the finish batch implements drafts/recovery, clearer flows, accessibility foundations, preferences and the small additions. See [finish status and evidence](docs/FINISH_STATUS.md). Optional row density and backup reminders were omitted to keep scope small; they are not missing core features. **R31–R34 and physical accessibility acceptance remain open.** A passing build or browser check cannot close those gates.
 
 ## 4. Batch A — Correctness and recovery
 
-R01–R05 are complete locally; R06–R08 are next. Existing financial journals and portable backups are the foundation; use additive migrations and retain original evidence.
+R01–R08 are implemented locally. Installed-device interruption/recovery acceptance remains. Existing financial journals and portable backups are the foundation; use additive migrations and retain original evidence.
 
 | ID | Priority / size / evidence | Change | Acceptance |
 | --- | --- | --- | --- |
@@ -223,6 +223,7 @@ Once these conditions hold, use the app and fix observed issues. A “final road
 
 ## Supporting documents
 
+- [Finish status, verification and remaining gates](docs/FINISH_STATUS.md)
 - [First correctness batch — R01–R05](docs/ACCOUNT_REVIEW_FIXES.md)
 - [Final audit and evidence](docs/APP_AUDIT_FINAL.md)
 - [Flowcharts and proposed Settings map](docs/APP_FLOWS.md)

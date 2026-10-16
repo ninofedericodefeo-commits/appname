@@ -1,5 +1,9 @@
+import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
+import { useDraftGuard } from '@/components/useDraftGuard';
+import { useReducedMotion } from '@/components/useReducedMotion';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState, useSyncExternalStore } from 'react';
-import { Keyboard, Modal, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';
@@ -7,13 +11,13 @@ import { parseDollars } from '@/features/pocket/logic';
 import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
-import { colors } from '@/theme';
 import { previewSavingsAdjustment } from './savingsAdjustment';
 import type { SavingsAction, SavingsDestination } from './savingsAdjustment';
 
 export default function SavingsAdjustmentSheet({ initialDestination, initialAction = 'add', onClose }: {
   initialDestination: SavingsDestination; initialAction?: SavingsAction; onClose: () => void;
 }) {
+  useThemeRevision();
   const pocket = usePocketStore();
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const [goalId] = useState(pocket.activeGoal?.id ?? null);
@@ -21,13 +25,16 @@ export default function SavingsAdjustmentSheet({ initialDestination, initialActi
   const [action, setAction] = useState(initialAction);
   const [amount, setAmount] = useState('');
   const [error, setError] = useState('');
+  useValidationAnnouncement(error);
+  const guard = useDraftGuard({ destination, action, amount });
+  const reduced = useReducedMotion();
   const estimatedBalanceCents = accountBalanceEstimate(pocket).estimatedCents;
   const cents = parseDollars(amount);
   const inputError = amount.trim() && (cents === null || cents === 0) ? 'Enter an amount greater than $0, using at most two decimal places.' : '';
   const preview = cents !== null && cents > 0 ? previewSavingsAdjustment({ ...pocket, estimatedBalanceCents }, destination, action, cents, goalId) : null;
   const current = destination === 'goal' ? pocket.activeGoal?.savedCents ?? 0 : pocket.reservedCents - (pocket.activeGoal?.savedCents ?? 0);
   const available = estimatedBalanceCents === null ? null : estimatedBalanceCents - pocket.reservedCents;
-  function close() { Keyboard.dismiss(); onClose(); }
+  function close() { guard.confirm(() => { Keyboard.dismiss(); onClose(); }); }
   function save() {
     if (!ready || cents === null) return;
     const live = usePocketStore.getState();
@@ -36,10 +43,10 @@ export default function SavingsAdjustmentSheet({ initialDestination, initialActi
     const saved = destination === 'goal' ? action === 'add' ? live.reserveForGoal(cents) : live.releaseFromGoal(cents)
       : action === 'add' ? live.reserve(cents) : live.release(cents);
     if (!saved) return setError('Your savings changed. Check the amount and try again.');
-    close();
+    guard.accept(); close();
   }
-  return <Modal visible animationType="slide" onRequestClose={close}><SafeAreaView style={styles.safe}>
-    <View style={styles.header}><Text style={styles.title}>{action === 'add' ? 'Add money' : 'Adjust savings'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
+  return <Modal visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}><SafeAreaView style={styles.safe}>
+    <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>{action === 'add' ? 'Add money' : 'Adjust savings'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
     <FormScrollView contentContainerStyle={styles.form}>
       <Text style={styles.label}>Destination</Text>
       <View style={styles.choices}>{pocket.activeGoal && <SubscriptionButton label={`Goal: ${pocket.activeGoal.title}`} accessibilityState={{ selected: destination === 'goal' }} tone={destination === 'goal' ? 'primary' : 'secondary'} onPress={() => { setDestination('goal'); setError(''); }} />}
@@ -57,7 +64,7 @@ export default function SavingsAdjustmentSheet({ initialDestination, initialActi
       <Text style={styles.note}>Money stays in your bank account. This changes how much you have set aside{destination === 'goal' ? ' and your goal progress' : ''}.</Text>
       <View style={styles.row}><SubscriptionButton label="Cancel" grow onPress={close} /><SubscriptionButton label="Save adjustment" tone="primary" grow disabled={!ready || !preview || !!preview.error} onPress={save} /></View>
     </FormScrollView>
-  </SafeAreaView></Modal>;
+  {guard.dialog}</SafeAreaView></Modal>;
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.paper }, header: { padding: 20, borderBottomWidth: 1, borderColor: colors.line, flexDirection: 'row', gap: 12, alignItems: 'center' }, title: { flex: 1, color: colors.ink, fontSize: 25, fontWeight: '800' }, form: { padding: 20, paddingBottom: 40, gap: 16 },
-  label: { color: colors.ink, fontSize: 14, fontWeight: '700' }, choices: { gap: 8, alignItems: 'stretch' }, row: { flexDirection: 'row', gap: 8 }, input: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, color: colors.ink, fontSize: 18, backgroundColor: colors.surface }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, preview: { padding: 16, borderRadius: 12, backgroundColor: colors.paleGreen, gap: 9 }, summary: { color: colors.ink, fontSize: 14, lineHeight: 21 }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 } });
+const styles = themedStyles(() => ({ safe: { flex: 1, backgroundColor: colors.paper }, header: { padding: 20, borderBottomWidth: 1, borderColor: colors.line, flexDirection: 'row', gap: 12, alignItems: 'center' }, title: { flex: 1, color: colors.ink, fontSize: 25, fontWeight: '800' }, form: { padding: 20, paddingBottom: 40, gap: 16 },
+  label: { color: colors.ink, fontSize: 14, fontWeight: '700' }, choices: { gap: 8, alignItems: 'stretch' }, row: { flexWrap: 'wrap', flexDirection: 'row', gap: 8 }, input: { minHeight: 48, paddingHorizontal: 12, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, color: colors.ink, fontSize: 18, backgroundColor: colors.surface }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, preview: { padding: 16, borderRadius: 12, backgroundColor: colors.paleGreen, gap: 9 }, summary: { color: colors.ink, fontSize: 14, lineHeight: 21 }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 } }));

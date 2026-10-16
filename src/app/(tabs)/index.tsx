@@ -1,7 +1,7 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
-import { colors } from '@/theme';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, Text, View } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -27,9 +27,11 @@ import type { FuelType } from '@/types/stations';
 
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
+  useThemeRevision();
   const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'nearby' | 'online'>('nearby');
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const viewMode = useSettingsStore(state => state.gasView);
+  const setViewMode = (gasView: 'map' | 'list') => useSettingsStore.getState().configure({ gasView });
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const receiptReports = useReceiptStore((state) => state.reports);
   const priceReports = usePriceReportStore((state) => state.reports);
@@ -116,7 +118,7 @@ export default function GasScreen() {
       <PageToolbar />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Text style={styles.title}>Gas stations</Text>
+          <Text accessibilityRole="header" style={styles.title}>Gas stations</Text>
           <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
         </View>
 
@@ -135,14 +137,15 @@ export default function GasScreen() {
             <View style={{ flex: 1 }}><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {priceQualifier} · {selectedRadius} mi · {sortOrder}{recentPricesOnly ? ' · last 24h' : hideUnpricedStations ? ' · prices only' : ''}</Text></View>
             <Text style={styles.filterChevron}>{filtersOpen ? '−' : '+'}</Text>
           </Pressable>
-          {filtersOpen && <>
+          {filtersOpen && <SubscriptionButton label="Reset gas filters" onPress={() => { setSelectedFuelType('regular'); setSelectedRadius(5); setSortOrder('price'); setHideUnpricedStations(false); setRecentPricesOnly(false); setPriceQualifier('standard'); }} />}
+      {filtersOpen && <>
           <View style={styles.pillRow}>{priceQualifiers.map(value => <Pressable key={value.id} accessibilityRole="button" accessibilityState={{ selected: priceQualifier === value.id }} style={[styles.pill, priceQualifier === value.id && styles.activePill]} onPress={() => setPriceQualifier(value.id)}><Text style={[styles.pillText, priceQualifier === value.id && styles.activePillText]}>{value.label}</Text></Pressable>)}</View>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Recent prices only" accessibilityState={{ checked: recentPricesOnly }} aria-checked={recentPricesOnly} onPress={() => setRecentPricesOnly(!recentPricesOnly)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Only prices reported in the last 24 hours</Text><Text style={styles.filterChevron}>{recentPricesOnly ? '☑' : '☐'}</Text></Pressable>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Hide stations without a price</Text><Text style={styles.filterChevron}>{hideUnpricedStations ? '☑' : '☐'}</Text></Pressable>
           <Text style={styles.noPriceNote}>Applies to {selectedFuelType} prices on the map and in the list. N/A means no price saved.</Text>
           {!!stationApiBaseUrl && <View style={styles.pillRow}><Pressable accessibilityRole="button" style={styles.pill} onPress={() => setMode('nearby')}><Text style={styles.pillText}>Nearby map</Text></Pressable><Pressable accessibilityRole="button" style={styles.pill} onPress={() => { setViewMode('list'); setMode('online'); }}><Text style={styles.pillText}>Google prices</Text></Pressable></View>}
           <View style={styles.filterPanel}>
-            <Text style={styles.sectionTitle}>Fuel</Text>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Fuel</Text>
             <View style={styles.pillRow}>
               {fuelOptions.map((fuel) => (
                 <Pressable
@@ -157,7 +160,7 @@ export default function GasScreen() {
           </View>
 
           <View style={styles.filterPanel}>
-            <Text style={styles.sectionTitle}>Sort</Text>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Sort</Text>
             <View style={styles.pillRow}>
               {(['price', 'distance'] as const).map((sort) => (
                 <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: sortOrder === sort }} style={[styles.pill, sortOrder === sort && styles.activePill]} onPress={() => setSortOrder(sort)}>
@@ -168,7 +171,7 @@ export default function GasScreen() {
           </View>
 
           <View style={styles.filterPanel}>
-            <Text style={styles.sectionTitle}>Radius</Text>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Radius</Text>
             <View style={styles.pillRow}>
               {[5, 10, 25].map((radius) => (
                 <Pressable
@@ -236,9 +239,9 @@ export default function GasScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   areaCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, gap: 8, marginBottom: 10 },
-  areaLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 }, areaName: { color: colors.ink, fontSize: 15, fontWeight: '700', lineHeight: 21 }, areaActions: { flexDirection: 'row', gap: 8 },
+  areaLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 }, areaName: { color: colors.ink, fontSize: 15, fontWeight: '700', lineHeight: 21 }, areaActions: { flexWrap: 'wrap', flexDirection: 'row', gap: 8 },
   statusBox: { padding: 12, borderRadius: 10, backgroundColor: colors.paleOrange, gap: 7, marginBottom: 10 }, statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, statusText: { color: colors.inkSoft, fontSize: 13, lineHeight: 19 },
   viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
   viewButton: { minHeight: 44, minWidth: 70, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7 },
@@ -297,4 +300,4 @@ const styles = StyleSheet.create({
   emptyText: { marginTop: 8, color: colors.muted },
   retryButton: { marginTop: 14, backgroundColor: colors.ink, borderRadius: 6, paddingVertical: 11, paddingHorizontal: 16 },
   retryText: { color: colors.surface, fontWeight: '700' },
-});
+}));

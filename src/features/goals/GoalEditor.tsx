@@ -1,5 +1,8 @@
+import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
+import { useDraftGuard } from '@/components/useDraftGuard';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Linking, Pressable, Text, TextInput, View } from 'react-native';
 
 import { CalendarDateField, localDateKey } from '@/components/CalendarDateField';
 import { confirmAmazonProduct, parseAmazonLink } from '@/features/goals/amazonLink';
@@ -8,17 +11,18 @@ import { DEFAULT_SET_ASIDE_RULE, validDeadline } from '@/features/goals/logic';
 import type { Goal, GoalInput, GoalKind, SetAsideRule } from '@/features/goals/logic';
 import { parseDollars } from '@/features/pocket/logic';
 import { formatAmount, formatMoney as money } from '@/lib/money';
-import { colors } from '@/theme';
 
 const tomorrowKey = () => { const date = new Date(); date.setDate(date.getDate() + 1); return localDateKey(date); };
 
 function Action({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.action, secondary && styles.actionSecondary, disabled && styles.disabled]}>
     <Text style={[styles.actionText, secondary && styles.actionSecondaryText]}>{label}</Text>
   </Pressable>;
 }
 
 function Choice({ label, selected, onPress }: { label: string; selected: boolean; onPress: () => void }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={[styles.choice, selected && styles.choiceSelected]}>
     <Text style={[styles.choiceText, selected && styles.choiceTextSelected]}>{label}</Text>
   </Pressable>;
@@ -32,6 +36,7 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
   onSave: (input: GoalInput, assignAll: boolean) => boolean;
   onCancel?: () => void;
 }) {
+  useThemeRevision();
   const product = goal?.product ?? draft;
   const [title, setTitle] = useState(goal?.title ?? product?.title ?? '');
   const kind: GoalKind = goal?.kind ?? (product ? 'item' : 'money');
@@ -46,6 +51,8 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
   const [percentAmount, setPercentAmount] = useState(currentRule.mode === 'percent' ? String(currentRule.percent) : '5');
   const [roundIncrement, setRoundIncrement] = useState(currentRule.mode === 'round' ? currentRule.incrementCents : 100);
   const [error, setError] = useState('');
+  useValidationAnnouncement(error);
+  const guard = useDraftGuard({ title, target, variant, timed, deadline, assignAll, ruleMode, fixedAmount, percentAmount, roundIncrement });
   const previewCents = parseDollars(target);
 
   function save() {
@@ -65,10 +72,10 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
       setError('Could not save this goal. Please try again.');
       return;
     }
-    setError('');
+    guard.accept(); setError('');
   }
 
-  return <View style={styles.card}>
+  return <View style={styles.card}>{guard.dialog}
     <Text style={styles.section}>{goal ? 'Edit goal' : product ? 'Review your product goal' : 'Set your goal'}</Text>
     {product && <View style={styles.productPreview}>
       <Text style={styles.label}>AMAZON · USD · {product.priceSource === 'amazon-page' && previewCents === product.priceCents && variant.trim() === product.variant ? 'PRICE FROM AMAZON' : 'ENTERED BY YOU'}</Text>
@@ -100,12 +107,12 @@ export default function GoalEditor({ goal, draft, reservedCents, onSave, onCance
     {!goal && reservedCents > 0 && <><Text style={styles.label}>Existing savings</Text><Text style={styles.hint}>You already have {money(reservedCents)} earmarked. Assigning it changes goal progress, not the amount set aside.</Text><View style={styles.row}><Choice label="Assign none" selected={!assignAll} onPress={() => setAssignAll(false)} /><Choice label="Assign all" selected={assignAll} onPress={() => setAssignAll(true)} /></View></>}
     <Text style={styles.hint}>Money stays in your bank account. Saving a goal changes its details and the rule for future purchases.</Text>
     {error ? <Text style={styles.error}>{error}</Text> : null}
-    <View style={styles.row}><Action label={goal ? 'Save goal' : 'Create goal'} onPress={save} disabled={disabled} />{onCancel && <Action label="Cancel" secondary onPress={onCancel} />}</View>
+    <View style={styles.row}><Action label={goal ? 'Save goal' : 'Create goal'} onPress={save} disabled={disabled} />{onCancel && <Action label="Cancel" secondary onPress={() => guard.confirm(() => onCancel?.())} />}</View>
   </View>;
 }
 
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 9, padding: 19, gap: 10 },
   section: { color: colors.ink, fontSize: 21, fontWeight: '800', letterSpacing: -0.5, flexShrink: 1 },
   label: { color: colors.inkSoft, fontSize: 11, fontWeight: '800', letterSpacing: 1, textTransform: 'uppercase', marginTop: 8 },
@@ -129,4 +136,4 @@ const styles = StyleSheet.create({
   productTitle: { color: colors.ink, fontSize: 19, lineHeight: 26, fontWeight: '800' },
   productPrice: { color: colors.ink, fontSize: 24, fontWeight: '800', fontVariant: ['tabular-nums'] },
   sourceUrl: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-});
+}));

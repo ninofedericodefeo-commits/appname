@@ -1,3 +1,4 @@
+import { manualCredit } from '@/features/pocket/manualMovement';
 import { bankDuplicateCandidates, matchCandidates, separationEvidence, isCurrentReviewRevision } from '@/features/pocket/reconciliation';
 import type { BankDuplicateRevision, MatchRevision, SeparatePurchaseDecision } from '@/features/pocket/reconciliation';
 import { merchantAliasKey, validateDetails, revisionCanUndo } from '@/features/pocket/repository';
@@ -75,6 +76,7 @@ type PocketState = {
   deleteGoal: () => boolean;
   reserveForGoal: (cents: number, purchaseId?: string) => boolean;
   releaseFromGoal: (cents: number) => boolean;
+  addManualCredit: (id: string, title: string, cents: number, day: string, kind: 'deposit' | 'refund') => boolean;
   addPurchase: (id: string, title: string, amountCents: number, sourcePauseId?: string, source?: 'manual' | 'shortcut', occurredAt?: string, applyRule?: boolean) => boolean;
   updatePurchase: (id: string, title: string, amountCents: number) => boolean;
   skipPurchase: (id: string) => void;
@@ -251,6 +253,12 @@ export const usePocketStore = create<PocketState>()(
         set({ reservedCents: state.reservedCents - cents, activeGoal: { ...goal, savedCents: goal.savedCents - cents }, entries: [entry('release', cents, goal.id), ...state.entries] });
         return true;
       },
+      addManualCredit: (id, title, cents, day, kind) => {
+        const state = get();
+        if (state.accountTransactions.some(row => row.id === id)) return false;
+        const movement = manualCredit(id,title,cents,day,kind,state.linkedBankAccount ?? { nickname: state.bankImportAccountLabel });
+        set({ accountTransactions: [movement,...state.accountTransactions] }); return true;
+      },
       addPurchase: (id, title, amountCents, sourcePauseId, source = 'manual', occurredAt, applyRule = true) => {
         const state = get();
         if (!canLogPurchase(id, title, amountCents, sourcePauseId, state.purchases)) return false;
@@ -261,7 +269,7 @@ export const usePocketStore = create<PocketState>()(
           ...(state.linkedBankAccount ? { bankAccountId: state.linkedBankAccount.id, bankAccountLabel: state.linkedBankAccount.nickname } : {}) };
         const afterPurchase = accountBalanceEstimate({ ...state, purchases: [purchase, ...state.purchases] }).estimatedCents;
         const savedCents = applyRule ? automaticSetAsideCents(amountCents, goal, afterPurchase, state.reservedCents) : 0;
-        purchase.decision = savedCents > 0 ? 'saved' : 'pending';
+        purchase.decision = savedCents > 0 ? 'saved' : applyRule ? 'pending' : 'skipped';
         if (savedCents > 0) purchase.savedCents = savedCents;
         set({
           purchases: [purchase, ...state.purchases],
@@ -290,7 +298,7 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }); },
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 14,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 15,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };

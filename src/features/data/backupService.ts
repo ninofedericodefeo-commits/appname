@@ -1,3 +1,5 @@
+import { completeErasure } from './erasure';
+import { clearDrafts } from '@/features/drafts/persistence';
 import { Platform } from 'react-native';
 import { clearBatch } from '@/features/bank/batch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -39,7 +41,8 @@ function photoReferences(stores: Record<string, StoreRecord>) {
 function photoAttachment(data: BackupPayload, reference: ReturnType<typeof photoReferences>[number]) {
   return data.attachments.find(item => item.kind === 'photo' && (item.id === reference.id || item.id === reference.legacyId));
 }
-export async function makeBackup(password: string, includesFiles: boolean) {
+export async function makeBackup(password: string, choice: boolean | 'available') {
+  const includesFiles = choice !== false;
   const payload = await exclusively(async () => {
     const stores = captureStores(); await prepareStores(stores);
     const archives = JSON.parse(JSON.stringify(await archiveStorage.list())) as SavedBankImport[], attachments: BackupAttachment[] = [];
@@ -51,15 +54,22 @@ export async function makeBackup(password: string, includesFiles: boolean) {
     };
     if (includesFiles) {
       for (const entry of archives) {
-        const file = await archiveStorage.read(entry);
+        let file;
+        try { file = await archiveStorage.read(entry); } catch (error) { if (choice !== 'available') throw error; entry.missingOriginal = true; continue; }
         append({ kind: 'bank', id: entry.id, name: entry.name, base64: file.base64 ?? encodeBase64(strToU8(file.kind === 'csv' ? file.text : '')) });
       }
-      for (const reference of photoReferences(stores)) append({ kind: 'photo', id: reference.id, name: `receipt.${/\.(png|heic|webp)$/i.exec(String(reference.row.photoUri))?.[1]?.toLowerCase() ?? 'jpg'}`, base64: await readBackupPhoto(String(reference.row.photoUri)) });
+      for (const reference of photoReferences(stores)) {
+        let base64;
+        try { base64 = await readBackupPhoto(String(reference.row.photoUri)); } catch (error) { if (choice !== 'available') throw error; reference.row.photoUri = ''; reference.row.photoMissing = true; continue; }
+        append({ kind: 'photo', id: reference.id, name: `receipt.${/\.(png|heic|webp)$/i.exec(String(reference.row.photoUri))?.[1]?.toLowerCase() ?? 'jpg'}`, base64 });
+      }
     }
-    return validateBackup({ format: 'gasfinder-data', version: 1, createdAt: new Date().toISOString(), appVersion: Constants.expoConfig?.version ?? '1', stores, archives, attachments, includesFiles });
+    return validateBackup({ format: 'gasfinder-data', version: 1, createdAt: new Date().toISOString(), appVersion: Constants.expoConfig?.version ?? '1', stores, archives, attachments, includesFiles, attachmentScope: choice === 'available' ? 'available' : includesFiles ? 'all' : 'none' });
   });
   const encrypted = await encryptBackup(payload, password, secureRandom);
-  return exportDataFile(strToU8(encrypted), `GasFinder-${new Date().toISOString().replace(/[:.]/g, '-')}.gasbackup`);
+  const result = await exportDataFile(strToU8(encrypted), `GasFinder-${new Date().toISOString().replace(/[:.]/g, '-')}.gasbackup`);
+  await AsyncStorage.setItem('gasfinder-last-backup-created', new Date().toISOString());
+  return result;
 }
 export async function inspectBackup(text: string, password: string) {
   return preparePayload(await decryptBackup(text, password));
@@ -97,11 +107,13 @@ async function rollBack(journal: Journal, key = journalKey) {
   await AsyncStorage.removeItem(key);
 }
 export async function recoverInterruptedRestore() {
-  if (await AsyncStorage.getItem(eraseKey)) { await exclusively(finishErasure); return; }
+  if (await AsyncStorage.getItem(eraseKey)) { await exclusively(finishErasure); markDataReplacement('Interrupted erasure completed. App records, originals and drafts erased. External backups and device privacy settings remain.'); return; }
   for (const key of [importJournalKey, journalKey]) {
     const stored = await AsyncStorage.getItem(key);
     if (stored) { const journal = parseJournal(stored); if (journal.phase === 'prepared') await exclusively(() => rollBack(journal, key)); }
   }
+  const completed = await AsyncStorage.getItem('gasfinder-erasure-complete');
+  if (completed) { updateDataStatus({ notice: completed }); await AsyncStorage.removeItem('gasfinder-erasure-complete'); }
   await rehydrateStores();
 }
 async function verifyPersistedRecords() {
@@ -128,11 +140,12 @@ export async function recoverableBankOperation<T>(operation: (permit: <R>(action
 export async function hasRestoreRollback() { return !!await AsyncStorage.getItem(journalKey); }
 export async function undoRestore() {
   const text = await AsyncStorage.getItem(journalKey); if (!text) throw new Error('No previous restore is available.');
-  await exclusively(() => rollBack(parseJournal(text))); clearBatch(); markDataReplacement('Previous records recovered.');
+  await exclusively(async () => { await clearDrafts(); await rollBack(parseJournal(text)); }); clearBatch(); markDataReplacement('Previous records recovered.');
 }
 export async function restoreBackup(payload: BackupPayload) {
   const data = await preparePayload(validateBackup(payload)), records = data.stores;
   return exclusively(async () => {
+    await clearDrafts();
     const names = managedStores.map(store => store.persist.getOptions().name);
     const before = await AsyncStorage.multiGet(names);
     const oldArchives = await archiveStorage.list();
@@ -155,7 +168,7 @@ export async function restoreBackup(payload: BackupPayload) {
       const references = photoReferences(records);
       for (let index = 0; index < references.length; index++) {
         const photo = photoAttachment(data, references[index]);
-        references[index].row.photoUri = photo ? await writeBackupPhoto(photo.base64, `${runId}-${index}`, photo.name) : '';
+        references[index].row.photoUri = photo ? await writeBackupPhoto(photo.base64, `${runId}-${index}`, photo.name) : ''; references[index].row.photoMissing = !photo;
       }
       applyStores(records); await flushAppStorage(); recordsToVerify = records;
       },
@@ -163,7 +176,7 @@ export async function restoreBackup(payload: BackupPayload) {
       rollback: async copy => { await flushAppStorage().catch(() => undefined); await rollBack(copy); },
     });
     queryClient.clear();
-  }).then(() => { clearBatch(); markDataReplacement('Restore complete. Review Account and reminder status in Settings.'); });
+  }).then(async () => { clearBatch(); markDataReplacement('Restore complete. Review Account and reminder status in Settings.'); });
 }
 export function backupSummary(stores: Record<string, StoreRecord>) {
   const pocket = stores['gasfinder-savings-pocket']?.state ?? {};
@@ -176,6 +189,7 @@ export function backupSummary(stores: Record<string, StoreRecord>) {
 export async function resetAccountData(nickname = '') {
   if (nickname && (!nickname.trim() || nickname.length > 60)) throw Error('Choose an account name up to 60 characters.');
   return exclusively(async () => {
+    await clearDrafts();
     const before = await AsyncStorage.multiGet(managedStores.map(store => store.persist.getOptions().name));
     const archives = await archiveStorage.list(), records = captureStores(), defaults = captureStores(true);
     records['gasfinder-savings-pocket'] = defaults['gasfinder-savings-pocket'];
@@ -194,18 +208,32 @@ export async function resetAccountData(nickname = '') {
       rollback: rollBack,
     });
     queryClient.clear();
-  }).then(() => { clearBatch(); markDataReplacement('Account reset complete. Undo is available in Backup & restore.'); });
+  }).then(async () => { clearBatch(); markDataReplacement('Account reset complete. Undo is available in Backup & restore.'); });
 }
 
 async function finishErasure() {
-  await rehydrateStores();
-  resetStores(); await flushAppStorage();
-  await archiveStorage.erase!(); await eraseAppPhotosAndExports();
-  await AsyncStorage.multiRemove([journalKey, importJournalKey]);
-  clearBatch(); queryClient.clear();
-  await AsyncStorage.removeItem(eraseKey);
+  await completeErasure({
+    resetRecords: async () => { await rehydrateStores(); resetStores(); await flushAppStorage(); },
+    eraseOriginals: async () => { await archiveStorage.erase!(); },
+    eraseAttachments: eraseAppPhotosAndExports,
+    eraseDrafts: clearDrafts,
+    clearRecovery: async () => { await AsyncStorage.multiRemove([journalKey, importJournalKey, 'gasfinder-last-backup-created']); },
+    clearCache: () => { clearBatch(); queryClient.clear(); },
+    recordCompletion: async () => { await AsyncStorage.setItem('gasfinder-erasure-complete','App records, saved originals and drafts erased. There is no Undo. External backups and device privacy settings remain.'); },
+    clearMarker: async () => { await AsyncStorage.removeItem(eraseKey); },
+  });
 }
 export async function eraseAllAppRecords() {
   await exclusively(async () => { await AsyncStorage.setItem(eraseKey, new Date().toISOString()); await finishErasure(); });
-  markDataReplacement('App records and saved originals erased. External backups and device privacy settings remain.');
+  markDataReplacement('App records, saved originals and drafts erased. There is no Undo. External backups and device privacy settings remain.');
+}
+
+export async function dataHealth() {
+  const archives = await archiveStorage.list(), stores = captureStores();
+  let originalsAvailable = 0, originalsMissing = 0, photosAvailable = 0, photosMissing = ['gasfinder-receipt-reports','gasfinder-local-price-reports'].reduce((sum,name) => sum + (stores[name]?.state.reports as Record<string,unknown>[] ?? []).filter(row => row.photoMissing && !row.photoUri).length,0), bytes = 0;
+  // Sequential reads bound transient memory to one original/photo at a time.
+  for (const entry of archives) { try { const file = await archiveStorage.read(entry); bytes += file.base64 ? Math.floor(file.base64.length*3/4) : file.kind === 'csv' ? strToU8(file.text).length : 0; originalsAvailable++; } catch { originalsMissing++; } }
+  for (const reference of photoReferences(stores)) { try { const photo = await readBackupPhoto(String(reference.row.photoUri)); bytes += Math.floor(photo.length*3/4); photosAvailable++; } catch { photosMissing++; } }
+  const recordsBytes = strToU8(JSON.stringify(stores)).length;
+  return { ...backupSummary(stores), originalsAvailable, originalsMissing, photosAvailable, photosMissing, bytes, recordsBytes, lastCreatedAt: await AsyncStorage.getItem('gasfinder-last-backup-created') };
 }

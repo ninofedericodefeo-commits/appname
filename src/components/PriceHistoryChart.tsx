@@ -1,11 +1,14 @@
-import { colors } from '@/theme';
-import { StyleSheet, Text, View } from 'react-native';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
+import { useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 import Svg, { Circle, Line, Polyline } from 'react-native-svg';
 
 import { formatFuelPrice } from '@/features/stations/logic';
 import { graphCoordinates, type HistoryRange, type PriceReportPoint } from '@/features/stations/history';
 
 export function PriceHistoryChart({ reports, range, now }: { reports: PriceReportPoint[]; range: HistoryRange; now: number }) {
+  useThemeRevision();
+  const [limit,setLimit] = useState(20);
   if (reports.length === 0) return null;
   const points = graphCoordinates(reports, range, now);
   const prices = reports.map((report) => report.price);
@@ -25,13 +28,16 @@ export function PriceHistoryChart({ reports, range, now }: { reports: PriceRepor
       </Svg>
       <View style={styles.axisLabels}><Text style={styles.axisText}>{formatFuelPrice(low)}</Text><Text style={styles.axisText}>LOW</Text></View>
       <View style={styles.dates}><Text style={styles.dateText}>{startDate.toLocaleDateString()}</Text><Text style={styles.dateText}>{endDate.toLocaleDateString()}</Text></View>
+      <Text accessibilityRole="header" style={{ color: colors.ink, fontSize: 17, fontWeight: '700', marginTop: 16 }}>Dated price reports</Text>
+      {[...reports].reverse().slice(0,limit).map(report => <View key={report.id} style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 8, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.line }}><Text style={{ color: colors.ink }}>{new Date(report.reportedAt).toLocaleString()}</Text><Text style={{ color: colors.ink }}>{formatFuelPrice(report.price)} / gal</Text></View>)}
+      {reports.length > limit && <Pressable accessibilityRole="button" onPress={() => setLimit(value => value+20)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.primary }}>Show more dated reports</Text></Pressable>}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   axisLabels: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 5 },
   axisText: { color: colors.muted, fontSize: 11, fontWeight: '700' },
   dates: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
   dateText: { color: colors.inkSoft, fontSize: 12 },
-});
+}));

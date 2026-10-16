@@ -1,11 +1,12 @@
+import { useThemeRevision , colors } from '@/theme';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { addCalendarDays, localDateKey, upcomingCharges } from './logic';
 import type { Subscription } from './logic';
 import { dataStyles as s } from '@/features/data/styles';
-import { colors } from '@/theme';
 import { formatMoney } from '@/lib/money';
 export default function SubscriptionCalendar({ subscriptions, today, includeSamples, onEdit }: { subscriptions: Subscription[]; today: Date; includeSamples: boolean; onEdit: (subscription: Subscription) => void }) {
+  useThemeRevision();
   const [offset, setOffset] = useState(0), [selected, setSelected] = useState('');
   const start = new Date(today.getFullYear(), today.getMonth() + offset, 1, 12), days = new Date(start.getFullYear(), start.getMonth() + 1, 0).getDate();
   const charges = upcomingCharges(subscriptions, start, days, includeSamples), groups = new Map<string, typeof charges>();

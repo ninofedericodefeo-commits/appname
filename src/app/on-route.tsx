@@ -1,8 +1,9 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { reviewRoutedLegs, detourEconomics } from '@/features/stations/tripReview';
 import { formatMoney } from '@/lib/money';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Linking from 'expo-linking';
 import { Link, useLocalSearchParams } from 'expo-router';
@@ -24,14 +25,15 @@ import { useDriveStore } from '@/stores/driveStore';
 import { usePriceReportStore } from '@/stores/priceReportStore';
 import { useReceiptStore } from '@/stores/receiptStore';
 import { useSettingsStore } from '@/stores/settingsStore';
-import { colors } from '@/theme';
 import { preferredMapsApp } from '@/features/stations/preferences';
 
 export default function OnRouteScreen() {
+  useThemeRevision();
   const params = useLocalSearchParams<{ destination?: string; handoff?: string }>();
   const { cars, selectedCarId, lastDestination, destinations, preferredStationIds, avoidedStationIds, saveDestination, removeDestination, setStationPreference, selectCar, setDestination } = useDriveStore();
   const hydrated = useSyncExternalStore(useDriveStore.persist.onFinishHydration, useDriveStore.persist.hasHydrated, () => false);
   const car = cars.find((item) => item.id === selectedCarId);
+  const [advancedPlan,setAdvancedPlan] = useState(false);
   const [destinationInput, setDestinationInput] = useState('');
   const [fuelUnit, setFuelUnit] = useState<'percent' | 'gallons'>('percent');
   const [fuelRemaining, setFuelRemaining] = useState('');
@@ -176,43 +178,45 @@ export default function OnRouteScreen() {
   return <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safe}>
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <View style={styles.headingRow}><Text style={styles.kicker}>GAS ON YOUR DRIVE</Text><Link href="/settings" asChild><Pressable accessibilityRole="button" style={styles.textButton}><Text style={styles.link}>Settings</Text></Pressable></Link></View>
-      <Text style={styles.title}>Where are you going?</Text>
+      <Text accessibilityRole="header" style={styles.title}>Where are you going?</Text>
       <Text style={styles.note}>Enter your destination, plan fuel stops, then open the trip in {mapsName}.</Text>
       <View style={styles.card}>
-        <Text style={styles.heading}>1 · Destination</Text>
+        <Text accessibilityRole="header" style={styles.heading}>1 · Destination</Text>
         <TextInput style={styles.input} value={destinationInput} onChangeText={(value) => { clearPlan(); setDestinationInput(value); destinationTouched.current = true; }} placeholder="Address, city or coordinates" accessibilityLabel="Trip destination" autoCorrect={false} returnKeyType="done" />
         <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void pasteDestination()}><Text style={styles.link}>Paste an address or Maps link</Text></Pressable>
         <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => { try { saveDestination(destinationInput); } catch (cause) { setError((cause as Error).message); } }}><Text style={styles.link}>Save this destination</Text></Pressable>
         {destinations.map(value => <View key={value} style={styles.row}><Pressable accessibilityRole="button" style={styles.choice} onPress={() => { clearPlan(); setDestinationInput(value); destinationTouched.current = true; }}><Text style={styles.choiceText}>{value.slice(0,70)}</Text></Pressable><Pressable accessibilityRole="button" style={styles.textButton} onPress={() => removeDestination(value)}><Text style={styles.link}>Remove saved destination</Text></Pressable></View>)}
         {!!lastDestination && <Text style={styles.note}>Your last destination is remembered. You can change it above.</Text>}
       </View>
-      <View style={styles.card}><Text style={styles.heading}>Refill target</Text><TextInput accessibilityLabel="Refill tank target percentage" keyboardType="number-pad" style={styles.input} value={refillTarget} onChangeText={value => { clearPlan(); setRefillTarget(value); }} /><Text style={styles.note}>Percent of tank after each refill; 100 is full. Keep at least 5% above the safety level. Partial refills require more stops.</Text><TextInput accessibilityLabel="Alternative fuel price for comparison" keyboardType="decimal-pad" placeholder="Optional comparison price per gallon" style={styles.input} value={alternativePrice} onChangeText={setAlternativePrice} />{!!avoidedStationIds.length && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => { avoidedStationIds.forEach(id => setStationPreference(id,'none')); clearPlan(); }}><Text style={styles.link}>Clear {avoidedStationIds.length} avoided stations</Text></Pressable>}</View>
+
       <View style={styles.card}>
-        <View style={styles.headingRow}><Text style={styles.heading}>2 · What are you driving?</Text><Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.textButton}><Text style={styles.link}>Manage cars</Text></Pressable></Link></View>
+        <View style={styles.headingRow}><Text accessibilityRole="header" style={styles.heading}>2 · What are you driving?</Text><Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.textButton}><Text style={styles.link}>Manage cars</Text></Pressable></Link></View>
         <View style={styles.row}>{cars.map((item) => <Pressable key={item.id} accessibilityRole="button" accessibilityState={{ selected: item.id === car?.id }} onPress={() => { clearPlan(); selectCar(item.id); }} style={[styles.choice, item.id === car?.id && styles.selected]}><Text style={[styles.choiceText, item.id === car?.id && styles.selectedText]}>{item.name}</Text></Pressable>)}
           <Link href="/cars" asChild><Pressable accessibilityRole="button" style={styles.choice}><Text style={styles.choiceText}>+ Add car</Text></Pressable></Link></View>
         {car && <Text style={styles.note}>{car.mpg} MPG · {car.tankGallons} US gal tank · editable estimates</Text>}
       </View>
       <View style={styles.card}>
-        <Text style={styles.heading}>3 · How full is the tank?</Text>
+        <Text accessibilityRole="header" style={styles.heading}>3 · How full is the tank?</Text>
         <View style={styles.row}>{(['percent', 'gallons'] as const).map((unit) => <Pressable key={unit} accessibilityRole="button" accessibilityState={{ selected: fuelUnit === unit }} style={[styles.choice, fuelUnit === unit && styles.selected]} onPress={() => { clearPlan(); setFuelRemaining(''); setFuelUnit(unit); }}><Text style={[styles.choiceText, fuelUnit === unit && styles.selectedText]}>{unit === 'percent' ? 'Percent left' : 'Gallons left'}</Text></Pressable>)}</View>
         {fuelUnit === 'percent' && <View style={styles.row}>{[10, 25, 50, 75, 100].map((percent) => <Pressable key={percent} accessibilityRole="button" accessibilityLabel={`${percent} percent of tank left`} accessibilityState={{ selected: fuelRemaining === String(percent) }} onPress={() => { clearPlan(); setFuelRemaining(String(percent)); }} style={[styles.choice, fuelRemaining === String(percent) && styles.selected]}><Text style={[styles.choiceText, fuelRemaining === String(percent) && styles.selectedText]}>{percent}%</Text></Pressable>)}</View>}
         <TextInput style={styles.input} value={fuelRemaining} onChangeText={(value) => { clearPlan(); setFuelRemaining(value); }} placeholder={fuelUnit === 'percent' ? 'Or enter a percentage' : 'US gallons remaining'} accessibilityLabel={fuelUnit === 'percent' ? 'Tank percentage left' : 'US gallons left in tank'} keyboardType="decimal-pad" />
         {range && <Text style={styles.range}>~{Math.floor(safeRange(range.initialRange, range.fullRange, refillPercent))} mi until your refill level · ~{range.gallons.toFixed(1)} gal</Text>}
         <Text style={styles.note}>Refill at {refillPercent}% left · change this in Settings. Range uses your saved car estimates and a 15% reduction. Check your tank size in Manage cars before using percent.</Text>
       </View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: advancedPlan }} style={styles.textButton} onPress={() => setAdvancedPlan(!advancedPlan)}><Text style={styles.link}>{advancedPlan ? 'Hide refill & cost options' : 'Optional refill & cost options'}</Text></Pressable>
+      {advancedPlan && <>      <View style={styles.card}><Text accessibilityRole="header" style={styles.heading}>Refill target</Text><TextInput accessibilityLabel="Refill tank target percentage" keyboardType="number-pad" style={styles.input} value={refillTarget} onChangeText={value => { clearPlan(); setRefillTarget(value); }} /><Text style={styles.note}>Percent of tank after each refill; 100 is full. Keep at least 5% above the safety level. Partial refills require more stops.</Text><TextInput accessibilityLabel="Alternative fuel price for comparison" keyboardType="decimal-pad" placeholder="Optional comparison price per gallon" style={styles.input} value={alternativePrice} onChangeText={setAlternativePrice} />{!!avoidedStationIds.length && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => { avoidedStationIds.forEach(id => setStationPreference(id,'none')); clearPlan(); }}><Text style={styles.link}>Clear {avoidedStationIds.length} avoided stations</Text></Pressable>}</View></>}
       <Pressable accessibilityRole="button" disabled={!!busy || !hydrated} style={[styles.primary, !!busy && styles.disabled]} onPress={() => void planTrip()}><Text style={styles.primaryText}>{busy ? 'Planning…' : 'Plan fuel stops'}</Text></Pressable>
       {!!busy && <View style={styles.status}><ActivityIndicator color={colors.accentDark} /><Text style={styles.note}>{busy}</Text><Pressable accessibilityRole="button" style={styles.textButton} onPress={clearPlan}><Text style={styles.link}>Cancel</Text></Pressable></View>}
       {!!error && <Text style={styles.error}>{error}{stops.length ? ' Stops shown so far do not cover the full trip.' : ''}</Text>}
       {!!error && end && !route && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void openMaps(mapsApp === 'apple' ? appleMapsDirections(end) : googleMapsDirections(end))}><Text style={styles.link}>Open destination in {mapsName} without a fuel plan ↗</Text></Pressable>}
       {route && <>
-        <View style={styles.summary}><Text style={styles.heading}>{Math.round(route.miles)} mi · ~{(route.minutes / 60).toFixed(1)} hr</Text>
+        <View style={styles.summary}><Text accessibilityRole="header" style={styles.heading}>{Math.round(route.miles)} mi · ~{(route.minutes / 60).toFixed(1)} hr</Text>
           <Text style={styles.note}>{plan ? plan.complete ? plan.needsFuel ? `${stops.length} fuel stop${stops.length === 1 ? '' : 's'} planned. Refill to full at each stop. Target: ${refillPercent}% left.` : stops.length ? 'Optional fuel stop. Your estimated fuel reaches the destination above your refill level.' : 'Your estimated fuel reaches the destination above your refill level.' : 'Building the fuel plan…' : busy ? 'Stops will appear as they are found.' : 'Fuel plan unavailable. Replan before driving.'}</Text>
           {!!error && !busy && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void searchAnyway()}><Text style={styles.link}>Retry gas station search</Text></Pressable>}
           {plan?.reason && <Text style={styles.error}>{plan.reason} Check Maps or refuel earlier before driving.</Text>}
           {plan?.complete && !plan.needsFuel && stops.length === 0 && <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => void searchAnyway()}><Text style={styles.link}>Find gas on this trip anyway</Text></Pressable>}
         </View>
-        {end && (access ? access.complete : plan?.complete) && <View style={styles.card}><Text style={styles.heading}>Ready for {mapsName}?</Text>
+        {end && (access ? access.complete : plan?.complete) && <View style={styles.card}><Text accessibilityRole="header" style={styles.heading}>Ready for {mapsName}?</Text>
           {mapsApp === 'apple' && modernAppleMaps && <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(appleMapsTrip(end, stops.map((stop) => stop.station)))}><Text style={styles.primaryText}>Open trip in Apple Maps ↗</Text></Pressable>}
           {mapsApp === 'apple' && !modernAppleMaps && (stops.length === 0 ? <Pressable accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(appleMapsDirections(end))}><Text style={styles.primaryText}>Open destination in Apple Maps ↗</Text></Pressable> : <Text style={styles.note}>All-stop Apple Maps links require iOS 18.4+. Use each stop’s directions below on this iPhone.</Text>)}
           {mapsApp === 'google' && googleSegments.map((segment, index) => <Pressable key={segment.url} accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(segment.url)}><Text style={styles.primaryText}>{googleSegments.length > 1 ? `Google Maps · part ${index + 1}/${googleSegments.length}${segment.firstStop <= segment.lastStop ? ` · stops ${segment.firstStop}–${segment.lastStop}` : ''}${segment.reachesDestination ? ' + destination' : ''}` : `Google Maps · ${stops.length} stops + destination`} ↗</Text></Pressable>)}
@@ -224,7 +228,7 @@ export default function OnRouteScreen() {
           const price = station.prices.find((item) => item.fuelType === fuelType && item.source !== 'sample');
           return <View key={station.id} style={[styles.card, selectedStop === station.id && styles.stopSelected]}>
             <Text style={styles.kicker}>STOP {index + 1} · REFILL TO {refillTarget}%</Text>
-            <View style={styles.headingRow}><Text style={styles.heading}>{station.name}</Text><Text style={styles.price}>{price ? formatFuelPrice(price.price) : 'Unknown price'}</Text></View>
+            <View style={styles.headingRow}><Text accessibilityRole="header" style={styles.heading}>{station.name}</Text><Text style={styles.price}>{price ? formatFuelPrice(price.price) : 'Unknown price'}</Text></View>
             <Text style={styles.note}>Mile {Math.round(station.milesAhead)} · ~{Math.round(legMiles)} mi this leg · ~{station.milesOffRoute.toFixed(1)} mi off route</Text>
             <Text style={styles.note}>{station.address}{price ? ` · ${priceDescription(price, false)}` : ` · no saved ${fuelType} price`}</Text>
             <View style={styles.row}><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => void replan([station.id])}><Text style={styles.choiceText}>Swap stop</Text></Pressable><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => { setStops(current => current.filter(item => item.station.id !== station.id)); setPlan(current => current ? {...current,complete:false,reason:'Stop removed. Verify road access and fuel range before using this edited trip.'} : current); setAccess(null); }}><Text style={styles.choiceText}>Remove stop</Text></Pressable><Pressable accessibilityRole="button" style={styles.choice} onPress={() => setStationPreference(station.id,preferredStationIds.includes(station.id) ? 'none' : 'prefer')}><Text style={styles.choiceText}>{preferredStationIds.includes(station.id) ? 'Unprefer' : 'Prefer station'}</Text></Pressable><Pressable accessibilityRole="button" disabled={!!busy} style={styles.choice} onPress={() => { setStationPreference(station.id,'avoid'); void replan(); }}><Text style={styles.choiceText}>Avoid & replan</Text></Pressable></View>
@@ -240,7 +244,7 @@ export default function OnRouteScreen() {
     </ScrollView>
   </SafeAreaView>;
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper }, content: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 50, gap: 15 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.4 }, title: { color: colors.ink, fontSize: 35, lineHeight: 39, fontWeight: '800', marginBottom: 4 },
   card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 16, gap: 10 },
@@ -254,4 +258,4 @@ const styles = StyleSheet.create({
   status: { backgroundColor: colors.surface, borderRadius: 9, padding: 12, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 },
   summary: { backgroundColor: colors.paleGreen, borderRadius: 9, padding: 16, gap: 8 }, mapFrame: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 12, overflow: 'hidden' },
   stopSelected: { borderColor: colors.accentDark, borderWidth: 2 }, price: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
-});
+}));

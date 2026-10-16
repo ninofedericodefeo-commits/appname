@@ -1,7 +1,7 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { formatMoney } from '@/lib/money';
-import { colors } from '@/theme';
 import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useInvestmentStore } from '@/stores/investmentStore';
@@ -15,6 +15,7 @@ function formatContributionRule(option: string, increment?: number) {
 }
 
 export default function ActivityScreen() {
+  useThemeRevision();
   const { payments, withdrawals, cashBalance, investedBalance, withdrawnTotal } = useInvestmentStore();
   const [period, setPeriod] = useState<'all' | '30-days'>('all');
   const [openedAt] = useState(() => Date.now());
@@ -28,7 +29,7 @@ export default function ActivityScreen() {
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.safeArea}>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <Text style={styles.kicker}>ARCHIVE</Text>
-        <Text style={styles.title}>Previous demo records</Text>
+        <Text accessibilityRole="header" style={styles.title}>Previous demo records</Text>
         <View style={styles.notice}>
           <Text style={styles.noticeTitle}>Read-only demo archive</Text>
           <Text style={styles.noticeText}>
@@ -55,7 +56,7 @@ export default function ActivityScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Contributions ({visiblePayments.length})</Text>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Contributions ({visiblePayments.length})</Text>
           {visiblePayments.length === 0 ? (
             <Text style={styles.emptyText}>No demo contributions in this period.</Text>
           ) : (
@@ -75,7 +76,7 @@ export default function ActivityScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Withdrawals ({visibleWithdrawals.length})</Text>
+          <Text accessibilityRole="header" style={styles.sectionTitle}>Withdrawals ({visibleWithdrawals.length})</Text>
           {visibleWithdrawals.length === 0 ? (
             <Text style={styles.emptyText}>No demo withdrawals in this period.</Text>
           ) : (
@@ -108,6 +109,7 @@ export default function ActivityScreen() {
 }
 
 function Summary({ label, amount }: { label: string; amount: number }) {
+  useThemeRevision();
   return (
     <View style={styles.summary}>
       <Text style={styles.summaryLabel}>{label}</Text>
@@ -116,7 +118,7 @@ function Summary({ label, amount }: { label: string; amount: number }) {
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
   content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 40, gap: 18 },
@@ -154,4 +156,4 @@ const styles = StyleSheet.create({
   cancelButton: { backgroundColor: colors.surface, borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, paddingVertical: 10, paddingHorizontal: 16 },
   cancelText: { color: colors.ink, fontWeight: '700' },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.7, marginBottom: 1 },
-});
+}));

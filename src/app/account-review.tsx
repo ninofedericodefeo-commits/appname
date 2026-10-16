@@ -1,3 +1,4 @@
+import { useThemeRevision } from '@/theme';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -16,6 +17,7 @@ const pageSize = 25;
 const firstPages = { app: 0, bank: 0, links: 0, duplicates: 0, hidden: 0, separate: 0 };
 type Section = keyof typeof firstPages;
 function Pager({ label, page, shown, more, onPage }: { label: string; page: number; shown: number; more: boolean; onPage: (page: number) => void }) {
+  useThemeRevision();
   if (!page && !more) return null;
   return <View style={{ gap: 8 }}>
     <Text style={s.note}>{label}: {shown ? `${page * pageSize + 1}–${page * pageSize + shown}` : 'No results on this page'}{more ? ' · more available' : ''}</Text>
@@ -27,6 +29,7 @@ function Pager({ label, page, shown, more, onPage }: { label: string; page: numb
 }
 
 export default function AccountReview() {
+  useThemeRevision();
   const state = usePocketStore();
   const [confirm, setConfirm] = useState(''), [error, setError] = useState(''), [busy, setBusy] = useState(false);
   const [message, setMessage] = useState(''), [query, setQuery] = useState(''), [pages, setPages] = useState(firstPages);

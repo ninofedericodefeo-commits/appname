@@ -16,7 +16,7 @@ export type AccountTransaction = {
   sourceRow?: number;
   rawDescription?: string;
   shadowPurchaseIds?: string[];
-  source: 'csv' | 'citizens-pdf';
+  source: 'csv' | 'citizens-pdf' | 'manual';
   status: 'posted' | 'pending' | 'recorded';
   accountLabel: string;
   accountId?: string;
@@ -54,7 +54,7 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
     if (!/^account-[a-f0-9]{16}$/.test(item.id) || !item.title.trim() || item.title.length > 80 ||
       !Number.isSafeInteger(item.amountCents) || item.amountCents === 0 || Math.abs(item.amountCents) > 100_000_000 ||
       !Number.isFinite(Date.parse(item.occurredAt)) || Date.parse(item.occurredAt) > latest.getTime() ||
-      !['csv', 'citizens-pdf'].includes(item.source) || !['pending', 'recorded', 'posted'].includes(item.status) || !item.accountLabel.trim() || item.accountLabel.length > 60) continue;
+      !['csv', 'citizens-pdf', 'manual'].includes(item.source) || !['pending', 'recorded', 'posted'].includes(item.status) || !item.accountLabel.trim() || item.accountLabel.length > 60) continue;
     let old = transactions.get(item.id);
     if (!old && item.source === 'citizens-pdf') {
       // Earlier Citizens parsing could append sidebar totals to a purchase,

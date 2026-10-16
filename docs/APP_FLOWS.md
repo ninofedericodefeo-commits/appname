@@ -1,10 +1,10 @@
 # GasFinder flows and navigation
 
-**October 15, 2026.** These are the **target journeys** for the [final roadmap](../ROADMAP.md), not claims that every branch is already implemented. The [audit](APP_AUDIT_FINAL.md) distinguishes current behavior from proposed changes. Existing safety/reconciliation checks remain in every shortened flow.
+**October 16, 2026.** These are the implemented local journeys and acceptance targets for the [final roadmap](../ROADMAP.md), not claims that every branch is already implemented. The [audit](APP_AUDIT_FINAL.md) distinguishes current behavior from proposed changes. Existing safety/reconciliation checks remain in every shortened flow.
 
 ## 1. Settings structure
 
-The nine current categories remain the starting point. Controls live inside a category. General & appearance is a proposed tenth category only if its preferences are implemented; it should not be added as an empty destination.
+Ten categories include General & appearance, with working theme/start-screen controls and optional setup help. Controls live inside their category; Settings search opens the matching subsection.
 
 ```mermaid
 flowchart LR
@@ -26,8 +26,8 @@ flowchart LR
   D --> D1["Backup, restore, export, account reset, wipe"]
   S --> B["About GasFinder"]
   B --> B1["Version, build capabilities, diagnostics"]
-  S -.-> C["General & appearance — proposed"]
-  C -.-> C1["System theme, start tab"]
+  S --> C["General & appearance"]
+  C --> C1["System/Light/Dark, contrast, start tab, setup help"]
 ```
 
 **Rule:** a contextual “Manage reminders” or “Manage test mode” link opens its subsection, not the root list. Returning from a subsection restores the list position. Unavailable native capabilities explain the requirement inside their category.

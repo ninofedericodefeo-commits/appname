@@ -1,5 +1,6 @@
 export type PriceQualifier = 'standard' | 'cash' | 'card' | 'member';
 export type FuelPurchaseDetails = {
+  photoMissing?: boolean;
   priceQualifier?: PriceQualifier;
   observedAt?: string;
   gallons?: number;

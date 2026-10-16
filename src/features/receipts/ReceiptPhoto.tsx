@@ -1,8 +1,10 @@
+import { useThemeRevision } from '@/theme';
 import { useEffect, useState } from 'react';
 import { Image, Platform, Text } from 'react-native';
 import { resolveReceiptPhoto } from './photoStorage';
 import { dataStyles as s } from '@/features/data/styles';
 export default function ReceiptPhoto({ uri, label }: { uri: string; label: string }) {
+  useThemeRevision();
   const [resolved, setResolved] = useState(''), [missing, setMissing] = useState(false);
   useEffect(() => {
     let active = true, local = '';

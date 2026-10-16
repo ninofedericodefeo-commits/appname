@@ -9,7 +9,7 @@ export const BACKUP_FILE_LIMIT = 68 * 1024 * 1024;
 export const BACKUP_ITERATIONS = 600_000;
 export type StoreRecord = { version: number; state: Record<string, unknown> };
 export type BackupAttachment = { kind: 'bank' | 'photo'; id: string; name: string; sha256: string; base64: string; metadata?: Record<string, unknown> };
-export type BackupPayload = { format: 'gasfinder-data'; version: 1; createdAt: string; appVersion: string; stores: Record<string, StoreRecord>; archives: Record<string, unknown>[]; attachments: BackupAttachment[]; includesFiles: boolean };
+export type BackupPayload = { format: 'gasfinder-data'; version: 1; createdAt: string; appVersion: string; stores: Record<string, StoreRecord>; archives: Record<string, unknown>[]; attachments: BackupAttachment[]; includesFiles: boolean; attachmentScope?: 'all' | 'available' | 'none' };
 export type BackupEnvelope = { format: 'gasfinder-encrypted'; version: 1; kdf: 'PBKDF2-SHA256'; iterations: number; cipher: 'AES-256-GCM'; salt: string; nonce: string; ciphertext: string };
 const aad = strToU8('gasfinder-encrypted:1:PBKDF2-SHA256:600000:AES-256-GCM');
 export const digestBytes = (bytes: Uint8Array) => Array.from(sha256(bytes), byte => byte.toString(16).padStart(2, '0')).join('');
@@ -31,6 +31,8 @@ export function validateBackup(value: unknown): BackupPayload {
   validateJson(value);
   const data = value as BackupPayload;
   if (!data || data.format !== 'gasfinder-data' || data.version !== 1 || !Number.isFinite(Date.parse(data.createdAt)) || typeof data.appVersion !== 'string' || typeof data.includesFiles !== 'boolean' || !data.stores || typeof data.stores !== 'object' || Array.isArray(data.stores) || !Array.isArray(data.archives) || !Array.isArray(data.attachments)) throw new Error('Unsupported or damaged GasFinder backup.');
+  if (data.attachmentScope && !['all','available','none'].includes(data.attachmentScope)) throw new Error('Unsupported attachment scope.');
+  if (data.attachmentScope === 'none' && data.includesFiles || data.attachmentScope && data.attachmentScope !== 'none' && !data.includesFiles) throw new Error('Attachment scope is inconsistent.');
   if (!data.includesFiles && data.attachments.length) throw new Error('Backup attachment choice is inconsistent.');
   const ids = new Set<string>();
   let totalBytes = 0;

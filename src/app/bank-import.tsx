@@ -1,8 +1,13 @@
+import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
+import { useReducedMotion } from '@/components/useReducedMotion';
+import { useSavedDraft } from '@/features/drafts/useSavedDraft';
+import { useDraftGuard } from '@/components/useDraftGuard';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { readScannedStatement, scannedReadingAvailable } from '@/features/bank/scannedStatement';
-import { findBatchItem, batchBalanceAllowed, updateBatch, startBatch } from '@/features/bank/batch';
+import { findBatchItem, batchBalanceAllowed, batchDecisionMade, updateBatch, startBatch } from '@/features/bank/batch';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Keyboard, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
@@ -27,7 +32,6 @@ import { ruleDescription } from '@/features/goals/logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 import { useStatementAutomationStore } from '@/stores/statementAutomationStore';
-import { colors } from '@/theme';
 import { accountContains, inferLinkedAccount, resolveLinkedAccount } from '@/features/bank/accountIdentity';
 import StatementChecks from '@/features/bank/StatementChecks';
 
@@ -35,22 +39,27 @@ type Column = Exclude<keyof BankMapping, 'mode' | 'spendingSign' | 'dateOrder'>;
 const columnNames: Record<Column, string> = { date: 'Date', description: 'Description', amount: 'Amount', debit: 'Debit / money out', credit: 'Credit / money in', currency: 'Currency', type: 'Transaction type', status: 'Status', transactionId: 'Transaction ID' };
 
 function Button({ label, onPress, secondary = false, disabled = false }: { label: string; onPress: () => void; secondary?: boolean; disabled?: boolean }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress} style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}>
     <Text style={[styles.buttonText, secondary && styles.secondaryText]}>{label}</Text>
   </Pressable>;
 }
 function Choice({ label, selected, onPress, disabled = false }: { label: string; selected: boolean; onPress: () => void; disabled?: boolean }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" accessibilityState={{ selected, disabled }} disabled={disabled} onPress={onPress} style={[styles.choice, selected && styles.selected, disabled && styles.disabled]}>
     <Text style={[styles.choiceText, selected && styles.selectedText]}>{label}</Text>
   </Pressable>;
 }
 function Check({ checked, label, onPress, disabled = false }: { checked: boolean; label: string; onPress: () => void; disabled?: boolean }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="checkbox" accessibilityLabel={label} accessibilityState={{ checked, disabled }} aria-checked={checked} disabled={disabled} onPress={onPress} style={styles.checkButton}>
     <View style={[styles.check, checked && styles.selected, disabled && styles.disabled]}><Text style={styles.selectedText}>{checked ? '✓' : ''}</Text></View>
   </Pressable>;
 }
 
 export default function BankImportScreen() {
+  useThemeRevision();
+  const reduced = useReducedMotion();
   const { bankFileToken, archiveId, batchToken } = useLocalSearchParams<{ bankFileToken?: string; archiveId?: string; batchToken?: string }>();
   const consumedBatch = useRef('');
   const consumedToken = useRef('');
@@ -82,6 +91,7 @@ export default function BankImportScreen() {
   const [automaticSaving, setAutomaticSaving] = useState(false);
   const [pendingAutomatic, setPendingAutomatic] = useState<{ id: number; statement: CitizensStatement; file: BankFile; accountLabel: string } | null>(null);
   const [error, setError] = useState('');
+  useValidationAnnouncement(error);
   const [directionConfirmed, setDirectionConfirmed] = useState(false);
   const [scanned, setScanned] = useState(false), [scanReviewed, setScanReviewed] = useState(false);
   const [automaticReview, setAutomaticReview] = useState('');
@@ -99,6 +109,8 @@ export default function BankImportScreen() {
   const [showHistory, setShowHistory] = useState(false);
   const [historyLimit, setHistoryLimit] = useState(20);
   const [done, setDone] = useState<{ imported: number; skipped: number; savedCents: number; transactionsAdded: number; transactionsUpdated: number; matched: number; balanceUpdated: boolean; automatic?: boolean } | null>(null);
+  const guard = useDraftGuard({ file: sourceFile?.name, accountDraft, mapping, applyRule, saveHistory, balanceDraftOverride, selection: [...selectionOverrides] }, true, !done && !!sourceFile);
+
   const request = useRef(0);
   useEffect(() => () => { request.current++; }, []);
   useEffect(() => {
@@ -153,12 +165,13 @@ export default function BankImportScreen() {
     if (file.kind === 'csv') { load(file.text, file.name); setBusy(false); }
     else setPDFJob({ id: current, name: file.name, base64: file.base64, file, shared });
   }, [load]);
+  const savedDraft = useSavedDraft('bank-import', sourceFile, !!sourceFile && !done, file => { if (file) { openFile(file, ++request.current); setAutomaticReview('Source file resumed. Review choices and balance consent are reset; check them before saving.'); } }, !batchToken && !archiveId && !bankFileToken);
   useEffect(() => {
     if (!hydrated || !automationHydrated || !batchToken || consumedBatch.current === batchToken) return;
     consumedBatch.current = batchToken;
     const item = findBatchItem(batchToken);
     void Promise.resolve().then(() => {
-      if (!item) { setError('Batch draft expired. Choose the files again.'); return; }
+      if (!item || !batchDecisionMade()) { setError('Return to Import a batch and choose its balance option first.'); return; }
       openFile(item.file, ++request.current); setBusy(item.file.kind === 'pdf');
     });
   }, [hydrated, automationHydrated, batchToken, openFile]);
@@ -237,13 +250,14 @@ export default function BankImportScreen() {
       if (request.current !== current || result.status === 'canceled') return;
       if (result.status === 'review') setAutomaticReview(result.reason);
       else {
+        guard.accept(); await savedDraft.clear().catch(() => undefined);
         setDone({ ...result.result, automatic: true }); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null);
       }
     } catch (cause) {
       if (request.current === current) setError(cause instanceof Error ? cause.message : 'Could not save this statement. Review it and try again.');
     } finally { if (request.current === current) { setBusy(false); setAutomaticSaving(false); } }
   }
-  async function chooseFile() {
+  async function chooseFileUnchecked() {
     const current = ++request.current;
     setPendingAutomatic(null);
     setBusy(true); setError('');
@@ -262,8 +276,10 @@ export default function BankImportScreen() {
         : message || 'Could not open this file. Choose a PDF or CSV from Files.');
     } finally { if (current === request.current && !readingPDF) setBusy(false); }
   }
+  function chooseFile() { guard.confirm(() => { void chooseFileUnchecked(); }); }
   function toggle(id: string) { setSelectionOverrides((previous) => new Map(previous).set(id, !selectedIds.has(id))); }
   async function importSelected() {
+    if (batchToken && !batchDecisionMade()) { setError('Choose the batch balance option first.'); return; }
     if (!hydrated || !automationHydrated || review.error || accountIdentity.error || !canImport || busy || pendingAutomatic || statement?.reconciliation?.status === 'mismatch' && !mismatchReviewed || (needsBalanceChoice && balanceOverride === null)) return;
     const current = ++request.current;
     const reviewedState = usePocketStore.getState();
@@ -286,7 +302,7 @@ export default function BankImportScreen() {
         return outcome;
       });
       if (batchToken) updateBatch(batchToken, { saved: true });
-      setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
+      guard.accept(); await savedDraft.clear().catch(() => undefined); setDone(result); setCSV(null); setMapping(null); setStatement(null); setSourceFile(null); setSelectionOverrides(new Map());
     } catch (cause) {
       if (current === request.current) setError(cause instanceof Error ? cause.message : 'Could not save the file in Imports. Try again.');
     } finally { if (current === request.current) setBusy(false); }
@@ -300,6 +316,7 @@ export default function BankImportScreen() {
 
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <FormScrollView contentContainerStyle={styles.content}>
+      {savedDraft.panel}{guard.dialog}{sourceFile && !batchToken && !busy && !done && <Button label="Discard import draft" secondary onPress={() => guard.confirm(() => { void savedDraft.clear().then(() => { guard.accept(); setSourceFile(null); setCSV(null); setStatement(null); setMapping(null); setError(''); }).catch(() => setError('Could not discard this draft. Try again.')); }, false)} />}
       <Text accessibilityRole="header" style={styles.title}>Import statement</Text>
       {done ? <View style={styles.card}>
         <Text style={styles.section}>{done.automatic ? 'Statement imported' : 'Import saved'}</Text>
@@ -438,7 +455,7 @@ export default function BankImportScreen() {
       } catch (cause) { if (request.current === pdfJob.id) setError(cause instanceof Error ? cause.message : 'Could not read or save this Citizens statement. Review it and try again.'); }
       finally { if (request.current === pdfJob.id) { setBusy(false); setAutomaticSaving(false); } }
     }} onError={async (message) => { if (request.current === pdfJob.id && processedPDF.current !== pdfJob.id) { setError(message); setPDFJob(null); setBusy(false); } }} />}
-    <Modal visible={pendingAutomatic !== null} transparent animationType="fade" onRequestClose={() => { setPendingAutomatic(null); setAutomaticReview('Review this statement before saving.'); }}>
+    <Modal visible={pendingAutomatic !== null} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={() => { setPendingAutomatic(null); setAutomaticReview('Review this statement before saving.'); }}>
       <View style={styles.scrim}><SafeAreaView style={styles.modal}><ScrollView contentContainerStyle={styles.balanceQuestion}>
         <Text accessibilityRole="header" style={styles.section}>Update your balance?</Text>
         <Text style={styles.body}>Use the PDF’s closing balance for your Account?</Text>
@@ -450,7 +467,7 @@ export default function BankImportScreen() {
         <Button label="Review before saving" secondary onPress={() => { setPendingAutomatic(null); setAutomaticReview('Review this statement before saving.'); }} />
       </ScrollView></SafeAreaView></View>
     </Modal>
-    <Modal visible={column !== null} transparent animationType="fade" onRequestClose={() => setColumn(null)}>
+    <Modal visible={column !== null} transparent animationType={reduced ? 'none' : 'fade'} onRequestClose={() => setColumn(null)}>
       <View style={styles.scrim}><SafeAreaView style={styles.modal}>
         <View style={styles.modalHeader}><Text style={styles.section}>Choose {column ? columnNames[column].toLowerCase() : 'column'}</Text><IconButton icon="close" label="Close column selection" onPress={() => setColumn(null)} /></View>
         <ScrollView keyboardShouldPersistTaps="handled">
@@ -464,7 +481,7 @@ export default function BankImportScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper }, content: { padding: 20, paddingBottom: 36, gap: 16 },
   title: { color: colors.ink, fontSize: 32, fontWeight: '800' },
   section: { color: colors.ink, fontSize: 20, fontWeight: '800', flexShrink: 1 }, body: { color: colors.inkSoft, fontSize: 14, lineHeight: 21 },
@@ -483,4 +500,4 @@ const styles = StyleSheet.create({
   historyRow: { gap: 5, borderTopColor: colors.line, borderTopWidth: 1, paddingTop: 12 },
   credit: { color: colors.primary }, debit: { color: colors.danger }, balanceQuestion: { gap: 14 }, balanceAmount: { color: colors.ink, fontSize: 32, fontWeight: '800', fontVariant: ['tabular-nums'] },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 }, scrim: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'center', padding: 20 }, modal: { maxHeight: '80%', backgroundColor: colors.surface, borderRadius: 12, padding: 15 }, modalHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, justifyContent: 'space-between' }, option: { minHeight: 48, padding: 13, borderBottomWidth: 1, borderBottomColor: colors.line },
-});
+}));

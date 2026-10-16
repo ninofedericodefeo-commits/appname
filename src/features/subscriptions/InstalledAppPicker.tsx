@@ -1,6 +1,6 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { colors } from '@/theme';
+import { AppState, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { APPLE_SUBSCRIPTIONS } from './providerApps';
 import type { SubscriptionApp } from './providerApps';
 import type { InstalledAppResult } from './installedAppLogic';
@@ -8,6 +8,7 @@ import { installedSubscriptionApps } from './installedApps';
 import SubscriptionButton from './SubscriptionButton';
 
 export default function InstalledAppPicker({ selected, onSelect }: { selected?: SubscriptionApp; onSelect: (app?: SubscriptionApp) => void }) {
+  useThemeRevision();
   const [expanded, setExpanded] = useState(false);
   const [result, setResult] = useState<InstalledAppResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -54,11 +55,11 @@ export default function InstalledAppPicker({ selected, onSelect }: { selected?: 
     </View>}
   </View>;
 }
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   container: { gap: 10 }, label: { color: colors.inkSoft, fontSize: 13, fontWeight: '700' },
-  row: { flexDirection: 'row', gap: 10, alignItems: 'center' }, selected: { color: colors.ink, flex: 1, fontSize: 15 },
+  row: { flexWrap: 'wrap', flexDirection: 'row', gap: 10, alignItems: 'center' }, selected: { color: colors.ink, flex: 1, fontSize: 15 },
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 }, list: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, gap: 12 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 46, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 10 },
   optionText: { color: colors.ink, fontSize: 15, fontWeight: '600', flex: 1 }, check: { color: colors.primary, fontSize: 18 },
   search: { minHeight: 46, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: colors.ink },
-});
+}));

@@ -2,8 +2,8 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { appStorage } from '@/lib/appStorage';
-export const useDevicePrivacy = create<{ enabled: boolean; hidePreview: boolean; relockSeconds: number; configure: (change: Partial<{ enabled: boolean; hidePreview: boolean; relockSeconds: number }>) => void }>()(persist(set => ({
-  enabled: false, hidePreview: false, relockSeconds: 60,
+export const useDevicePrivacy = create<{ enabled: boolean; hidePreview: boolean; hideAmounts: boolean; relockSeconds: number; configure: (change: Partial<{ enabled: boolean; hidePreview: boolean; hideAmounts: boolean; relockSeconds: number }>) => void }>()(persist(set => ({
+  enabled: false, hidePreview: false, hideAmounts: false, relockSeconds: 60,
   configure: change => set(change),
-}), { name: 'gasfinder-device-privacy', version: 1, storage: createJSONStorage(() => appStorage) }));
+}), { name: 'gasfinder-device-privacy', version: 2, migrate: state => ({ hideAmounts: false, ...(state as object) }), storage: createJSONStorage(() => appStorage) }));
 export const usePrivacySession = create<{ unlocked: boolean; warning: string }>(() => ({ unlocked: false, warning: '' }));

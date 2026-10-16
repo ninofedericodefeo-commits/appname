@@ -1,9 +1,9 @@
-import { colors } from '@/theme';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useGasSearchStore } from '@/stores/gasSearchStore';
 import { useSettingsStore } from '@/stores/settingsStore';
 import { preferredMapsApp } from '@/features/stations/preferences';
 import { useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { Link } from 'expo-router';
 import * as Linking from 'expo-linking';
 import { useQueryClient } from '@tanstack/react-query';
@@ -38,6 +38,7 @@ export function GasStationCard({
   distanceLabel?: string;
   onReported?: () => void;
 }) {
+  useThemeRevision();
   const priceQualifier = useSettingsStore(state => state.priceQualifier);
   const mapsPreference = useSettingsStore((state) => state.mapsPreference);
   const favorites = useGasSearchStore(state => state.favorites);
@@ -117,27 +118,27 @@ export function GasStationCard({
             {error ? <Text style={styles.error}>{error}</Text> : null}
             <View style={styles.reportActions}>
               <Pressable accessibilityRole="button" onPress={() => void submitPrice()} disabled={saving} style={styles.reportButton}><Text style={styles.reportButtonText}>{saving ? 'Saving…' : 'Save price'}</Text></Pressable>
-              <Pressable accessibilityRole="button" onPress={() => { setEditing(false); setError(''); }}><Text style={styles.cancelText}>Cancel</Text></Pressable>
+              <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { setEditing(false); setError(''); }}><Text style={styles.cancelText}>Cancel</Text></Pressable>
             </View>
-          </> : <Pressable accessibilityRole="button" onPress={() => setEditing(true)}><Text style={styles.editText}>Report a price ↗</Text></Pressable>}
+          </> : <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setEditing(true)}><Text style={styles.editText}>Report a price ↗</Text></Pressable>}
         </View>
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   receiptLink: { marginTop: 13, paddingVertical: 7, alignSelf: 'flex-start' },
   mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 15, alignItems: 'center' },
   mapButton: { borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
   mapButtonText: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   reportArea: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12 },
-  historyLink: { marginBottom: 10 },
+  historyLink: { minHeight: 44, justifyContent: 'center', marginBottom: 10 },
   reportNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginBottom: 9 },
   input: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 6, padding: 10, minHeight: 44, color: colors.ink },
   error: { color: colors.danger, fontSize: 12, marginTop: 6 },
   reportActions: { flexDirection: 'row', alignItems: 'center', gap: 18, marginTop: 10 },
-  reportButton: { backgroundColor: colors.accentDark, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 6 },
+  reportButton: { minHeight: 44, justifyContent: 'center', backgroundColor: colors.accentDark, paddingHorizontal: 14, paddingVertical: 11, borderRadius: 6 },
   reportButtonText: { color: colors.surface, fontWeight: '700' },
   cancelText: { color: colors.muted, fontWeight: '700' },
   editText: { color: colors.accentDark, fontWeight: '700' },
@@ -154,7 +155,7 @@ const styles = StyleSheet.create({
     borderLeftColor: colors.accent,
     backgroundColor: colors.paleOrange,
   },
-  row: {
+  row: { flexWrap: 'wrap',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -195,4 +196,4 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
   },
-});
+}));

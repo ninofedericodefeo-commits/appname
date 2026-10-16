@@ -1,14 +1,17 @@
+import { useReducedMotion } from '@/components/useReducedMotion';
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Modal, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import { useGasSearchStore } from '@/stores/gasSearchStore';
-import { colors } from '@/theme';
 import { areaKey, coordinateArea, coordinateLabel, fetchPlaceMatches, placeQueryKey } from './areaSearch';
 import type { PlaceMatch, SearchArea } from './areaSearch';
 
 export default function AreaSearchSheet({ onChoose, onClose }: { onChoose: (area: SearchArea) => void; onClose: () => void }) {
+  useThemeRevision();
+  const reduced = useReducedMotion();
   const { recentAreas, favorites } = useGasSearchStore();
   const [query, setQuery] = useState('');
   const [matches, setMatches] = useState<PlaceMatch[]>([]);
@@ -37,8 +40,8 @@ export default function AreaSearchSheet({ onChoose, onClose }: { onChoose: (area
     } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'Place search unavailable. Choose a saved area or enter coordinates.'); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
-  return <Modal visible animationType="slide" onRequestClose={close}><SafeAreaView style={styles.safe}>
-    <View style={styles.header}><Text style={styles.title}>Search an area</Text><SubscriptionButton label="Close" onPress={close} /></View>
+  return <Modal visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}><SafeAreaView style={styles.safe}>
+    <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Search an area</Text><SubscriptionButton label="Close" onPress={close} /></View>
     <FormScrollView contentContainerStyle={styles.form}>
       <Text style={styles.label}>City, ZIP, address or latitude, longitude</Text>
       <TextInput accessibilityLabel="Gas search area" style={styles.input} value={query} maxLength={200} placeholder="Philadelphia, PA" autoCapitalize="words" returnKeyType="search" onSubmitEditing={() => void search()} onChangeText={value => { current.current?.abort(); setQuery(value); setMatches([]); setMessage(''); setUsingSaved(false); setBusy(false); }} />
@@ -53,4 +56,4 @@ export default function AreaSearchSheet({ onChoose, onClose }: { onChoose: (area
     </FormScrollView>
   </SafeAreaView></Modal>;
 }
-const styles = StyleSheet.create({ safe: { flex: 1, backgroundColor: colors.paper }, header: { padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderColor: colors.line }, title: { flex: 1, fontSize: 24, color: colors.ink, fontWeight: '800' }, form: { padding: 20, gap: 14, paddingBottom: 40 }, label: { color: colors.ink, fontSize: 14, fontWeight: '700' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: colors.ink, fontSize: 16, backgroundColor: colors.surface }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, match: { gap: 5 }, saved: { padding: 14, borderWidth: 1, borderColor: colors.line, borderRadius: 10, gap: 8 } });
+const styles = themedStyles(() => ({ safe: { flex: 1, backgroundColor: colors.paper }, header: { padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderColor: colors.line }, title: { flex: 1, fontSize: 24, color: colors.ink, fontWeight: '800' }, form: { padding: 20, gap: 14, paddingBottom: 40 }, label: { color: colors.ink, fontSize: 14, fontWeight: '700' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: colors.ink, fontSize: 16, backgroundColor: colors.surface }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, match: { gap: 5 }, saved: { padding: 14, borderWidth: 1, borderColor: colors.line, borderRadius: 10, gap: 8 } }));

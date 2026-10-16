@@ -1,10 +1,10 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useDataStatus } from '@/features/data/operationStatus';
 import { useShortcutSetupStore } from '@/stores/shortcutSetupStore';
 import { formatMoney } from '@/lib/money';
-import { colors } from '@/theme';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { Link, useLocalSearchParams } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { parseImportedPurchase } from '@/features/goals/importPurchase';
@@ -12,10 +12,12 @@ import { usePocketStore } from '@/stores/pocketStore';
 
 type ImportParams = { amount?: string; merchant?: string; id?: string; currency?: string };
 export default function ImportPurchaseScreen() {
+  useThemeRevision();
   const params = useLocalSearchParams<ImportParams>();
   return <ImportPurchaseContent key={JSON.stringify(params)} params={params} />;
 }
 function ImportPurchaseContent({ params }: {params: ImportParams}) {
+  useThemeRevision();
   const { busy, recoveryError } = useDataStatus();
   const [openedAt] = useState(() => new Date());
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
@@ -40,13 +42,13 @@ function ImportPurchaseContent({ params }: {params: ImportParams}) {
 
   return <SafeAreaView style={styles.safe}><View style={styles.content}>
     <Text style={styles.kicker}>PURCHASE IMPORT</Text>
-    <Text style={styles.title}>{result === 'saved' ? 'Purchase recorded' : result === 'pending' ? 'Purchase logged' : result === 'invalid' ? 'Could not import' : 'Opening your account…'}</Text>
+    <Text accessibilityRole="header" style={styles.title}>{result === 'saved' ? 'Purchase recorded' : result === 'pending' ? 'Purchase logged' : result === 'invalid' ? 'Could not import' : 'Opening your account…'}</Text>
     <Text style={styles.body}>{result === 'saved' ? `${details} · ${formatMoney(logged?.savedCents ?? 0)} included in your set-aside estimate` : result === 'pending' ? `${details}. ${activeGoal ? 'Your rule could not set money aside; review this purchase in Account → Transactions.' : 'Create a goal to begin setting money aside. Find this purchase in Account → Transactions.'}` : result === 'invalid' ? 'The link needs a merchant and a positive USD amount. Other currencies are not supported. Check the Shortcuts automation.' : 'Loading saved goals and purchases.'}</Text>
     <Link href="/account-transactions" asChild><Pressable accessibilityRole="button" style={styles.button}><Text style={styles.buttonText}>Open transactions</Text></Pressable></Link>
   </View></SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper },
   content: { flex: 1, justifyContent: 'center', padding: 24, gap: 15 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
@@ -54,4 +56,4 @@ const styles = StyleSheet.create({
   body: { color: colors.inkSoft, fontSize: 16, lineHeight: 24 },
   button: { backgroundColor: colors.ink, padding: 15, borderRadius: 8, alignSelf: 'flex-start' },
   buttonText: { color: colors.surface, fontWeight: '800' },
-});
+}));

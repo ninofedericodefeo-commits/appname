@@ -1,7 +1,8 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import * as Linking from 'expo-linking';
 import { router } from 'expo-router';
-import { AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
@@ -10,7 +11,6 @@ import { automationSetupURL, firstSetupPurchase, PURCHASE_SHORTCUT_NAME } from '
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
 import { useShortcutSetupStore } from '@/stores/shortcutSetupStore';
-import { colors } from '@/theme';
 
 const isIPhone = Platform.OS === 'ios';
 const modernShortcuts = isIPhone && Number.parseInt(String(Platform.Version), 10) >= 27;
@@ -20,6 +20,7 @@ type Handoff = { opened: boolean; leftApp: boolean; returned: boolean };
 function Button({ label, onPress, disabled = false, secondary = false }: {
   label: string; onPress: () => void; disabled?: boolean; secondary?: boolean;
 }) {
+  useThemeRevision();
   return <Pressable accessibilityRole="button" disabled={disabled} onPress={onPress}
     style={[styles.button, secondary && styles.secondary, disabled && styles.disabled]}>
     <Text style={secondary ? styles.secondaryText : styles.buttonText}>{label}</Text>
@@ -27,12 +28,14 @@ function Button({ label, onPress, disabled = false, secondary = false }: {
 }
 
 function TapPath({ labels }: { labels: string[] }) {
+  useThemeRevision();
   return <View style={styles.path}>{labels.map((label, index) => <View key={label} style={styles.pathPart}>
     {index > 0 && <Text style={styles.arrow}>›</Text>}<Text style={styles.tap}>{label}</Text>
   </View>)}</View>;
 }
 
 export default function PurchaseAutomationScreen() {
+  useThemeRevision();
   const { stage, verificationStartedAt, connectCard, awaitPurchase, restart } = useShortcutSetupStore();
   const hydrated = useSyncExternalStore(useShortcutSetupStore.persist.onFinishHydration,
     useShortcutSetupStore.persist.hasHydrated, () => false);
@@ -101,7 +104,7 @@ export default function PurchaseAutomationScreen() {
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.safe}>
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>PURCHASE LOGGING</Text>
-      <Text style={styles.title}>Connect Apple Pay</Text>
+      <Text accessibilityRole="header" style={styles.title}>Connect Apple Pay</Text>
       <Text style={styles.body}>Add our shortcut, connect your card, then your supported Wallet taps can update your goal automatically.</Text>
       {!isIPhone && <Text style={styles.notice}>Set this up in GasFinder on your iPhone. You can read the steps here; manual logging is available in Edit goal.</Text>}
       {!hydrated ? <Text style={styles.hint}>Loading your setup…</Text> : <>
@@ -187,7 +190,7 @@ export default function PurchaseAutomationScreen() {
   </SafeAreaView>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper },
   content: { paddingHorizontal: 20, paddingTop: 24, paddingBottom: 36, gap: 15 },
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
@@ -225,4 +228,4 @@ const styles = StyleSheet.create({
   helpButton: { minHeight: 44, justifyContent: 'center' },
   waiting: { color: colors.ink, backgroundColor: colors.paleGreen, padding: 12, borderRadius: 6, fontSize: 13, fontWeight: '700' },
   received: { color: colors.ink, fontSize: 23, fontWeight: '800' },
-});
+}));

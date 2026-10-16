@@ -1,6 +1,7 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState, useSyncExternalStore } from 'react';
 import { Link, router } from 'expo-router';
-import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, Text, View } from 'react-native';
 import { IconButton } from '@/components/IconButton';
 import GoalEditor from './GoalEditor';
 import GoalProgressCard from './GoalProgressCard';
@@ -9,9 +10,9 @@ import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import type { Goal } from './logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
-import { colors } from '@/theme';
 
 function GoalActions({ goal }: { goal: Goal }) {
+  useThemeRevision();
   const [open, setOpen] = useState(false);
   const [confirm, setConfirm] = useState<'archive' | 'delete' | null>(null);
   const [error, setError] = useState('');
@@ -33,6 +34,7 @@ function GoalActions({ goal }: { goal: Goal }) {
 }
 
 export default function GoalsPanel() {
+  useThemeRevision();
   const { activeGoal, reservedCents, createGoal, updateGoal } = usePocketStore();
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const [creating, setCreating] = useState(false);
@@ -58,5 +60,5 @@ export default function GoalsPanel() {
     {adjustment && <SavingsAdjustmentSheet initialDestination="goal" initialAction={adjustment} onClose={() => setAdjustment(null)} />}
   </View>;
 }
-const styles = StyleSheet.create({ content: { gap: 14 }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2 }, intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
-  row: { flexDirection: 'row', gap: 8 }, card: { padding: 18, gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12 }, section: { color: colors.ink, fontSize: 20, fontWeight: '800' }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, error: { color: colors.danger, fontSize: 13 }, menu: { gap: 10, marginTop: 2 }, link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', gap: 5 }, linkText: { color: colors.ink, fontSize: 13, fontWeight: '800' } });
+const styles = themedStyles(() => ({ content: { gap: 14 }, header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 39, letterSpacing: -1.2 }, intro: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 },
+  row: { flexWrap: 'wrap', flexDirection: 'row', gap: 8 }, card: { padding: 18, gap: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12 }, section: { color: colors.ink, fontSize: 20, fontWeight: '800' }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, error: { color: colors.danger, fontSize: 13 }, menu: { gap: 10, marginTop: 2 }, link: { alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center', gap: 5 }, linkText: { color: colors.ink, fontSize: 13, fontWeight: '800' } }));

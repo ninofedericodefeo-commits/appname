@@ -1,8 +1,8 @@
+import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { dateFromKey, localDateKey } from '@/lib/calendarDate';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
-import { colors } from '@/theme';
 export { localDateKey } from '@/lib/calendarDate';
 
 const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
@@ -15,6 +15,10 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
   maximumDate?: string;
   displayValue?: string;
 }) {
+  useThemeRevision();
+  const width = useWindowDimensions().width;
+  const [measuredWidth,setMeasuredWidth] = useState(0);
+  const narrow = (measuredWidth || width-40) < 334;
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const selected = dateFromKey(value) ?? new Date();
@@ -29,7 +33,7 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
     setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + delta, 1));
   }
 
-  return <View>
+  return <View onLayout={event => setMeasuredWidth(event.nativeEvent.layout.width)}>
     <Pressable accessibilityRole="button" accessibilityLabel={`${label}, ${selected ? selected.toLocaleDateString() : 'choose a date'}`} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.trigger}>
       <Text style={styles.triggerText}>{displayValue ?? (selected ? selected.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Choose a date')}</Text>
       <Text style={styles.icon}>▦</Text>
@@ -40,33 +44,33 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
         <Text style={styles.monthTitle}>{visibleMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Next month" onPress={() => shiftMonth(1)} style={styles.arrow}><Text style={styles.arrowText}>›</Text></Pressable>
       </View>
-      <View style={styles.grid}>{weekdays.map((day) => <Text key={day} style={styles.weekday}>{day}</Text>)}
+      <View style={[styles.grid, narrow && { gap: 6 }]}>{!narrow && weekdays.map((day) => <Text key={day} style={styles.weekday}>{day}</Text>)}
         {cells.map((day, index) => {
-          if (day < 1 || day > daysInMonth) return <View key={`blank-${index}`} style={styles.day} />;
+          if (day < 1 || day > daysInMonth) return narrow ? null : <View key={`blank-${index}`} style={styles.day} />;
           const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day, 12);
           const key = localDateKey(date);
           const disabled = (minimumDate && key < minimumDate) || (maximumDate && key > maximumDate);
-          return <Pressable key={key} accessibilityRole="button" accessibilityLabel={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} accessibilityState={{ selected: value === key, disabled: !!disabled }} disabled={!!disabled} onPress={() => { onChange(key); setOpen(false); }} style={[styles.day, value === key && styles.selectedDay]}><Text style={[styles.dayText, disabled && styles.disabledDay, value === key && styles.selectedDayText]}>{day}</Text></Pressable>;
+          return <Pressable key={key} accessibilityRole="button" accessibilityLabel={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} accessibilityState={{ selected: value === key, disabled: !!disabled }} disabled={!!disabled} onPress={() => { onChange(key); setOpen(false); }} style={[styles.day, narrow && { width: 48, minWidth: 44, minHeight: 48 }, value === key && styles.selectedDay]}><Text style={[styles.dayText, disabled && styles.disabledDay, value === key && styles.selectedDayText]}>{day}</Text></Pressable>;
         })}
       </View>
     </View>}
   </View>;
 }
 
-const styles = StyleSheet.create({
+const styles = themedStyles(() => ({
   trigger: { minHeight: 48, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13 },
-  triggerText: { color: colors.ink, fontSize: 15, fontWeight: '700' },
+  triggerText: { flex: 1, flexShrink: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
   icon: { color: colors.accentDark, fontSize: 22 },
   calendar: { marginTop: 8, padding: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 9 },
   monthRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 },
-  monthTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  monthTitle: { flex: 1, textAlign: 'center', color: colors.ink, fontSize: 15, fontWeight: '800' },
   arrow: { minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   arrowText: { color: colors.accentDark, fontSize: 28 },
   grid: { flexDirection: 'row', flexWrap: 'wrap' },
   weekday: { width: '14.2857%', textAlign: 'center', color: colors.muted, fontSize: 11, fontWeight: '800', paddingVertical: 7 },
-  day: { width: '14.2857%', minHeight: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
+  day: { width: '14.2857%', minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 6 },
   dayText: { color: colors.ink, fontSize: 14 },
   disabledDay: { color: colors.lineStrong },
   selectedDay: { backgroundColor: colors.ink },
   selectedDayText: { color: colors.surface, fontWeight: '800' },
-});
+}));
