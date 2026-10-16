@@ -39,6 +39,7 @@ export default function AccountTransactionsScreen() {
         ListHeaderComponent={<View style={styles.header}>
           <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>Transactions</Text><Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/bank-import')}><Text style={styles.link}>Import</Text></Pressable></View>
           <LogPurchase />
+          <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/account-review')}><Text style={styles.link}>Review matches & hidden history ›</Text></Pressable>
           {linkedBankAccount && <Text style={styles.note}>{showLegacyAccounts ? 'All saved account histories' : linkedBankAccount.nickname}</Text>}
           {hasOtherAccounts && <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => setShowLegacyAccounts(!showLegacyAccounts)}><Text style={styles.link}>{showLegacyAccounts ? 'Show linked account only' : 'Show older account histories'}</Text></Pressable>}
           <TextInput style={styles.search} placeholder="Search transactions" accessibilityLabel="Search transactions" value={query} onChangeText={setQuery} autoCorrect={false} returnKeyType="search" />

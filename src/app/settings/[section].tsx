@@ -25,6 +25,7 @@ export default function SettingsSectionScreen() {
   return <SettingsPage title={category?.title ?? 'Settings'}>
     {section === 'account' && <>
       <AccountSettingsPanel />
+      <SettingsLink href="/account-review" label="Review matches & hidden history" />
       <SettingsLink href="/statement-automation" label="Set up quick statement import" />
       <Text style={s.note}>Set up the shortcut and learn how to share a PDF from Citizens.</Text>
       <StatementReminderSettings />

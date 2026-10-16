@@ -1,20 +1,11 @@
+import { dateFromKey, localDateKey } from '@/lib/calendarDate';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { colors } from '@/theme';
+export { localDateKey } from '@/lib/calendarDate';
 
 const weekdays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-export function localDateKey(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function dateFromKey(key: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
-  const [year, month, day] = key.split('-').map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  return localDateKey(date) === key ? date : null;
-}
 
 export function CalendarDateField({ value, onChange, label, minimumDate, maximumDate, displayValue }: {
   value: string;

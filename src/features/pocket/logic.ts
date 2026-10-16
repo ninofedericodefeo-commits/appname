@@ -13,3 +13,11 @@ export function canReserve(amountCents: number, balanceCents: number | null, res
   return amountCents > 0 && Number.isSafeInteger(amountCents) &&
     (balanceCents === null || amountCents <= balanceCents - reservedCents);
 }
+
+// Bank snapshots can be overdrawn. Purchase and savings inputs stay nonnegative.
+export function parseBankBalance(input: string): number | null {
+  const value = input.trim().replace(/^−/, '-');
+  const negative = value.startsWith('-');
+  const cents = parseDollars(value.replace(/^[+-]/, ''));
+  return cents === null ? null : negative && cents !== 0 ? -cents : cents;
+}

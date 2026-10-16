@@ -12,6 +12,8 @@ Use [final roadmap R31–R34](../ROADMAP.md) and the [target flows](APP_FLOWS.md
 | R34 | Large synthetic history/archive/report libraries and bounded file/OCR memory; Android native checks if Android is used | Measured timing/memory on actual hardware, not guessed performance |
 | R15–R20 | VoiceOver, large text, adequate targets, keyboard/focus, map List and chart text alternatives | Complete the six accessible journeys in the final roadmap |
 
+R01–R05 now have local fixes: on the phone verify Keep both → restart/reimport → Undo; corrected deposits stay out of outgoing match suggestions; the negative-balance checkbox works with the decimal keyboard; invalid calendar dates are rejected; and later review/hidden/Undo pages remain reachable. Use disposable records and keep the original snapshot before testing.
+
 Current setup is under Settings → Account & statements / Subscriptions / Shortcuts & spending pause / Widgets / Privacy / Data & backups. Wipe is already implemented with acknowledgement, ERASE ALL DATA and final confirmation. Test permanent erase only with disposable data; canceled confirmations must preserve all records.
 
 

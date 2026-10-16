@@ -8,7 +8,7 @@ import Svg, { Path } from 'react-native-svg';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { PageToolbar } from '@/components/SettingsButton';
-import { availableCents, parseDollars } from '@/features/pocket/logic';
+import { availableCents, parseBankBalance } from '@/features/pocket/logic';
 import { PocketTransactions } from '@/features/pocket/PocketTransactions';
 import { annotateRows } from '@/features/pocket/repository';
 import { pocketTransactions } from '@/features/pocket/transactions';
@@ -40,11 +40,11 @@ export default function PocketScreen() {
   const balanceInput = balanceDraft ?? (reportedBalanceCents === null ? '' : formatAmount(reportedBalanceCents));
   const transactions = useMemo(() => annotateRows(pocketTransactions(accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections), transactionDetails, merchantAliases).filter(row => belongsToLinkedAccount(row, linkedBankAccount)), [accountTransactions, purchases, entries, hiddenTransactionIds, transactionDirections, transactionDetails, merchantAliases, linkedBankAccount]);
 
-  const reviewCount = useMemo(() => matchCandidates(accountTransactions,purchases,linkedBankAccount).length + bankDuplicateCandidates(accountTransactions,linkedBankAccount).length, [accountTransactions,purchases,linkedBankAccount]);
+  const reviewCount = useMemo(() => { const options = { directions: transactionDirections, separateDecisions: pocket.separatePurchaseDecisions, limit: 101 }; return matchCandidates(accountTransactions,purchases,linkedBankAccount, options).length + bankDuplicateCandidates(accountTransactions,linkedBankAccount, options).length; }, [accountTransactions,purchases,linkedBankAccount,transactionDirections,pocket.separatePurchaseDecisions]);
   function updateBalance() {
-    const cents = parseDollars(balanceInput);
-    if (cents === null) { setBalanceError('Enter a balance using at most two decimal places.'); return; }
-    setReportedBalance(cents); setBalanceDraft(null); setBalanceError(''); setEditingBalance(false); setShowCurrentBalance(false); Keyboard.dismiss();
+    const cents = parseBankBalance(balanceInput);
+    if (cents === null) { setBalanceError('Enter a balance from −$1,000,000 to $1,000,000 using at most two decimal places.'); return; }
+    try { setReportedBalance(cents); } catch (cause) { setBalanceError(cause instanceof Error ? cause.message : 'Could not save this bank balance.'); return; } setBalanceDraft(null); setBalanceError(''); setEditingBalance(false); setShowCurrentBalance(false); Keyboard.dismiss();
   }
   return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
     <PageToolbar />
@@ -63,7 +63,7 @@ export default function PocketScreen() {
         </Pressable>
         {estimate.newerCount > 0 && <Text style={styles.updated}>{estimate.deltaCents < 0 ? '−' : '+'}{money(Math.abs(estimate.deltaCents))} from posted/logged activity since that balance. Unlogged activity may be missing.</Text>}
         {estimate.pendingCount > 0 && <Text style={styles.updated}>{estimate.pendingCount} pending bank transaction{estimate.pendingCount === 1 ? '' : 's'} excluded from this estimate.</Text>}
-        {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>Your set-aside amount is above your estimated bank balance. Update the balance or lower your set-aside amount.</Text>}
+        {available !== null && available < 0 && <Text accessibilityRole="alert" style={styles.balanceWarning}>{estimate.estimatedCents !== null && estimate.estimatedCents < 0 ? 'Your estimated bank balance is below $0. Check it against your bank before setting aside more.' : 'Your set-aside amount is above your estimated bank balance. Update the balance or lower your set-aside amount.'}</Text>}
         <View style={styles.accountActions}>
           <AccountAction label="Update balance" path="m16 3 5 5M3 21l5-1L20 8a3.54 3.54 0 0 0-5-5L3 15v6Z" onPress={() => { Keyboard.dismiss(); setEditingBalance(!editingBalance); setEditingPocket(false); }} />
           <AccountAction label="Manage savings" path="M4 7h15m-4-4 4 4-4 4M20 17H5m4-4-4 4 4 4" onPress={() => { Keyboard.dismiss(); setEditingPocket(true); setEditingBalance(false); }} />
@@ -73,12 +73,14 @@ export default function PocketScreen() {
       {editingBalance && <View style={styles.card}>
         <Text style={styles.section}>Update bank balance</Text><Text style={styles.hint}>Copy the current balance from your bank app.</Text>
         <TextInput value={balanceInput} onChangeText={setBalanceDraft} style={styles.input} keyboardType="decimal-pad" placeholder="0.00" accessibilityLabel="Account balance" />
+        <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: /^[-−]/.test(balanceInput.trim()) }} aria-checked={/^[-−]/.test(balanceInput.trim())} style={styles.secondary} onPress={() => { const value = balanceInput.trim(); setBalanceDraft(/^[-−]/.test(value) ? value.slice(1) : `-${value.replace(/^\+/, '')}`); setBalanceError(''); }}><Text style={styles.secondaryText}>{/^[-−]/.test(balanceInput.trim()) ? '✓ ' : ''}Overdrawn / negative bank balance</Text></Pressable>
+        <Text style={styles.hint}>Enable for a balance below $0. This does not change your money set aside.</Text>
         {balanceError ? <Text accessibilityRole="alert" style={styles.error}>{balanceError}</Text> : null}
         <View style={styles.row}><Pressable accessibilityRole="button" style={styles.button} onPress={updateBalance}><Text style={styles.buttonText}>Save balance</Text></Pressable><Pressable accessibilityRole="button" style={styles.secondary} onPress={() => { Keyboard.dismiss(); setEditingBalance(false); }}><Text style={styles.secondaryText}>Close</Text></Pressable></View>
       </View>}
       {editingPocket && <SavingsAdjustmentSheet initialDestination="unassigned" onClose={() => setEditingPocket(false)} />}
       <BalanceExplanation />
-      {reviewCount > 0 && <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/account-review')}><Text style={styles.secondaryText}>Review {reviewCount} possible transaction match{reviewCount === 1 ? '' : 'es'} ›</Text><Text style={styles.hint}>Similar charges stay separate until reviewed.</Text></Pressable>}
+      {reviewCount > 0 && <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/account-review')}><Text style={styles.secondaryText}>Review {reviewCount > 100 ? '100+' : reviewCount} possible transaction match{reviewCount === 1 ? '' : 'es'} ›</Text><Text style={styles.hint}>Similar charges stay separate until reviewed.</Text></Pressable>}
       <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/insights')}><Text style={styles.secondaryText}>Spending insights & exports ›</Text></Pressable>
       <PocketTransactions transactions={transactions} />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>

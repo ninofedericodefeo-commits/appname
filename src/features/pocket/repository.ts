@@ -1,3 +1,4 @@
+import { dateFromKey } from '../../lib/calendarDate.ts';
 import { transactionDay } from './dates.ts';
 import { bankTransactionName } from '../bank/merchantName.ts';
 import type { PocketTransaction } from './transactions.ts';
@@ -19,7 +20,7 @@ export function revisionCanUndo(revision: TransactionRevision, state: { transact
     (!revision.after.alias || (state.merchantAliases[revision.after.alias.key] ?? null) === revision.after.alias.value);
 }
 export function filterHistory(rows: PocketTransaction[], options: { from: string; to: string; source: string; category: string; importIds?: string[] }) {
-  for (const value of [options.from, options.to]) if (value && (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(Date.parse(`${value}T12:00:00`)))) throw new Error('Use dates in YYYY-MM-DD format.');
+  for (const value of [options.from, options.to]) if (value && !dateFromKey(value)) throw new Error('Use real calendar dates in YYYY-MM-DD format.');
   if (options.from && options.to && options.from > options.to) throw new Error('Start date must come before end date.');
   const ids = options.importIds ? new Set(options.importIds) : null;
   return rows.filter(row => {

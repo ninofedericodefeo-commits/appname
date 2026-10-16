@@ -1,7 +1,8 @@
+import type { SeparatePurchaseDecision, MatchRevision, BankDuplicateRevision } from '../pocket/reconciliation.ts';
 import type { TransactionDetails, TransactionRevision } from '../pocket/repository.ts';
 import { applyBankImport, parseBankDate } from './importLogic.ts';
 import type { BankImportState, BankPreviewRow, BankPurchase } from './importLogic.ts';
-import { mergeAccountTransactions } from '../pocket/transactions.ts';
+import { clearInvalidBankDuplicates, mergeAccountTransactions } from '../pocket/transactions.ts';
 import type { AccountTransaction, TransactionDirections } from '../pocket/transactions.ts';
 import { accountNamespace, accountNickname, renameLinkedAccount, resolveLinkedAccount } from './accountIdentity.ts';
 import type { BankAccountInput, LinkedBankAccount } from './accountIdentity.ts';
@@ -9,6 +10,9 @@ import { accountBalanceEstimate } from '../pocket/balanceEstimate.ts';
 
 export type StatementBalance = { amountCents: number; asOf: string; page: number; line: number };
 export type AccountImportState = BankImportState & {
+  separatePurchaseDecisions?: SeparatePurchaseDecision[];
+  matchHistory?: MatchRevision[];
+  bankDuplicateHistory?: BankDuplicateRevision[];
   linkedBankAccount?: LinkedBankAccount | null;
   balanceIncludedTransactionIds?: string[];
   accountTransactions: AccountTransaction[];
@@ -45,13 +49,14 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
     statementBalanceKeys: [...new Set([...(state.statementBalanceKeys ?? []), statementBalanceKey(balance!, account)])],
   } : state;
   const existingHistory = profile ? renameLinkedAccount(state, profile).accountTransactions : state.accountTransactions;
-  const movements = mergeAccountTransactions(existingHistory, history, now);
+  const movements = mergeAccountTransactions(existingHistory, history, now, state.transactionDirections);
   const hidden = new Set(state.hiddenTransactionIds ?? []);
   const directions = { ...(state.transactionDirections ?? {}) };
   for (const replacement of movements.replacedIds) if (hidden.has(replacement.from)) hidden.add(replacement.to);
   for (const replacement of movements.replacedIds) if (directions[replacement.from]) {
     directions[replacement.to] = directions[replacement.from]; delete directions[replacement.from];
   }
+  movements.transactions = clearInvalidBankDuplicates(movements.transactions, directions);
   const details = { ...(state.transactionDetails ?? {}) };
   for (const replacement of movements.replacedIds) if (details[replacement.from]) details[replacement.to] ??= details[replacement.from];
   const replacements = new Map(movements.replacedIds.map(item => [item.from, item.to]));
@@ -82,6 +87,10 @@ export function applyAccountImport(state: AccountImportState, candidates: BankPu
     ...(profile ? renameLinkedAccount({ ...state, purchases, accountTransactions: movements.transactions }, profile) : {}),
     ...(state.hiddenTransactionIds ? { hiddenTransactionIds: [...hidden] } : {}),
     ...(state.transactionDetails ? { transactionDetails: details } : {}), ...(correctionHistory ? { correctionHistory } : {}),
+    ...(state.separatePurchaseDecisions ? { separatePurchaseDecisions: state.separatePurchaseDecisions.map(item => ({ ...item,
+      bankId: replacements.get(item.bankId) ?? item.bankId, otherId: item.kind === 'bank-bank' ? replacements.get(item.otherId) ?? item.otherId : item.otherId })) } : {}),
+    ...(state.matchHistory ? { matchHistory: state.matchHistory.map(item => ({ ...item, bankId: replacements.get(item.bankId) ?? item.bankId })) } : {}),
+    ...(state.bankDuplicateHistory ? { bankDuplicateHistory: state.bankDuplicateHistory.map(item => ({ ...item, bankId: replacements.get(item.bankId) ?? item.bankId, canonicalId: replacements.get(item.canonicalId) ?? item.canonicalId })) } : {}),
     ...(state.transactionDirections ? { transactionDirections: directions } : {}) },
     imported: result.imported, skipped: result.skipped, savedCents: result.savedCents,
     matched: matched.size, balanceUpdated, transactionsAdded: movements.added, transactionsUpdated: movements.updated };

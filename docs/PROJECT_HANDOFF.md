@@ -2,6 +2,12 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
+## Latest correctness batch — October 15, 2026
+
+Final-roadmap **R01–R05 are implemented locally**. See [batch notes](ACCOUNT_REVIEW_FIXES.md). Pocket schema **14** adds persistent separate-purchase decisions with evidence fingerprints and Undo; review and saves respect direction corrections; negative manual bank snapshots have a phone-friendly sign control; calendar validation is shared/strict; all review/hidden/Undo sections are paged and searchable. Original evidence and set-aside contributions stay intact. ID repair remaps review references. Full history and Settings → Account & statements link directly to review.
+
+Verification: 273 logic tests, lint, TypeScript and all-platform JS exports pass. Browser checks verified Keep both/reload/Undo and isolated negative-balance save/reload. No real bank files were uploaded, financial originals erased or native capability/dependency changed. Screenshot proof is in `/tmp/gasfinder-correctness-proof/`. R06–R08 (drafts, batch balance setup, recovery completion) are the next correctness work; later flows/accessibility and actual-phone gates remain open.
+
 ## Final audit and finish plan — October 15, 2026
 
 The [final roadmap](../ROADMAP.md) is the single current backlog; the [final audit](APP_AUDIT_FINAL.md) records confirmed findings versus proposals/device gates, and [flowcharts](APP_FLOWS.md) describe target journeys. The previous roadmap is preserved in ROADMAP_HISTORY.md. This audit changed documentation only.
@@ -10,7 +16,7 @@ Settings categories were implemented in `25b0994`; wipe was exposed directly in 
 
 Current priorities: persist separate-purchase decisions; make reconciliation honor direction corrections; signed manual bank balances; strict date validation; reachable review/Undo lists; draft protection; explicit batch balance setup and recovery completion. Accessibility findings include 4.33:1 muted text on paper, narrow calendar hit areas, a monthly selector announcing an arbitrary March date, and inconsistent heading/focus/status behavior. Native behavior remains an acceptance gate, not a new missing-feature claim.
 
-Audit verification: 259 logic tests passed; lint/TypeScript were rerun for the documentation batch. Browser review used synthetic existing records at 390/320 px; no private files were uploaded and no financial decision, permanent wipe or restore was executed. Read-only synthetic probes confirmed negative-balance entry rejection and invalid history-date acceptance. No production app code was changed to fix audit findings in this turn; R01–R34 remain planned.
+Audit verification: 259 logic tests passed; lint/TypeScript were rerun for the documentation batch. Browser review used synthetic existing records at 390/320 px; no private files were uploaded and no financial decision, permanent wipe or restore was executed. Read-only synthetic probes confirmed negative-balance entry rejection and invalid history-date acceptance. No production app code was changed to fix audit findings in this turn; At that audit checkpoint R01–R34 were planned; the latest batch above supersedes that status.
 
 ## Current implementation status — October 15, 2026
 

@@ -35,7 +35,7 @@ export type PocketTransaction = Omit<AccountTransaction, 'source' | 'status'> & 
   adjustmentKind?: SavingsAdjustment['kind'];
 };
 
-export function mergeAccountTransactions(existing: AccountTransaction[], incoming: AccountTransaction[], now = new Date()) {
+export function mergeAccountTransactions(existing: AccountTransaction[], incoming: AccountTransaction[], now = new Date(), directions: TransactionDirections = {}) {
   const transactions = new Map(existing.map((item) => [item.id, item]));
   const latest = new Date(now); latest.setHours(23, 59, 59, 999);
   const rank = { recorded: 0, pending: 1, posted: 2 };
@@ -88,19 +88,31 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
   }
   const replacements = new Map(replacedIds.map(pair => [pair.from,pair.to]));
   const resolved = [...transactions.values()].map(row => row.duplicateOf && replacements.has(row.duplicateOf) ? {...row,duplicateOf:replacements.get(row.duplicateOf)} : row);
-  const byResolvedId = new Map(resolved.map(row => [row.id,row]));
-  return { transactions: resolved.map(row => row.duplicateOf && byResolvedId.get(row.duplicateOf)?.amountCents !== row.amountCents ? {...row,duplicateOf:undefined} : row).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
+  const corrected = { ...directions };
+  for (const replacement of replacedIds) if (corrected[replacement.from]) { corrected[replacement.to] = corrected[replacement.from]; delete corrected[replacement.from]; }
+  return { transactions: clearInvalidBankDuplicates(resolved, corrected).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
 }
 
 export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 
 export type TransactionDirections = Record<string, 'in' | 'out'>;
+export function effectiveBankTransaction(row: AccountTransaction, directions: TransactionDirections = {}): AccountTransaction & { directionCorrected?: boolean } {
+  const direction = directions[row.id] ?? directions[row.linkedPurchaseId ?? ''];
+  return direction ? { ...row, amountCents: Math.abs(row.amountCents) * (direction === 'in' ? 1 : -1), directionCorrected: true } : row;
+}
+export function clearInvalidBankDuplicates(rows: AccountTransaction[], directions: TransactionDirections = {}) {
+  const byId = new Map(rows.map(row => [row.id, row]));
+  return rows.map(row => row.duplicateOf && (!byId.has(row.duplicateOf) ||
+    effectiveBankTransaction(row, directions).amountCents !== effectiveBankTransaction(byId.get(row.duplicateOf)!, directions).amountCents)
+    ? { ...row, duplicateOf: undefined } : row);
+}
+
 export function pocketTransactions(bank: AccountTransaction[], purchases: LoggedPurchase[], adjustments: SavingsAdjustment[] = [], hiddenIds: string[] = [], directions: TransactionDirections = {}): PocketTransaction[] {
   const linked = new Set(bank.flatMap(item => [item.linkedPurchaseId,...(item.shadowPurchaseIds ?? [])]).filter(Boolean));
   const seen = new Set(bank.map((item) => item.id));
   const byPurchase = new Map(purchases.map((item) => [item.id, item]));
   const adjustmentPurchases = new Map(adjustments.map((item) => [`savings-${item.id}`, item.purchaseId]));
-  const rows: PocketTransaction[] = bank.filter(item => !item.duplicateOf).map((item) => ({ ...item, purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
+  const rows: PocketTransaction[] = bank.filter(item => !item.duplicateOf).map((item) => ({ ...effectiveBankTransaction(item, directions), purchase: item.linkedPurchaseId ? byPurchase.get(item.linkedPurchaseId) : undefined }));
   for (const purchase of purchases) {
     if (linked.has(purchase.id) || seen.has(purchase.id) || !Number.isSafeInteger(purchase.amountCents) || purchase.amountCents <= 0 || !Number.isFinite(Date.parse(purchase.purchasedAt))) continue;
     seen.add(purchase.id);

@@ -44,7 +44,7 @@ These are maintenance/acceptance responsibilities, not features to build again.
 | Convenience | Amazon lookup/share/recheck, Safari and desktop Chrome package/override, account/goal widgets behind capabilities | Real source/browser checks and honest capability-specific setup |
 | Delivery | Private build profiles and a previous clean iOS simulator build | Installed standalone Release and upgrade/recovery proof |
 
-**Audit verification:** 259 logic tests passed. Lint and TypeScript also passed during this documentation batch. Previous native build success is historical evidence, not a new phone test. Browser/code checks cannot close phone-only gates.
+**Audit verification:** 259 logic tests passed at the audit checkpoint; the first correctness batch now passes 273. Lint and TypeScript also passed during this documentation batch. Previous native build success is historical evidence, not a new phone test. Browser/code checks cannot close phone-only gates.
 
 ## 3. Priority and evidence rules
 
@@ -55,11 +55,11 @@ These are maintenance/acceptance responsibilities, not features to build again.
 
 **S/M/L** mean contained / several connected components / migration or native integration. They are relative scope, not delivery dates. “Observed” means reproduced in the browser; “Source” means established by current code; “Proposal” is an improvement; “Device” requires installed-device testing. Never promote a suspected risk into a confirmed bug without evidence.
 
-Every ticket below is **open/planned**. Implemented work in the baseline is not an open ticket just because device acceptance remains.
+**R01–R05 are implemented and locally verified** in the first correctness batch: 273 tests, lint, TypeScript, all-platform JS exports, and synthetic restart/Undo checks pass. See [batch details](docs/ACCOUNT_REVIEW_FIXES.md). R06–R34 remain open/planned, with preferences/additions still optional as described. Implemented work is not an open feature ticket just because phone acceptance remains.
 
 ## 4. Batch A — Correctness and recovery
 
-Do this first. Existing financial journals and portable backups are the foundation; use additive migrations and retain original evidence.
+R01–R05 are complete locally; R06–R08 are next. Existing financial journals and portable backups are the foundation; use additive migrations and retain original evidence.
 
 | ID | Priority / size / evidence | Change | Acceptance |
 | --- | --- | --- | --- |
@@ -223,6 +223,7 @@ Once these conditions hold, use the app and fix observed issues. A “final road
 
 ## Supporting documents
 
+- [First correctness batch — R01–R05](docs/ACCOUNT_REVIEW_FIXES.md)
 - [Final audit and evidence](docs/APP_AUDIT_FINAL.md)
 - [Flowcharts and proposed Settings map](docs/APP_FLOWS.md)
 - [Implemented local feature details](docs/LOCAL_FEATURES.md)

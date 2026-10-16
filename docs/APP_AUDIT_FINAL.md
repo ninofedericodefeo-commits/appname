@@ -4,6 +4,10 @@
 
 The implementation queue is in the [final roadmap](../ROADMAP.md). Proposed journeys are in [flowcharts](APP_FLOWS.md). This audit supersedes the findings-as-backlog in [the October 13 review](APP_REVIEW.md); it does not erase that history.
 
+## Follow-up implementation — October 15
+
+**A01–A05 are addressed locally by roadmap R01–R05.** Separate-purchase choices persist with Undo and evidence checks; review honors direction corrections; signed manual balances and strict dates are supported; review/history paging replaces the earlier display limits. 273 tests, lint, TypeScript and all-platform JS exports pass. See [implementation and verification](ACCOUNT_REVIEW_FIXES.md). The original findings below describe the audited `b7c27a3` baseline, not continuing bugs after this batch. Other findings and device gates remain open.
+
 ## Conclusion
 
 The app has most of the intended functionality. The remaining work should make its behavior dependable, understandable and accessible before adding more integrations. Settings categories and the multi-confirmation wipe already exist and should remain.

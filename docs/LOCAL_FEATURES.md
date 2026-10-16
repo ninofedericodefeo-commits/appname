@@ -1,5 +1,9 @@
 # Local roadmap implementation — October 15, 2026
 
+## First final-audit fixes
+
+Roadmap R01–R05 are implemented. See [account correctness batch](ACCOUNT_REVIEW_FIXES.md) for schema 14, durable Keep both/Undo, corrected-direction review, negative balance entry, shared strict dates and paged review history. This checkpoint passes 273 tests, lint, TypeScript and all-platform JS exports; older feature-batch evidence below remains historical.
+
 ## Account and insights
 
 Account has a collapsible Why this amount? breakdown using the same balance calculator as savings and widgets. Imported dates now have an explicit source calendar date; older records keep a stored-date compatibility fallback because their original import timezone cannot always be reconstructed. Original timestamps and transaction IDs stay intact.

@@ -45,3 +45,9 @@ export function accountBalanceEstimate(state: BalanceEstimateState) {
   return { confirmedCents, estimatedCents: confirmedCents === null ? null : confirmedCents + deltaCents,
     deltaCents, depositsCents, spendingCents, newerCount, pendingCount, snapshotDay, canEstimate: !!snapshotDay };
 }
+
+export function manualBalanceSnapshot(state: BalanceEstimateState, cents: number, now = new Date()) {
+  if (!Number.isSafeInteger(cents) || Math.abs(cents) > 100_000_000) throw Error('Enter a bank balance between −$1,000,000 and $1,000,000.');
+  return { reportedBalanceCents: cents, balanceUpdatedAt: now.toISOString(), balanceSource: 'manual' as const,
+    balanceAsOf: localDay(now.toISOString()), balanceIncludedTransactionIds: balanceSnapshotIds(state) };
+}

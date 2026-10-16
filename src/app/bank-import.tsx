@@ -125,7 +125,7 @@ export default function BankImportScreen() {
     return previewAccountTransactions(csv, mapping, accountRef);
   }, [csv, mapping, accountRef, review.error]);
   const history = useMemo(() => linkAccountTransactions(historyReview.rows, review.rows, selectedIds), [historyReview.rows, review.rows, selectedIds]);
-  const historyPlan = useMemo(() => mergeAccountTransactions(pocket.accountTransactions, saveHistory ? history : []), [pocket.accountTransactions, history, saveHistory]);
+  const historyPlan = useMemo(() => mergeAccountTransactions(pocket.accountTransactions, saveHistory ? history : [], undefined, pocket.transactionDirections), [pocket.accountTransactions, history, saveHistory, pocket.transactionDirections]);
   const matchedRows = useMemo(() => review.rows.filter((row) => row.duplicate === 'possible' && !selectedIds.has(row.id)), [review.rows, selectedIds]);
   const balanceStatus = statement?.balance ? statementBalanceStatus(pocket, statement.balance, accountRef) : 'invalid';
   const needsBalanceChoice = !!statement?.balance && balanceStatus !== 'invalid';

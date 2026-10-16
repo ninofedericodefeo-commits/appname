@@ -1,5 +1,5 @@
-import { bankDuplicateCandidates, matchCandidates } from '@/features/pocket/reconciliation';
-import type { BankDuplicateRevision, MatchRevision } from '@/features/pocket/reconciliation';
+import { bankDuplicateCandidates, matchCandidates, separationEvidence, isCurrentReviewRevision } from '@/features/pocket/reconciliation';
+import type { BankDuplicateRevision, MatchRevision, SeparatePurchaseDecision } from '@/features/pocket/reconciliation';
 import { merchantAliasKey, validateDetails, revisionCanUndo } from '@/features/pocket/repository';
 import type { TransactionDetails, TransactionRevision } from '@/features/pocket/repository';
 import { appStorage } from '@/lib/appStorage';
@@ -8,14 +8,14 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { AccountTransaction, TransactionDirections } from '@/features/pocket/transactions';
-import { hideTransactionFromHistory, pocketTransactions, setTransactionDirection } from '@/features/pocket/transactions';
+import { clearInvalidBankDuplicates, hideTransactionFromHistory, pocketTransactions, setTransactionDirection } from '@/features/pocket/transactions';
 import { canReserve } from '@/features/pocket/logic';
 import { applyAccountImport } from '@/features/bank/accountImport';
 import type { AccountImportOptions } from '@/features/bank/accountImport';
 import type { BankPurchase } from '@/features/bank/importLogic';
 import { inferLinkedAccount, renameLinkedAccount, resolveLinkedAccount } from '@/features/bank/accountIdentity';
 import type { BankAccountInput, LinkedBankAccount } from '@/features/bank/accountIdentity';
-import { accountBalanceEstimate, balanceSnapshotIds } from '@/features/pocket/balanceEstimate';
+import { accountBalanceEstimate, manualBalanceSnapshot } from '@/features/pocket/balanceEstimate';
 import { DEFAULT_GOAL_SETTINGS, DEFAULT_SET_ASIDE_RULE, automaticSetAsideCents, canLogPurchase, canReleaseFromGoal, canReleaseUnassigned, canSetAsideForGoal, createGoalFromInput, editGoalFromInput } from '@/features/goals/logic';
 import type { ArchivedGoal, Goal, GoalInput, GoalSettings, LoggedPurchase } from '@/features/goals/logic';
 
@@ -29,6 +29,9 @@ export type PocketEntry = {
 };
 
 type PocketState = {
+  separatePurchaseDecisions: SeparatePurchaseDecision[];
+  keepPurchasesSeparate: (kind: SeparatePurchaseDecision['kind'], bankId: string, otherId: string) => void;
+  undoSeparatePurchases: (id: string) => void;
   bankDuplicateHistory: BankDuplicateRevision[];
   markBankDuplicate: (id: string, canonicalId: string) => void;
   undoBankDuplicate: (id: string) => void;
@@ -86,25 +89,41 @@ function entry(kind: PocketEntry['kind'], amountCents: number, goalId?: string, 
 export const usePocketStore = create<PocketState>()(
   persist(
     (rawSet, get) => { const set = guardedSet(rawSet); return ({
+      separatePurchaseDecisions: [],
+      keepPurchasesSeparate: (kind, bankId, otherId) => set(state => {
+        const options = { directions: state.transactionDirections, separateDecisions: state.separatePurchaseDecisions, pair: [bankId, otherId] as const, limit: 1 };
+        const valid = kind === 'bank-bank'
+          ? bankDuplicateCandidates(state.accountTransactions, state.linkedBankAccount, options).length > 0
+          : matchCandidates(state.accountTransactions, state.purchases, state.linkedBankAccount, options).length > 0;
+        if (!valid) throw Error('This pair changed. Review it again before keeping it separate.');
+        const bank = state.accountTransactions.find(row => row.id === bankId)!;
+        const other = kind === 'bank-bank' ? state.accountTransactions.find(row => row.id === otherId)! : state.purchases.find(purchase => purchase.id === otherId)!;
+        return { separatePurchaseDecisions: [...state.separatePurchaseDecisions, { id: `separate-${Date.now()}-${Math.random()}`, kind, bankId, otherId,
+          evidence: separationEvidence(kind, bank, other, state.transactionDirections), createdAt: new Date().toISOString() }] };
+      }),
+      undoSeparatePurchases: id => set(state => {
+        if (!state.separatePurchaseDecisions.some(item => item.id === id && !item.undoneAt)) throw Error('This separate-purchase decision was already undone.');
+        return { separatePurchaseDecisions: state.separatePurchaseDecisions.map(item => item.id === id ? { ...item, undoneAt: new Date().toISOString() } : item) };
+      }),
       bankDuplicateHistory: [],
       markBankDuplicate: (id, canonicalId) => set(state => {
-        if (!bankDuplicateCandidates(state.accountTransactions,state.linkedBankAccount).some(pair => pair.row.id === id && pair.canonical.id === canonicalId)) throw Error('This pair changed. Review again.');
+        if (!bankDuplicateCandidates(state.accountTransactions,state.linkedBankAccount, { directions: state.transactionDirections, separateDecisions: state.separatePurchaseDecisions, pair: [id, canonicalId], limit: 1 }).some(pair => pair.row.id === id && pair.canonical.id === canonicalId)) throw Error('This pair changed. Review again.');
         return { accountTransactions:state.accountTransactions.map(row => row.id === id ? {...row,duplicateOf:canonicalId} : row),bankDuplicateHistory:[...state.bankDuplicateHistory,{id:`bank-match-${Date.now()}-${Math.random()}`,bankId:id,canonicalId,createdAt:new Date().toISOString()}] };
       }),
       undoBankDuplicate: id => set(state => {
         const revision = state.bankDuplicateHistory.find(item => item.id === id && !item.undoneAt);
-        if (!revision || !state.accountTransactions.some(row => row.id === revision.bankId && row.duplicateOf === revision.canonicalId)) throw Error('This duplicate decision changed.');
+        if (!revision || !isCurrentReviewRevision(state.bankDuplicateHistory, revision) || !state.accountTransactions.some(row => row.id === revision.bankId && row.duplicateOf === revision.canonicalId)) throw Error('This duplicate decision changed.');
         return {accountTransactions:state.accountTransactions.map(row => row.id === revision.bankId ? {...row,duplicateOf:undefined} : row),bankDuplicateHistory:state.bankDuplicateHistory.map(item => item.id === id ? {...item,undoneAt:new Date().toISOString()} : item)};
       }),
       matchHistory: [],
       linkExistingPurchase: (bankId, purchaseId) => set(state => {
-        if (!matchCandidates(state.accountTransactions, state.purchases, state.linkedBankAccount).some(match => match.row.id === bankId && match.purchase.id === purchaseId)) throw Error('This match changed. Review again.');
+        if (!matchCandidates(state.accountTransactions, state.purchases, state.linkedBankAccount, { directions: state.transactionDirections, separateDecisions: state.separatePurchaseDecisions, pair: [bankId, purchaseId], limit: 1 }).some(match => match.row.id === bankId && match.purchase.id === purchaseId)) throw Error('This match changed. Review again.');
         const previous = state.accountTransactions.find(row => row.id === bankId)!;
         return { accountTransactions: state.accountTransactions.map(row => row.id === bankId ? { ...row, linkedPurchaseId: purchaseId, shadowPurchaseIds:[...new Set([...(row.shadowPurchaseIds ?? []),...(row.linkedPurchaseId ? [row.linkedPurchaseId] : [])])] } : row), matchHistory: [...state.matchHistory, { id: `match-${Date.now()}-${Math.random()}`, bankId, purchaseId, previousLinkedPurchaseId:previous.linkedPurchaseId, previousShadowPurchaseIds:previous.shadowPurchaseIds, createdAt: new Date().toISOString() }] };
       }),
       undoPurchaseLink: id => set(state => {
         const revision = state.matchHistory.find(item => item.id === id && !item.undoneAt);
-        if (!revision || !state.accountTransactions.some(row => row.id === revision.bankId && row.linkedPurchaseId === revision.purchaseId)) throw Error('This link has changed and cannot be undone here.');
+        if (!revision || !isCurrentReviewRevision(state.matchHistory, revision) || !state.accountTransactions.some(row => row.id === revision.bankId && row.linkedPurchaseId === revision.purchaseId)) throw Error('This link has changed and cannot be undone here.');
         return { accountTransactions: state.accountTransactions.map(row => row.id === revision.bankId ? { ...row, linkedPurchaseId: revision.previousLinkedPurchaseId, shadowPurchaseIds:revision.previousShadowPurchaseIds } : row), matchHistory: state.matchHistory.map(item => item.id === id ? { ...item, undoneAt: new Date().toISOString() } : item) };
       }),
       reportedBalanceCents: null,
@@ -140,14 +159,15 @@ export const usePocketStore = create<PocketState>()(
         const details = { ...state.transactionDetails }, aliases = { ...state.merchantAliases };
         if ('details' in revision.before) { if (revision.before.details) details[revision.transactionId] = revision.before.details; else delete details[revision.transactionId]; }
         if (revision.before.alias) { if (revision.before.alias.value !== null) aliases[revision.before.alias.key] = revision.before.alias.value; else delete aliases[revision.before.alias.key]; }
-        set({ transactionDetails: details, merchantAliases: aliases,
-          transactionDirections: 'direction' in revision.before ? setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, revision.transactionId, revision.before.direction ?? null) : state.transactionDirections,
+        const directions = 'direction' in revision.before ? setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, revision.transactionId, revision.before.direction ?? null) : state.transactionDirections;
+        set({ transactionDetails: details, merchantAliases: aliases, transactionDirections: directions,
+          accountTransactions: clearInvalidBankDuplicates(state.accountTransactions, directions),
           correctionHistory: state.correctionHistory.map(item => item.id === id ? { ...item, undoneAt: new Date().toISOString() } : item) }); return true;
       },
       correctTransactionDirection: (id, direction) => set(state => {
         const directions = setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, id, direction);
         if (directions === state.transactionDirections) return state;
-        return { transactionDirections: directions, correctionHistory: [...state.correctionHistory, { id: `direction-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before: { direction: state.transactionDirections[id] ?? null }, after: { direction } }] };
+        return { transactionDirections: directions, accountTransactions: clearInvalidBankDuplicates(state.accountTransactions, directions), correctionHistory: [...state.correctionHistory, { id: `direction-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before: { direction: state.transactionDirections[id] ?? null }, after: { direction } }] };
       }),
       removeTransactionFromHistory: (id) => {
         const state = get();
@@ -168,14 +188,7 @@ export const usePocketStore = create<PocketState>()(
         return result;
       },
       goalSettings: DEFAULT_GOAL_SETTINGS,
-      setReportedBalance: (cents) => {
-        if (Number.isSafeInteger(cents) && cents >= 0) {
-          const now = new Date();
-          const state = get();
-          set({ reportedBalanceCents: cents, balanceUpdatedAt: now.toISOString(), balanceSource: 'manual', balanceAsOf: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`,
-            balanceIncludedTransactionIds: balanceSnapshotIds(state) });
-        }
-      },
+      setReportedBalance: cents => set(manualBalanceSnapshot(get(), cents)),
       reserve: (cents) => {
         const state = get();
         if (!canReserve(cents, accountBalanceEstimate(state).estimatedCents, state.reservedCents)) return false;
@@ -277,7 +290,7 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }); },
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 13,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 14,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
         if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
@@ -288,6 +301,7 @@ export const usePocketStore = create<PocketState>()(
           balanceAsOf: previous.balanceAsOf ?? null,
           balanceSource: previous.balanceSource ?? null,
           statementBalanceKeys: previous.statementBalanceKeys ?? [],
+          separatePurchaseDecisions: previous.separatePurchaseDecisions ?? [],
           bankDuplicateHistory: previous.bankDuplicateHistory ?? [],
           matchHistory: previous.matchHistory ?? [],
           bankImportKeys: previous.bankImportKeys ?? [],

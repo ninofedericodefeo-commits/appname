@@ -1,5 +1,7 @@
+import { dateFromKey, localDateKey } from '../../lib/calendarDate.ts';
 import type { BillingChannel } from './billing.ts';
 import type { SubscriptionApp } from './providerApps.ts';
+export { dateFromKey, localDateKey } from '../../lib/calendarDate.ts';
 
 export type Subscription = {
   id: string;
@@ -28,9 +30,7 @@ export type Subscription = {
   };
 };
 
-export function localDateKey(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
+
 
 export function addCalendarDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days, 12);
@@ -80,11 +80,6 @@ export type ReminderGroup = {
   cancelNames?: string[];
 };
 
-export function dateFromKey(key: string): Date | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
-  const [year, month, day] = key.split('-').map(Number), date = new Date(year, month - 1, day, 12);
-  return localDateKey(date) === key ? date : null;
-}
 export function renewalsBetween(subscription: Subscription, from: Date, through: Date): Date[] {
   const first = localDateKey(from), end = localDateKey(through), trial = dateFromKey(subscription.trialEndsOn ?? '');
   const dates = new Map<string, Date>();

@@ -1,3 +1,5 @@
+import { effectiveBankTransaction } from '../pocket/transactions.ts';
+import type { AccountTransaction, TransactionDirections } from '../pocket/transactions.ts';
 import { validateDetails } from '../pocket/repository.ts';
 import type { TransactionDetails } from '../pocket/repository.ts';
 import { dateFromKey, validateSubscription } from '../subscriptions/logic.ts';
@@ -42,11 +44,16 @@ export function validateStoreState(name: string, state: Record<string, unknown>,
       const seen = new Set([row.id]); let pointer: unknown = row.duplicateOf;
       while (pointer) {
         requireValue(typeof pointer === 'string' && bankRows.has(pointer) && !seen.has(pointer), 'duplicate relationship');
-        const target = bankRows.get(pointer)!; requireValue(target.amountCents === row.amountCents, 'duplicate amount');
+        const target = bankRows.get(pointer)!; requireValue(effectiveBankTransaction(target as AccountTransaction, state.transactionDirections as TransactionDirections).amountCents === effectiveBankTransaction(row as AccountTransaction, state.transactionDirections as TransactionDirections).amountCents, 'duplicate amount');
         if (checkedDuplicates.has(pointer)) break;
         seen.add(pointer); pointer = target.duplicateOf;
       }
       seen.forEach(id => checkedDuplicates.add(id));
+    }
+    if (state.separatePurchaseDecisions) for (const decision of rows(state, 'separatePurchaseDecisions')) {
+      requireValue(['bank-bank', 'bank-purchase'].includes(String(decision.kind)) && typeof decision.bankId === 'string' && !!decision.bankId &&
+        typeof decision.otherId === 'string' && !!decision.otherId && decision.bankId !== decision.otherId && typeof decision.evidence === 'string' && decision.evidence.length > 0 && decision.evidence.length <= 10000 &&
+        Number.isFinite(Date.parse(String(decision.createdAt))) && (!decision.undoneAt || Number.isFinite(Date.parse(String(decision.undoneAt)))), 'separate purchase decision');
     }
     if (state.transactionDirections) requireValue(object(state.transactionDirections) && Object.values(state.transactionDirections).every(value => value === 'in' || value === 'out'), 'direction corrections');
     if (state.transactionDetails) { requireValue(object(state.transactionDetails), 'transaction details'); Object.values(state.transactionDetails).forEach(value => validateDetails(value as TransactionDetails)); }
