@@ -1,5 +1,20 @@
 # Physical phone smoke test
 
+## Current acceptance index — October 15, 2026
+
+Use [final roadmap R31–R34](../ROADMAP.md) and the [target flows](APP_FLOWS.md) as the current source of truth. The dated scenarios below are regression history; some old numbered steps refer to retired waiting-list/demo flows or old Settings locations and must not be followed as current product requirements.
+
+| Gate | Current check | Record |
+| --- | --- | --- |
+| R31 | Private Release cold launch without Metro, offline records, update preserving data, separate test restore and Undo | Device/build/OS, date, expected/actual and recovery result |
+| R32 | Citizens PDF balance choice, page-2 spending/page-3 credits, zero activity, equal real purchases, renamed/overlapping reimports, cold/warm share, eligible Wallet capture and interrupted save | Parsed/reconciled counts, totals and number of new versus matched records |
+| R33 | Native lock/preview, reminder permission/delivery/time zones, local OCR review, public Amazon fallback, supported Safari/desktop Chrome rules and optional signed widgets | Supported capability, explicit pass/fail/unavailable; never infer from configuration alone |
+| R34 | Large synthetic history/archive/report libraries and bounded file/OCR memory; Android native checks if Android is used | Measured timing/memory on actual hardware, not guessed performance |
+| R15–R20 | VoiceOver, large text, adequate targets, keyboard/focus, map List and chart text alternatives | Complete the six accessible journeys in the final roadmap |
+
+Current setup is under Settings → Account & statements / Subscriptions / Shortcuts & spending pause / Widgets / Privacy / Data & backups. Wipe is already implemented with acknowledgement, ERASE ALL DATA and final confirmation. Test permanent erase only with disposable data; canceled confirmations must preserve all records.
+
+
 ## Gas area-search checks — October 14, 2026
 
 Browser/logic checks pass; these native checks remain open. Use disposable/public search locations and record device/build/OS and outcome.

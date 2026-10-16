@@ -2,9 +2,19 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
+## Final audit and finish plan — October 15, 2026
+
+The [final roadmap](../ROADMAP.md) is the single current backlog; the [final audit](APP_AUDIT_FINAL.md) records confirmed findings versus proposals/device gates, and [flowcharts](APP_FLOWS.md) describe target journeys. The previous roadmap is preserved in ROADMAP_HISTORY.md. This audit changed documentation only.
+
+Settings categories were implemented in `25b0994`; wipe was exposed directly in Data & backups with acknowledgement, typed phrase and final confirmation in `b7c27a3`. Those are implemented and must not be added to the missing-feature list again.
+
+Current priorities: persist separate-purchase decisions; make reconciliation honor direction corrections; signed manual bank balances; strict date validation; reachable review/Undo lists; draft protection; explicit batch balance setup and recovery completion. Accessibility findings include 4.33:1 muted text on paper, narrow calendar hit areas, a monthly selector announcing an arbitrary March date, and inconsistent heading/focus/status behavior. Native behavior remains an acceptance gate, not a new missing-feature claim.
+
+Audit verification: 259 logic tests passed; lint/TypeScript were rerun for the documentation batch. Browser review used synthetic existing records at 390/320 px; no private files were uploaded and no financial decision, permanent wipe or restore was executed. Read-only synthetic probes confirmed negative-balance entry rejection and invalid history-date acceptance. No production app code was changed to fix audit findings in this turn; R01–R34 remain planned.
+
 ## Current implementation status — October 15, 2026
 
-This section supersedes the older baseline below. The remaining local core roadmap is implemented; see [local features and acceptance](LOCAL_FEATURES.md), [fuel reports](FUEL_REPORTS.md), [private builds](PRIVATE_BUILDS.md) and the current [roadmap status](../ROADMAP.md).
+This section supersedes the older baseline below. The original local core feature batch is implemented; the final audit above identifies remaining fixes and acceptance work. See [local features and acceptance](LOCAL_FEATURES.md), [fuel reports](FUEL_REPORTS.md), [private builds](PRIVATE_BUILDS.md) and the current [roadmap status](../ROADMAP.md).
 
 - Encrypted backups, original/photo attachments, durable restore/recovery/Undo, optional device authentication and preview privacy.
 - Account explanations, source-linked/raw transaction details, aliases/categories/classifications/audit, coverage and hidden-row recovery. Reviewed bank/local links and similar-bank duplicate decisions have Undo and feed the shared financial projection. Imported source calendar dates are explicit; legacy timestamps retain a documented compatibility fallback. Pocket schema version 13.

@@ -34,7 +34,7 @@ Chrome companion v1.1.0 is packaged as `public/downloads/GasFinder-Chrome.zip` b
 
 A backup-first account reset/switch clears the active financial ledger/goals/set-asides and shortcut account setup, unlinks retained fuel reports and moves originals to Trash. It keeps cars/subscriptions and has durable local Undo through Backup & restore. This is one active account, not simultaneous account balances.
 
-Permanent erasure is a separate typed-confirmation action in Backup & restore. It clears managed records, app-owned originals/photos and recovery journals; it retains external exported files and device privacy settings. An erasure marker resumes interrupted removal at startup and blocks writes if cleanup fails. Do not confuse history hiding, recoverable reset and permanent erasure.
+Settings now opens nine category rows with controls on separate subsection screens. Permanent erasure is available in Settings → Data & backups and Backup & restore; it requires acknowledgement, typing ERASE ALL DATA and a separate final confirmation. It clears managed records, app-owned originals/photos and recovery journals; it retains external exported files and device privacy settings. An erasure marker resumes interrupted removal at startup and blocks writes if cleanup fails. Do not confuse history hiding, recoverable reset and permanent erasure.
 
 Private development/preview/stable/simulator build profiles and capability notes are included. No EAS account, cloud deployment, paid membership, OTA service or bank feed is configured automatically. See PRIVATE_BUILDS.md.
 

@@ -1,5 +1,7 @@
 # App review — October 13, 2026
 
+> Historical audit. The [October 15 final audit](APP_AUDIT_FINAL.md) and [final roadmap](../ROADMAP.md) now define current findings and remaining work. Older open-feature claims below are not the current backlog.
+
 The [future roadmap](../ROADMAP.md) turns this audit and existing feature plans into a phased personal-use backlog, with dependencies and completion gates. App Store publication is outside the plan.
 
 ## Implementation progress — October 14
@@ -143,7 +145,7 @@ Saved files can be reviewed or shared individually, but there is no in-app renam
 
 **Improve:** archive management plus a versioned export/restore that includes the financial records and their settings. Treat deleting an archived original separately from removing imported transactions.
 
-Evidence: [`bank-imports.tsx`](../src/app/bank-imports.tsx), archive storage interfaces, persisted stores and [`settings.tsx`](../src/app/settings.tsx).
+Evidence: [`bank-imports.tsx`](../src/app/bank-imports.tsx), archive storage interfaces, persisted stores and [`settings.tsx`](../src/app/settings/index.tsx).
 
 ### 15. Checkout pause has a substantial setup and coverage gap — Medium
 
