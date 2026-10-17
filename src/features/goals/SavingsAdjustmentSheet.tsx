@@ -1,9 +1,11 @@
+import { useDialogFocus } from '@/components/useDialogFocus';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
+import { AccessibleField } from '@/components/AccessibleField';
 import { useDraftGuard } from '@/components/useDraftGuard';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState, useSyncExternalStore } from 'react';
-import { Keyboard, Modal, Text, TextInput, View } from 'react-native';
+import { Keyboard, Modal, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';
@@ -28,6 +30,7 @@ export default function SavingsAdjustmentSheet({ initialDestination, initialActi
   useValidationAnnouncement(error);
   const guard = useDraftGuard({ destination, action, amount });
   const reduced = useReducedMotion();
+  const { heading, focus } = useDialogFocus();
   const estimatedBalanceCents = accountBalanceEstimate(pocket).estimatedCents;
   const cents = parseDollars(amount);
   const inputError = amount.trim() && (cents === null || cents === 0) ? 'Enter an amount greater than $0, using at most two decimal places.' : '';
@@ -45,22 +48,21 @@ export default function SavingsAdjustmentSheet({ initialDestination, initialActi
     if (!saved) return setError('Your savings changed. Check the amount and try again.');
     guard.accept(); close();
   }
-  return <Modal visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}><SafeAreaView style={styles.safe}>
-    <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>{action === 'add' ? 'Add money' : 'Adjust savings'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
+  return <Modal visible onShow={focus} animationType={reduced ? 'none' : 'slide'} onRequestClose={close}><SafeAreaView style={styles.safe}>
+    <View style={styles.header}><Text ref={heading} tabIndex={-1} accessibilityRole="header" style={styles.title}>{action === 'add' ? 'Add money' : 'Adjust savings'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
     <FormScrollView contentContainerStyle={styles.form}>
       <Text style={styles.label}>Destination</Text>
       <View style={styles.choices}>{pocket.activeGoal && <SubscriptionButton label={`Goal: ${pocket.activeGoal.title}`} accessibilityState={{ selected: destination === 'goal' }} tone={destination === 'goal' ? 'primary' : 'secondary'} onPress={() => { setDestination('goal'); setError(''); }} />}
         <SubscriptionButton label="Unassigned savings" accessibilityState={{ selected: destination === 'unassigned' }} tone={destination === 'unassigned' ? 'primary' : 'secondary'} onPress={() => { setDestination('unassigned'); setError(''); }} /></View>
       <Text style={styles.note}>{formatMoney(current)} currently {destination === 'goal' ? 'assigned to this goal' : 'unassigned'}.</Text>
       <View style={styles.row}>{(['add', 'lower'] as const).map(value => <SubscriptionButton key={value} label={value === 'add' ? 'Add' : 'Lower'} grow accessibilityState={{ selected: action === value }} tone={action === value ? 'primary' : 'secondary'} onPress={() => { setAction(value); setError(''); }} />)}</View>
-      <Text style={styles.label}>Amount</Text><TextInput accessibilityLabel="Savings adjustment amount" value={amount} onChangeText={value => { setAmount(value); setError(''); }} style={styles.input} placeholder="0.00" keyboardType="decimal-pad" />
+      <AccessibleField label="Savings adjustment amount" error={error || inputError || preview?.error || undefined} value={amount} onChangeText={value => { setAmount(value); setError(''); }} placeholder="0.00" keyboardType="decimal-pad" />
       {available === null ? <Text style={styles.note}>No bank balance saved yet. Availability cannot be checked.</Text> : <Text style={styles.note}>Estimated available now: {formatMoney(available)}.</Text>}
       {preview && !preview.error && <View style={styles.preview}><Text style={styles.label}>After saving</Text>
         <Text style={styles.summary}>{destination === 'goal' ? 'Goal savings' : 'Unassigned savings'}: {formatMoney(preview.destinationBeforeCents)} → {formatMoney(preview.destinationAfterCents)}</Text>
         <Text style={styles.summary}>Total set aside: {formatMoney(pocket.reservedCents)} → {formatMoney(preview.reservedAfterCents)}</Text>
         {preview.availableAfterCents !== null && <Text style={styles.summary}>Estimated available: {formatMoney(preview.availableAfterCents)}</Text>}
       </View>}
-      {!!(error || inputError || preview?.error) && <Text accessibilityLiveRegion="polite" style={styles.error}>{error || inputError || preview?.error}</Text>}
       <Text style={styles.note}>Money stays in your bank account. This changes how much you have set aside{destination === 'goal' ? ' and your goal progress' : ''}.</Text>
       <View style={styles.row}><SubscriptionButton label="Cancel" grow onPress={close} /><SubscriptionButton label="Save adjustment" tone="primary" grow disabled={!ready || !preview || !!preview.error} onPress={save} /></View>
     </FormScrollView>

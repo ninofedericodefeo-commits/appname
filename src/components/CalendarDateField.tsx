@@ -1,6 +1,8 @@
-import { themedStyles, useThemeRevision , colors } from '@/theme';
+import CalendarKeyboardGrid from './CalendarKeyboardGrid';
+import { moveCalendarDate } from '@/features/accessibility/calendarNavigation';
+import { themedStyles, useThemeRevision , colors, accessibilityMetrics } from '@/theme';
 import { dateFromKey, localDateKey } from '@/lib/calendarDate';
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Pressable, Text, View, useWindowDimensions } from 'react-native';
 
 export { localDateKey } from '@/lib/calendarDate';
@@ -16,9 +18,12 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
   displayValue?: string;
 }) {
   useThemeRevision();
+  const prefix = useId();
+  const [focusDay,setFocusDay] = useState('');
   const width = useWindowDimensions().width;
   const [measuredWidth,setMeasuredWidth] = useState(0);
-  const narrow = (measuredWidth || width-40) < 334;
+  const daySize = accessibilityMetrics.targetSize;
+  const narrow = (measuredWidth || width-40) < daySize*7+26;
   const [open, setOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const selected = dateFromKey(value) ?? new Date();
@@ -29,12 +34,19 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
   const daysInMonth = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 0).getDate();
   const cells = Array.from({ length: Math.ceil((firstWeekday + daysInMonth) / 7) * 7 }, (_, index) => index - firstWeekday + 1);
 
+  function navigate(day: string, command: string) {
+    const next = moveCalendarDate(day,command,minimumDate,maximumDate), date = next && dateFromKey(next);
+    if (next && date) { setVisibleMonth(new Date(date.getFullYear(),date.getMonth(),1)); setFocusDay(next); }
+  }
+  const firstAllowed = cells.filter(day => day > 0 && day <= daysInMonth).map(day => localDateKey(new Date(visibleMonth.getFullYear(),visibleMonth.getMonth(),day,12))).find(key => (!minimumDate || key >= minimumDate) && (!maximumDate || key <= maximumDate));
+  const activeDay = [focusDay,value].find(key => firstAllowed && key.slice(0,7) === firstAllowed.slice(0,7) && (!minimumDate || key >= minimumDate) && (!maximumDate || key <= maximumDate)) ?? firstAllowed;
   function shiftMonth(delta: number) {
-    setVisibleMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + delta, 1));
+    const next = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + delta, 1);
+    if (next.getFullYear() >= 1 && next.getFullYear() <= 9999) { setVisibleMonth(next); setFocusDay(''); }
   }
 
-  return <View onLayout={event => setMeasuredWidth(event.nativeEvent.layout.width)}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${label}, ${selected ? selected.toLocaleDateString() : 'choose a date'}`} accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={styles.trigger}>
+  return <CalendarKeyboardGrid prefix={prefix} open={open} focusDay={focusDay} onNavigate={navigate} onClose={() => setOpen(false)}><View onLayout={event => setMeasuredWidth(event.nativeEvent.layout.width)}>
+    <Text style={styles.label}>{label}</Text><Pressable nativeID={`${prefix}-trigger`} accessibilityActions={[{ name: 'previousDay', label: 'Previous day' },{ name: 'nextDay', label: 'Next day' }]} onAccessibilityAction={event => { const action = event.nativeEvent.actionName; if (action !== 'previousDay' && action !== 'nextDay') return; const next = moveCalendarDate(value || localDateKey(new Date()),action === 'previousDay' ? 'ArrowLeft' : 'ArrowRight',minimumDate,maximumDate); if (next) onChange(next); }} accessibilityRole="button" accessibilityLabel={`${label}, ${selected ? selected.toLocaleDateString() : 'choose a date'}`} accessibilityState={{ expanded: open }} onPress={() => { if (!open) { const date = selected ?? new Date(); setVisibleMonth(new Date(date.getFullYear(),date.getMonth(),1)); setFocusDay(''); } setOpen(!open); }} style={styles.trigger}>
       <Text style={styles.triggerText}>{displayValue ?? (selected ? selected.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) : 'Choose a date')}</Text>
       <Text style={styles.icon}>▦</Text>
     </Pressable>
@@ -50,14 +62,15 @@ export function CalendarDateField({ value, onChange, label, minimumDate, maximum
           const date = new Date(visibleMonth.getFullYear(), visibleMonth.getMonth(), day, 12);
           const key = localDateKey(date);
           const disabled = (minimumDate && key < minimumDate) || (maximumDate && key > maximumDate);
-          return <Pressable key={key} accessibilityRole="button" accessibilityLabel={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} accessibilityState={{ selected: value === key, disabled: !!disabled }} disabled={!!disabled} onPress={() => { onChange(key); setOpen(false); }} style={[styles.day, narrow && { width: 48, minWidth: 44, minHeight: 48 }, value === key && styles.selectedDay]}><Text style={[styles.dayText, disabled && styles.disabledDay, value === key && styles.selectedDayText]}>{day}</Text></Pressable>;
+          return <Pressable key={key} nativeID={`${prefix}-day-${key}`} tabIndex={activeDay === key ? 0 : -1} aria-pressed={value === key} accessibilityRole="button" accessibilityLabel={date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} accessibilityState={{ selected: value === key, disabled: !!disabled }} disabled={!!disabled} onPress={() => { onChange(key); setOpen(false); }} style={[styles.day, narrow && { width: daySize, minWidth: daySize, minHeight: daySize }, value === key && styles.selectedDay]}><Text style={[styles.dayText, disabled && styles.disabledDay, value === key && styles.selectedDayText]}>{day}</Text></Pressable>;
         })}
       </View>
     </View>}
-  </View>;
+  </View></CalendarKeyboardGrid>;
 }
 
 const styles = themedStyles(() => ({
+  label: { color: colors.ink, fontSize: 14, fontWeight: '700', marginBottom: 7 },
   trigger: { minHeight: 48, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 13 },
   triggerText: { flex: 1, flexShrink: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
   icon: { color: colors.accentDark, fontSize: 22 },

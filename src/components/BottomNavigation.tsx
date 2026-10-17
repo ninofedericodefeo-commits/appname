@@ -1,3 +1,4 @@
+import TabKeyboardGroup from './TabKeyboardGroup';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -26,21 +27,21 @@ export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSe
   if (keyboardOpen) return null;
 
   return <SafeAreaView edges={['bottom']} style={styles.safeArea}>
-    <View style={styles.row} accessibilityRole="tablist">
+    <TabKeyboardGroup onSelect={index => onSelect(tabs[index].id)}><View style={styles.row} accessibilityRole="tablist" accessibilityLabel="Main navigation">
       {tabs.map((tab) => {
         const active = activeTab === tab.id;
-        return <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} style={StyleSheet.flatten([styles.tab, active && styles.activeTab])} onPress={() => { if (!active) onSelect(tab.id); }}>
+        return <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} accessibilityLabel={tab.id === 'subscriptions' ? 'Subscriptions' : tab.label} tabIndex={active ? 0 : -1} style={StyleSheet.flatten([styles.tab, active && styles.activeTab])} onPress={() => { if (!active) onSelect(tab.id); }}>
           <Text style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>
         </Pressable>;
       })}
-    </View>
+    </View></TabKeyboardGroup>
   </SafeAreaView>;
 }
 
 const styles = themedStyles(() => ({
   safeArea: { backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line },
   row: { flexWrap: 'wrap', flexDirection: 'row', paddingTop: 8, paddingHorizontal: 8, gap: 4 },
-  tab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
+  tab: { flex: 1, minWidth: 60, paddingHorizontal: 4, paddingVertical: 8, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 7 },
   activeTab: { backgroundColor: colors.paleGreen },
   label: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   activeLabel: { color: colors.ink, fontWeight: '800' },

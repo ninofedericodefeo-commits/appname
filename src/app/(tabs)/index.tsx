@@ -1,3 +1,4 @@
+import { useSystemAccessibility } from '@/features/accessibility/systemPreferences';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
@@ -30,8 +31,13 @@ export default function GasScreen() {
   useThemeRevision();
   const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'nearby' | 'online'>('nearby');
-  const viewMode = useSettingsStore(state => state.gasView);
-  const setViewMode = (gasView: 'map' | 'list') => useSettingsStore.getState().configure({ gasView });
+  const savedView = useSettingsStore(state => state.gasView);
+  const preferList = useSettingsStore(state => state.preferStationList);
+  const screenReader = useSystemAccessibility(state => state.screenReader);
+  const listPreferenceKey = `${preferList}-${screenReader}`;
+  const [mapOverride,setMapOverride] = useState('');
+  const viewMode = (preferList || screenReader) && mapOverride !== listPreferenceKey ? 'list' : savedView;
+  const setViewMode = (gasView: 'map' | 'list') => { setMapOverride(gasView === 'map' ? listPreferenceKey : ''); useSettingsStore.getState().configure({ gasView }); };
   const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const receiptReports = useReceiptStore((state) => state.reports);
   const priceReports = usePriceReportStore((state) => state.reports);
@@ -197,7 +203,7 @@ export default function GasScreen() {
         )}
 
         <View style={styles.viewToggle}>
-          {(['map', 'list'] as const).map((view) => <Pressable key={view} accessibilityRole="button" accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.activePill]}><Text style={[styles.pillText, viewMode === view && styles.activePillText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}
+          {(['map', 'list'] as const).map((view) => <Pressable key={view} accessibilityRole="button" aria-pressed={viewMode === view} accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.activePill]}><Text style={[styles.pillText, viewMode === view && styles.activePillText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}
           <Text style={styles.mapCount}>{stations.length} station{stations.length === 1 ? '' : 's'}</Text>
         </View>
         {mode === 'online' && <Text style={styles.noPriceNote}>Google results are available in List. Choose Nearby map in Filters for the free map.</Text>}

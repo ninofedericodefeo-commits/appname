@@ -2,9 +2,13 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
+## Accessibility additions — October 16, 2026
+
+Settings → Accessibility adds bolder text, larger shared controls, reduced-motion override and preferred station list; native screen readers start Gas in List, with an explicit Map choice available. Forms now associate field errors and focus invalid inputs; transaction directions have words and richer spoken summaries; station actions identify their station; dates/tabs support web keyboard navigation. Settings schema **5** migrates accessibility defaults additively. See [accessibility behavior and acceptance](ACCESSIBILITY.md). 295 tests, lint, TypeScript and all-platform JavaScript exports pass. Browser checks cover 320/390 px, persisted preferences, 56-point controls, keyboard tabs/dates and invalid-field focus. Physical VoiceOver/TalkBack and largest native text sizes still require acceptance.
+
 ## Current finish batch — October 16, 2026
 
-R06–R30 have local implementations; see [finish status](FINISH_STATUS.md) for exact scope, evidence and remaining acceptance. Pocket schema **15** supports reviewed manual credit/refund rows; Settings schema **4** adds appearance, start/view preferences and reminder timing; device privacy schema **2** adds amount hiding. All migrate additively. Appearance uses `themedStyles` factories and `useThemeRevision` so switching theme does not remount forms. Financial privacy is a cover in PrivacyGate, not conditional unmounting of form content. Long drafts live in app-owned storage/IndexedDB, outside portable backups, with clear/reset/restore/wipe integration.
+R06–R30 have local implementations; see [finish status](FINISH_STATUS.md) for exact scope, evidence and remaining acceptance. Pocket schema **15** supports reviewed manual credit/refund rows; Settings schema **5** includes appearance, start/view preferences, reminder timing and accessibility options; device privacy schema **2** adds amount hiding. All migrate additively. Appearance uses `themedStyles` factories and `useThemeRevision` so switching theme does not remount forms. Financial privacy is a cover in PrivacyGate, not conditional unmounting of form content. Long drafts live in app-owned storage/IndexedDB, outside portable backups, with clear/reset/restore/wipe integration.
 
 290 tests, lint/TypeScript, all-platform JS export and iOS simulator Debug/Release builds pass. `scripts/benchmark-local.mjs` measures 10,000 synthetic movements and the supported 5,000-row CSV limit. Browser checks include narrow layouts, recurrence/draft prompts, report draft resume, a manual refund updating an isolated negative balance, amount privacy, and a generated backup reopened for inspection. No actual installation was erased or personal statements uploaded. Current logs/artifacts are listed in FINISH_STATUS.md.
 

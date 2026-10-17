@@ -1,3 +1,4 @@
+import { accessibleStyle } from '@/features/accessibility/preferences';
 import { useSyncExternalStore } from 'react';
 import { StyleSheet } from 'react-native';
 export const lightColors = {
@@ -16,6 +17,13 @@ export const darkColors: typeof lightColors = {
 // Components subscribe to a revision; switching appearance never remounts forms.
 export const colors = { ...lightColors };
 let revision = 0, current = 'light';
+let boldText = false, largerControls = false;
+export const accessibilityMetrics = { targetSize: 48 };
+export function applyAccessibility(bold: boolean, larger: boolean) {
+  if (bold === boldText && larger === largerControls) return;
+  boldText = bold; largerControls = larger; accessibilityMetrics.targetSize = larger ? 56 : 48;
+  revision++; listeners.forEach(listener => listener());
+}
 const listeners = new Set<() => void>();
 export function applyTheme(dark: boolean, contrast: boolean) {
   const next = `${dark ? 'dark' : 'light'}-${contrast}`;
@@ -29,7 +37,7 @@ export function useThemeRevision() { return useSyncExternalStore(listener => { l
 export function themedStyles<T extends StyleSheet.NamedStyles<T>>(factory: () => T): T {
   let at = -1, cache: T;
   return new Proxy({} as T, {
-    get: (_, key) => { if (at !== revision) { cache = StyleSheet.create(factory()); at = revision; } return cache[key as keyof T]; },
+    get: (_, key) => { if (at !== revision) { const styles = factory(); cache = StyleSheet.create(Object.fromEntries(Object.entries(styles).map(([name, style]) => [name, accessibleStyle(style as Record<string, unknown>,boldText,largerControls)])) as unknown as T); at = revision; } return cache[key as keyof T]; },
     ownKeys: () => Object.keys(factory()),
     getOwnPropertyDescriptor: () => ({ enumerable: true, configurable: true }),
   });

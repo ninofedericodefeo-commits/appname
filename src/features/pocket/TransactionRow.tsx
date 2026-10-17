@@ -11,7 +11,7 @@ import type { PocketTransaction } from './transactions';
 import { transactionDisplayName } from './transactions';
 
 const sourceNames = { 'citizens-pdf': 'Citizens statement', csv: 'Bank CSV', manual: 'Manually logged', shortcut: 'Apple Pay Shortcut', savings: 'Savings adjustment' };
-const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Imported', logged: 'Logged', adjustment: 'Local only' };
+const statusNames = { posted: 'Posted', pending: 'Pending', recorded: 'Recorded', logged: 'Logged', adjustment: 'Local only' };
 
 export function TransactionRow({ transaction, onRemove, initiallyExpanded = false }: { transaction: PocketTransaction; initiallyExpanded?: boolean; onRemove: (transaction: PocketTransaction) => void }) {
   useThemeRevision();
@@ -27,15 +27,17 @@ export function TransactionRow({ transaction, onRemove, initiallyExpanded = fals
   const date = new Date(`${transactionDay(transaction)}T12:00:00`);
   const shortDate = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
   const initials = title.replace(/[^a-z0-9 ]/gi, '').trim().slice(0, 2).toUpperCase();
+  const direction = adjustment ? 'Savings adjustment' : incoming ? transaction.transactionType === 'refund' ? 'Refund · Money in' : 'Money in' : outgoing ? 'Money out' : 'No balance change';
   return <View style={styles.container}>
-    <Pressable accessibilityRole="button" accessibilityLabel={`${incoming ? transaction.transactionType === 'refund' ? 'Refund' : 'Deposit' : outgoing ? 'Withdrawal' : 'Savings adjustment'}: ${title}, ${amount}, ${shortDate}. ${expanded ? 'Hide' : 'Show'} transaction details`} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
-      <View style={[styles.avatar, incoming && styles.creditAvatar, outgoing && styles.debitAvatar]}><Text style={[styles.initials, outgoing && styles.debit]}>{adjustment ? '↔' : incoming ? '+' : initials || '↗'}</Text></View>
+    <Pressable accessibilityRole="button" accessibilityLabel={`${direction}: ${title}, ${amount}, ${shortDate}. ${statusNames[transaction.status]}. ${sourceNames[transaction.source]}.${transaction.purchase?.decision === 'pending' ? ' Savings review needed.' : ''}`} accessibilityHint="Opens or closes transaction details." accessibilityActions={[{ name: 'toggleDetails', label: expanded ? 'Hide transaction details' : 'Show transaction details' }]} onAccessibilityAction={event => { if (event.nativeEvent.actionName === 'toggleDetails') setExpanded(!expanded); }} accessibilityState={{ expanded }} onPress={() => setExpanded(!expanded)} style={({ pressed }) => [styles.row, pressed && styles.pressed]}>
+      <View accessible={false} aria-hidden importantForAccessibility="no-hide-descendants" style={[styles.avatar, incoming && styles.creditAvatar, outgoing && styles.debitAvatar]}><Text style={[styles.initials, outgoing && styles.debit]}>{adjustment ? '↔' : incoming ? '+' : initials || '↗'}</Text></View>
       <View style={styles.main}>
         <Text style={styles.title} >{title}</Text>
         <Text style={styles.meta}>{shortDate}{adjustment ? ' · Savings' : transaction.status === 'pending' ? ' · Pending' : transaction.purchase?.decision === 'pending' ? ' · Savings review' : ''}</Text>
+        <Text style={[styles.meta, incoming && styles.credit, outgoing && styles.debit]}>{direction}</Text>
       </View>
       <Text style={[styles.amount, incoming && styles.credit, outgoing && styles.debit]}>{amount}</Text>
-      <Text style={styles.chevron}>{expanded ? '⌄' : '›'}</Text>
+      <Text accessible={false} aria-hidden style={styles.chevron}>{expanded ? '⌄' : '›'}</Text>
     </Pressable>
     {expanded && <View style={styles.details}>
       <Text style={styles.detailText}>{sourceNames[transaction.source]} · {statusNames[transaction.status]}</Text>

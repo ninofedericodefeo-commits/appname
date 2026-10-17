@@ -20,6 +20,12 @@ R01–R05 were delivered in `34479de`. The remaining local finish work now imple
 
 Optional row-density controls and backup reminders were not added: the roadmap explicitly allowed omitting additions that increase complexity. They are not open core tickets. Cloud sync, automatic bank downloads, public price services, extra financial products and App Store distribution remain out of scope.
 
+## Accessibility follow-up
+
+Settings → Accessibility adds bolder text, larger controls, motion and station-list preferences. Native screen readers select List first while preserving an explicit Map choice. Forms associate and focus errors; transactions speak status/source/direction and show Money in/out; station controls are contextual; web dates and tabs support keyboard navigation. See [details and phone acceptance](ACCESSIBILITY.md). Settings schema 5 migrates additively.
+
+This follow-up passes 295 tests, lint/TypeScript and all-platform JavaScript exports (`/tmp/gasfinder-accessibility-export`). Browser proof is `/tmp/gasfinder-accessibility-proof/settings.png`; checks use synthetic data at 320/390 px. Physical assistive-tool acceptance stays open. The native build evidence below belongs to the earlier finish batch.
+
 ## Evidence
 
 - 290 logic tests pass, including 17 new finish regressions. Lint, TypeScript and diff checks pass.

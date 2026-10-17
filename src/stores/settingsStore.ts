@@ -1,3 +1,5 @@
+import { accessibilityDefaults, validAccessibilityPreferences } from '@/features/accessibility/preferences';
+import type { AccessibilityPreferences } from '@/features/accessibility/preferences';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -8,7 +10,7 @@ import type { FuelType, SortOption } from '@/types/stations';
 import { validateRefillPercent } from '@/features/stations/preferences';
 import type { MapsApp } from '@/features/stations/preferences';
 
-export type PersonalPreferences = {
+export type PersonalPreferences = AccessibilityPreferences & {
   appearance: 'system' | 'light' | 'dark';
   strongerContrast: boolean;
   startScreen: 'index' | 'investment' | 'pocket' | 'subscriptions';
@@ -16,7 +18,7 @@ export type PersonalPreferences = {
   reminderHour: number; reminderLeadDays: number;
   setupDismissed: boolean;
 };
-export const personalDefaults: PersonalPreferences = { appearance: 'system', strongerContrast: false, startScreen: 'index', gasView: 'map', subscriptionView: 'list', reminderHour: 9, reminderLeadDays: 1, setupDismissed: false };
+export const personalDefaults: PersonalPreferences = { ...accessibilityDefaults, appearance: 'system', strongerContrast: false, startScreen: 'index', gasView: 'map', subscriptionView: 'list', reminderHour: 9, reminderLeadDays: 1, setupDismissed: false };
 type SettingsState = PersonalPreferences & {
   configure: (change: Partial<PersonalPreferences>) => void;
   statementReminderDays: number;
@@ -44,6 +46,7 @@ type SettingsState = PersonalPreferences & {
 export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { const set = guardedSet(rawSet); return ({
   ...personalDefaults, configure: change => {
     if (change.appearance && !['system','light','dark'].includes(change.appearance) || change.startScreen && !['index','investment','pocket','subscriptions'].includes(change.startScreen) || change.gasView && !['map','list'].includes(change.gasView) || change.subscriptionView && !['list','calendar'].includes(change.subscriptionView) || change.reminderHour !== undefined && (!Number.isInteger(change.reminderHour) || change.reminderHour < 0 || change.reminderHour > 23) || change.reminderLeadDays !== undefined && ![0,1,2,3,7].includes(change.reminderLeadDays)) throw Error('Choose supported preferences.');
+    if (!validAccessibilityPreferences(change)) throw Error('Choose supported accessibility preferences.');
     set(change);
   },
   statementReminderDays: 0, budgets: {},
@@ -64,4 +67,4 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   setSelectedFuelType: (selectedFuelType) => set({ selectedFuelType }),
   setSelectedRadius: (selectedRadius) => set({ selectedRadius }),
   setSortOrder: (sortOrder) => set({ sortOrder }),
-}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), version: 4, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));
+}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), version: 5, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));

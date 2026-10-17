@@ -1,3 +1,4 @@
+import AccessibilitySettings from '@/features/accessibility/AccessibilitySettings';
 import { useThemeRevision } from '@/theme';
 import GeneralSettings from '@/features/preferences/GeneralSettings';
 import DataHealth from '@/features/data/DataHealth';
@@ -34,6 +35,7 @@ export default function SettingsSectionScreen() {
   return <SettingsPage title={category?.title ?? 'Settings'}>
     {!!notice && <Text accessibilityLiveRegion="polite" style={s.body}>{notice}</Text>}
     {section === 'general' && <GeneralSettings />}
+    {section === 'accessibility' && <AccessibilitySettings />}
     {section === 'account' && <>
       <AccountSettingsPanel />
       <SettingsLink href="/account-review" label="Review matches & hidden history" />

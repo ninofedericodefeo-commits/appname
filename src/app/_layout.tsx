@@ -1,3 +1,4 @@
+import AccessibilityBridge from '@/features/accessibility/AccessibilityBridge';
 import { StatusBar } from 'expo-status-bar';
 import { isDarkTheme , themedStyles, useThemeRevision , colors } from '@/theme';
 import DataCompletionNotice from '@/features/data/DataCompletionNotice';
@@ -39,7 +40,7 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  useThemeRevision(); return <><AppearanceBridge /><DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate></>; }
+  useThemeRevision(); return <><AppearanceBridge /><AccessibilityBridge /><DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate></>; }
 
 function ReadyLayout() {
   useThemeRevision();

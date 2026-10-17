@@ -44,6 +44,7 @@ export function GasStationCard({
   const favorites = useGasSearchStore(state => state.favorites);
   const favorite = favorites.some(item => item.id === station.id);
   const mapsApp = preferredMapsApp(mapsPreference, Platform.OS);
+  const stationLabel = `${station.name}, ${station.address}`;
   const price = station.prices.find((item) => item.fuelType === fuelType);
   const queryClient = useQueryClient();
   const [editing, setEditing] = useState(false);
@@ -87,7 +88,7 @@ export function GasStationCard({
       <View style={styles.row}>
         <View style={styles.textBlock}>
           {isCheapest && <Text style={styles.bestLabel}>LOWEST RECENT REPORT</Text>}
-          <Text style={styles.name}>{station.name === 'Gas station' ? 'Name not listed' : station.name}</Text>
+          <Text accessibilityRole="header" style={styles.name}>{station.name === 'Gas station' ? 'Name not listed' : station.name}</Text>
           <Text style={styles.address}>{station.address}</Text>
           <Text style={styles.meta}>{station.distanceMiles?.toFixed(1) ?? '?'} mi{distanceLabel ? ` ${distanceLabel}` : ''} · {priceDescription(price, isDemo, now)}</Text>
           {station.attributions?.map((attribution, index) => attribution.providerUri ? (
@@ -97,30 +98,30 @@ export function GasStationCard({
           ) : <Text key={`${attribution.provider}-${index}`} style={styles.attribution}>{attribution.provider}</Text>)}
         </View>
 
-        <View style={styles.priceCol}>
+        <View accessible accessibilityLabel={`${fuelType}: ${price ? `${formatFuelPrice(price.price)} per gallon` : 'No price saved'}`} style={styles.priceCol}>
           <Text style={[styles.price, !price && styles.unknownPrice]}>{price ? formatFuelPrice(price.price) : '—'}</Text>
           <Text style={styles.priceLabel}>{price ? '/gal' : 'No price yet'}</Text>
         </View>
       </View>
       {canFavorite && <Pressable accessibilityRole="button" accessibilityLabel={`${favorite ? 'Unsave' : 'Save'} station ${station.name}`} accessibilityState={{ selected: favorite }} style={styles.receiptLink} onPress={() => { if (!favorite && favorites.length >= 50) { setMapsError('You can save up to 50 stations. Unsave one to add another.'); return; } useGasSearchStore.getState().toggleFavorite(station); setMapsError(''); }}><Text style={styles.editText}>{favorite ? '★ Saved station' : '☆ Save station'}</Text></Pressable>}
       {canOpenMaps && <View style={styles.mapActions}>
-        <Pressable accessibilityRole="button" style={styles.mapButton} onPress={() => void openMap(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.mapButtonText}>{mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'} ↗</Text></Pressable>
+        <Pressable accessibilityRole="button" accessibilityLabel={`Directions to ${stationLabel} in ${mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'}`} style={styles.mapButton} onPress={() => void openMap(mapsApp === 'apple' ? appleMapsDirections(station) : googleMapsDirections(station))}><Text style={styles.mapButtonText}>{mapsApp === 'apple' ? 'Apple Maps' : 'Google Maps'} ↗</Text></Pressable>
         {mapsError ? <Text style={styles.error}>{mapsError}</Text> : null}
       </View>}
-      {canAddReceipt && <Link href={{ pathname: '/report-price', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>Report price or refill ↗</Text></Pressable></Link>}
-      {canAddReceipt && <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, fuelType, qualifier: priceQualifier, source: 'local' } }} asChild><Pressable accessibilityRole="button" style={styles.receiptLink}><Text style={styles.editText}>View saved price history ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/report-price', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, stationAddress: station.address === 'Address not mapped' ? '' : station.address, latitude: String(station.latitude), longitude: String(station.longitude), fuelType } }} asChild><Pressable accessibilityRole="button" accessibilityLabel={`Report ${fuelType} price or refill at ${stationLabel}`} style={styles.receiptLink}><Text style={styles.editText}>Report price or refill ↗</Text></Pressable></Link>}
+      {canAddReceipt && <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name === 'Gas station' ? 'Name not listed' : station.name, fuelType, qualifier: priceQualifier, source: 'local' } }} asChild><Pressable accessibilityRole="button" accessibilityLabel={`View saved ${fuelType} price history for ${stationLabel}`} style={styles.receiptLink}><Text style={styles.editText}>View saved price history ↗</Text></Pressable></Link>}
       {canReport && (
         <View style={styles.reportArea}>
-          <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>
+          <Link href={{ pathname: '/price-history', params: { stationId: station.id, stationName: station.name, fuelType } }} asChild><Pressable accessibilityRole="button" accessibilityLabel={`View ${fuelType} price history for ${stationLabel}`} style={styles.historyLink}><Text style={styles.editText}>View price history ↗</Text></Pressable></Link>
           {editing ? <>
             <Text style={styles.reportNote}>Report the pump price you saw. This unverified price is shared with everyone using this API. No receipt photo is uploaded.</Text>
             <TextInput value={priceInput} onChangeText={setPriceInput} keyboardType="decimal-pad" placeholder="Price per gallon" accessibilityLabel={`${station.name} ${fuelType} price per gallon`} style={styles.input} maxLength={7} />
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
             <View style={styles.reportActions}>
-              <Pressable accessibilityRole="button" onPress={() => void submitPrice()} disabled={saving} style={styles.reportButton}><Text style={styles.reportButtonText}>{saving ? 'Saving…' : 'Save price'}</Text></Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel={`Save ${fuelType} price for ${stationLabel}`} accessibilityState={{ disabled: saving, busy: saving }} onPress={() => void submitPrice()} disabled={saving} style={styles.reportButton}><Text style={styles.reportButtonText}>{saving ? 'Saving…' : 'Save price'}</Text></Pressable>
               <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => { setEditing(false); setError(''); }}><Text style={styles.cancelText}>Cancel</Text></Pressable>
             </View>
-          </> : <Pressable accessibilityRole="button" style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setEditing(true)}><Text style={styles.editText}>Report a price ↗</Text></Pressable>}
+          </> : <Pressable accessibilityRole="button" accessibilityLabel={`Report ${fuelType} price for ${stationLabel}`} accessibilityState={{ expanded: false }} style={{ minHeight: 44, justifyContent: 'center' }} onPress={() => setEditing(true)}><Text style={styles.editText}>Report a price ↗</Text></Pressable>}
         </View>
       )}
     </View>
@@ -128,9 +129,9 @@ export function GasStationCard({
 }
 
 const styles = themedStyles(() => ({
-  receiptLink: { marginTop: 13, paddingVertical: 7, alignSelf: 'flex-start' },
+  receiptLink: { minHeight: 48, justifyContent: 'center', marginTop: 13, paddingVertical: 7, alignSelf: 'flex-start' },
   mapActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 15, alignItems: 'center' },
-  mapButton: { borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
+  mapButton: { minHeight: 48, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: 11, paddingVertical: 10, borderRadius: 6 },
   mapButtonText: { color: colors.ink, fontWeight: '700', fontSize: 12 },
   reportArea: { marginTop: 14, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 12 },
   historyLink: { minHeight: 44, justifyContent: 'center', marginBottom: 10 },

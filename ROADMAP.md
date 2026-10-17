@@ -33,7 +33,7 @@ These are maintenance/acceptance responsibilities, not features to build again.
 
 | Area | Existing implementation | Remaining acceptance |
 | --- | --- | --- |
-| Settings | Nine category rows and separate subsection screens; multi-confirmation wipe in Data & backups and Backup | Phone navigation, focus and large-text acceptance |
+| Settings | Eleven category rows and separate subsection screens, including Accessibility; multi-confirmation wipe in Data & backups and Backup | Phone navigation, focus and large-text acceptance |
 | Account | Confirmed snapshot, newer-activity estimate, set-aside subtraction, explanation, pending exclusion, corrections/aliases/notes | Real statement/phone acceptance and regressions from daily use |
 | History/imports | Unified history, filters, hide/Undo, original archive/Trash/relink/export, reconciliation, source evidence, batch/folder review | Phone interruption/storage-failure acceptance |
 | Recovery/privacy | Encrypted backup/restore, durable recovery/Undo, reset/switch, app lock, preview protection, interrupted erasure marker | Installed-device backup/restore/update and privacy acceptance |
@@ -55,7 +55,7 @@ These are maintenance/acceptance responsibilities, not features to build again.
 
 **S/M/L** mean contained / several connected components / migration or native integration. They are relative scope, not delivery dates. “Observed” means reproduced in the browser; “Source” means established by current code; “Proposal” is an improvement; “Device” requires installed-device testing. Never promote a suspected risk into a confirmed bug without evidence.
 
-**R01–R30 now have local implementations.** R01–R05 shipped in the first correctness batch; the finish batch implements drafts/recovery, clearer flows, accessibility foundations, preferences and the small additions. See [finish status and evidence](docs/FINISH_STATUS.md). Optional row density and backup reminders were omitted to keep scope small; they are not missing core features. **R31–R34 and physical accessibility acceptance remain open.** A passing build or browser check cannot close those gates.
+**R01–R30 now have local implementations.** R01–R05 shipped in the first correctness batch; the finish batch implements drafts/recovery, clearer flows, accessibility foundations, preferences and the small additions. See [finish status and evidence](docs/FINISH_STATUS.md). Optional row density and backup reminders were omitted to keep scope small; they are not missing core features. The [accessibility follow-up](docs/ACCESSIBILITY.md) adds dedicated preferences, contextual spoken descriptions, field-error focus and keyboard dates/tabs; 295 tests now pass. **R31–R34 and physical accessibility acceptance remain open.** A passing build or browser check cannot close those gates.
 
 ## 4. Batch A — Correctness and recovery
 

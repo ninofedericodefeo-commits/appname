@@ -21,7 +21,7 @@ import SavingsAdjustmentSheet from '@/features/goals/SavingsAdjustmentSheet';
 function AccountAction({ label, path, onPress }: { label: string; path: string; onPress: () => void }) {
   useThemeRevision();
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-    <View style={styles.actionCircle}><Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d={path} /></Svg></View>
+    <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.actionCircle}><Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d={path} /></Svg></View>
     <Text style={styles.actionLabel}>{label}</Text>
   </Pressable>;
 }
@@ -53,7 +53,7 @@ export default function PocketScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
       <View style={styles.balanceCard}>
-        <View style={styles.accountHeading}><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
+        <View style={styles.accountHeading}><View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg></View><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
         <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
         {!!estimate.snapshotDay && <Text style={styles.snapshot}>{balanceSource === 'citizens-pdf' ? 'Statement balance from' : 'Bank balance checked'} {new Date(`${estimate.snapshotDay}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
         <Text accessibilityLabel={available === null ? 'Available to spend: add your bank balance' : `Available to spend: ${money(available)}`} style={[styles.balanceMain, { fontSize: balanceFontSize }, available !== null && available < 0 && styles.balanceNegative]} >{availableLabel}</Text>

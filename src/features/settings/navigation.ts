@@ -1,5 +1,6 @@
 export const settingsSections = [
   { id: 'general', title: 'General & appearance', detail: 'Start screen, theme and quick setup' },
+  { id: 'accessibility', title: 'Accessibility', detail: 'Text, controls, motion and screen readers' },
   { id: 'account', title: 'Account & statements', detail: 'Account name, imports and statement reminders' },
   { id: 'gas', title: 'Gas & cars', detail: 'Maps, fuel preferences and saved cars' },
   { id: 'subscriptions', title: 'Subscriptions', detail: 'Phone reminders and test subscriptions' },

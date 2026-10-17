@@ -1,9 +1,12 @@
+import { useDialogFocus } from '@/components/useDialogFocus';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
 import { RecurringDayField } from '@/components/RecurringDayField';
 import { useDraftGuard } from '@/components/useDraftGuard';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
-import { useState, useSyncExternalStore } from 'react';
+import { useRef, useState, useSyncExternalStore } from 'react';
+import { AccessibleField } from '@/components/AccessibleField';
+import { useFieldErrorFocus } from '@/components/useFieldErrorFocus';
 import { Modal, Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
@@ -35,27 +38,35 @@ export default function SubscriptionEditor({ subscription, suggestion, onClose }
   const [category, setCategory] = useState(subscription?.category ?? 'Other');
   const [trialEndsOn, setTrialEndsOn] = useState(subscription?.trialEndsOn ?? '');
   const [extra, setExtra] = useState(!!subscription?.trialEndsOn);
+  const focusError = useFieldErrorFocus();
   const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ name?: string; amount?: string }>({});
+  const nameInput = useRef<TextInput>(null), amountInput = useRef<TextInput>(null);
   useValidationAnnouncement(error);
   const guard = useDraftGuard({ name, amount, cadence, day, month, app, billingChannel, category, trialEndsOn });
   const close = () => guard.confirm(onClose);
   const reduced = useReducedMotion();
+  const { heading, focus } = useDialogFocus();
   function save() {
     if (!ready) return;
     const amountCents = parseDollars(amount);
-    if (!name.trim()) return setError('Enter the subscription name.');
-    if (amountCents === null || amountCents <= 0 || amountCents > 100_000_000) return setError('Enter a price greater than $0, with no more than two decimal places.');
+    const errors = {
+      name: !name.trim() ? 'Enter the subscription name.' : undefined,
+      amount: amountCents === null || amountCents <= 0 || amountCents > 100_000_000 ? 'Enter a price greater than $0, with no more than two decimal places.' : undefined,
+    };
+    setFieldErrors(errors); setError('');
+    if (errors.name || errors.amount || amountCents === null) { focusError(errors.name ? nameInput : amountInput); return; }
     try { useSubscriptionStore.getState().saveSubscription({ name: name.trim(), amountCents, cadence, day, month, associatedApp: app, billingChannel, category, trialEndsOn: trialEndsOn || undefined,
       ...(suggestion ? { bankMerchantKey: suggestion.merchantKey } : {}) }, subscription?.id);
     guard.accept(); onClose(); } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not save the subscription.'); }
   }
-  return <Modal visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}>
+  return <Modal visible onShow={focus} animationType={reduced ? 'none' : 'slide'} onRequestClose={close}>
     <SafeAreaView style={styles.safe}>
-      <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>{subscription ? 'Edit subscription' : 'Add subscription'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
+      <View style={styles.header}><Text ref={heading} tabIndex={-1} accessibilityRole="header" style={styles.title}>{subscription ? 'Edit subscription' : 'Add subscription'}</Text><SubscriptionButton label="Close" onPress={close} /></View>
       <FormScrollView contentContainerStyle={styles.form}>
         {suggestion && <Text style={styles.note}>From bank history. Confirm the estimated price and renewal date before saving.</Text>}
-        <View style={styles.field}><Text style={styles.label}>Subscription name</Text><TextInput style={styles.input} value={name} onChangeText={setName} placeholder="e.g. Spotify" accessibilityLabel="Subscription name" maxLength={80} /></View>
-        <View style={styles.field}><Text style={styles.label}>Renewal price</Text><TextInput style={styles.input} value={amount} onChangeText={setAmount} placeholder="0.00" accessibilityLabel="Renewal price" keyboardType="decimal-pad" /></View>
+        <AccessibleField ref={nameInput} label="Subscription name" error={fieldErrors.name} value={name} onChangeText={value => { setName(value); setFieldErrors(previous => ({ ...previous, name: undefined })); }} placeholder="e.g. Spotify" maxLength={80} returnKeyType="next" onSubmitEditing={() => amountInput.current?.focus()} />
+        <AccessibleField ref={amountInput} label="Renewal price" hint="Dollars, with up to two decimal places." error={fieldErrors.amount} value={amount} onChangeText={value => { setAmount(value); setFieldErrors(previous => ({ ...previous, amount: undefined })); }} placeholder="0.00" keyboardType="decimal-pad" />
         <View style={styles.field}><Text style={styles.label}>Renews</Text><View style={styles.row}>{(['monthly', 'yearly'] as const).map(value => <SubscriptionButton key={value} label={value === 'monthly' ? 'Monthly' : 'Yearly'} grow tone={cadence === value ? 'primary' : 'secondary'} accessibilityState={{ selected: cadence === value }} onPress={() => setCadence(value)} />)}</View></View>
         <RecurringDayField day={day} month={month} yearly={cadence === 'yearly'} onChange={(d,m) => { setDay(d); setMonth(m); }} />
         <View style={styles.field}><Text style={styles.label}>Who bills you?</Text><View style={[styles.row, { flexWrap: 'wrap' }]}>{billingChannels.map(channel => <SubscriptionButton key={channel.id} label={channel.label} tone={billingChannel === channel.id ? 'primary' : 'secondary'} accessibilityState={{ selected: billingChannel === channel.id }} onPress={() => setBillingChannel(channel.id)} />)}</View><Text style={styles.note}>Check your receipt if unsure. This chooses where Plan to cancel opens.</Text></View>
