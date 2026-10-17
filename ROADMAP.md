@@ -4,6 +4,16 @@
 
 This is the single current backlog. It replaces the earlier milestone plan, preserved in [roadmap history](docs/ROADMAP_HISTORY.md). The [final audit](docs/APP_AUDIT_FINAL.md) records evidence, reproduction details and limitations. [Flowcharts](docs/APP_FLOWS.md) describe the intended journeys.
 
+**Appearance follow-up — October 16:** the [current style audit](docs/STYLE_AUDIT.md), against `6ee23b2`, adds **V01–V21**, all open. It includes 52 baseline captures, screen coverage, shared visual rules and acceptance criteria. This documentation pass did not implement the recommendations. Local appearance work therefore remains alongside the physical-device gates; earlier “only device acceptance remains” statements describe the feature backlog before this appearance audit.
+
+| Appearance batch | Open items | Order |
+| --- | --- | --- |
+| Concrete controls/labels/theme | V01–V05: 18.5-pixel folder control; narrow calendar/Larger controls; persistent field labels; native System theme configuration check; history development warning | First; V04 requires installed-device verification |
+| Shared appearance rules | V13–V17: buttons, typography, spacing/surfaces, navigation/header cues and selection states | Before broad page restyling |
+| Main-page hierarchy | V06–V10: Account, Subscriptions, renewal notice, station cards and history filters | Reuse shared controls; preserve financial context and the requested map |
+| Empty/help/loading states | V11–V12, V19 | Simplify presentation while retaining recovery and confirmations |
+| Wide/map/companion finish | V18, V20–V21 | Map chrome, readable tablet width, widget/extension themes; native acceptance remains |
+
 ## 1. What “finished” means
 
 A dependable app for four daily questions:
