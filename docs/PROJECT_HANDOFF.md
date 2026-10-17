@@ -2,6 +2,10 @@
 
 Use this file as the context for a fresh chat; the earlier chat history is not needed for normal project work. This summary does not delete messages from Codex.
 
+## iPhone build cache fix — October 16, 2026
+
+The device error 65 came from a stale ExpoModulesJSI device slice after an Xcode SDK change. `withIosJsiSdkCache` adds an idempotent CocoaPods post-install hook, generated through Expo prebuild, that runs `scripts/check-ios-jsi-cache.sh` before Expo’s framework phase. It invalidates only the selected platform’s generated stamp when Xcode/Swift/SDK fingerprints change. No dependency, signing, entitlement or app identifier changed. Prebuild and pods were applied to the local checkout. The signed physical-device Debug build and Expo device command now succeed; the latter installed the app using the existing Metro on 8087. 299 tests, lint and TypeScript pass. See [private build troubleshooting](PRIVATE_BUILDS.md#xcode-sdk-changes-and-error-65). Physical runtime/accessibility/Release acceptance remains open.
+
 ## Accessibility additions — October 16, 2026
 
 Settings → Accessibility adds bolder text, larger shared controls, reduced-motion override and preferred station list; native screen readers start Gas in List, with an explicit Map choice available. Forms now associate field errors and focus invalid inputs; transaction directions have words and richer spoken summaries; station actions identify their station; dates/tabs support web keyboard navigation. Settings schema **5** migrates accessibility defaults additively. See [accessibility behavior and acceptance](ACCESSIBILITY.md). 295 tests, lint, TypeScript and all-platform JavaScript exports pass. Browser checks cover 320/390 px, persisted preferences, 56-point controls, keyboard tabs/dates and invalid-field focus. Physical VoiceOver/TalkBack and largest native text sizes still require acceptance.

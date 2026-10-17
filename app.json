@@ -38,6 +38,7 @@
     },
     "plugins": [
       "./plugins/withIosBuildScriptAccess",
+      "./plugins/withIosJsiSdkCache",
       "./plugins/withSpendingPauseExtension",
       "./plugins/withSubscriptionApps",
       "expo-router",
