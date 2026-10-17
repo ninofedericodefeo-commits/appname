@@ -2,16 +2,18 @@ import { accessibleStyle } from '@/features/accessibility/preferences';
 import { useSyncExternalStore } from 'react';
 import { StyleSheet } from 'react-native';
 export const lightColors = {
-  paper: '#F4F0E7', surface: '#FFFEF9', ink: '#173A35', inkSoft: '#38574F',
-  muted: '#52675D', line: '#B9C8BA', lineStrong: '#7A8C7D', primary: '#245A4B',
-  accent: '#B64420', accentDark: '#A63F21', paleGreen: '#E8EFDD', paleOrange: '#FCEDDE',
-  lime: '#D7E7A7', danger: '#A33124', dangerPale: '#FBE8E2',
+  paper: '#F2F2F7', surface: '#FFFFFF', ink: '#1C1C1E', inkSoft: '#3A3A40',
+  muted: '#63636C', line: '#DEDEE4', lineStrong: '#8A8A93', primary: '#005FCC',
+  accent: '#005FCC', accentDark: '#0055B8', paleGreen: '#EAF5ED', paleOrange: '#FFF4E6',
+  lime: '#DDF0E2', danger: '#B42332', dangerPale: '#FDECEE',
+  tint: '#E8F1FF', onPrimary: '#FFFFFF', success: '#187642', successPale: '#EAF5ED',
 };
 export const darkColors: typeof lightColors = {
-  paper: '#101C19', surface: '#192A25', ink: '#F2F6ED', inkSoft: '#D3E3D8',
-  muted: '#B1C4B7', line: '#52685B', lineStrong: '#809A89', primary: '#A5D3B6',
-  accent: '#F0A27B', accentDark: '#FFB38C', paleGreen: '#253F31', paleOrange: '#443025',
-  lime: '#324529', danger: '#FFAD9B', dangerPale: '#482C27',
+  paper: '#000000', surface: '#1C1C1E', ink: '#F5F5F7', inkSoft: '#DEDEE5',
+  muted: '#A8A8B2', line: '#38383D', lineStrong: '#8E8E98', primary: '#8ABBFF',
+  accent: '#8ABBFF', accentDark: '#9CC7FF', paleGreen: '#193426', paleOrange: '#3A2A1B',
+  lime: '#224530', danger: '#FF9DA8', dangerPale: '#3F1E26',
+  tint: '#172A43', onPrimary: '#101C2D', success: '#7AD69B', successPale: '#193426',
 };
 // Existing semantic tokens are shared by inline styles and deferred StyleSheets.
 // Components subscribe to a revision; switching appearance never remounts forms.

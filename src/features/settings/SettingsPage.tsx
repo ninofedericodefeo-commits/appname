@@ -16,6 +16,6 @@ export default function SettingsPage({ title, children }: PropsWithChildren<{ ti
 }
 const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper },
-  content: { padding: 20, paddingBottom: 50, gap: 16 },
-  title: { color: colors.ink, fontSize: 32, fontWeight: '800', marginBottom: 4 },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 20, paddingBottom: 50, gap: 20 },
+  title: { color: colors.ink, fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 },
 }));

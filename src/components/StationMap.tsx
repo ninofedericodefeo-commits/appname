@@ -6,9 +6,9 @@ import './leaflet.css';
 import './station-map.css';
 
 type Point = { latitude: number; longitude: number };
-export type MapPin = Point & { id: string; name: string; price: number | null; sample: boolean; stopNumber?: number; stale?: boolean };
+export type MapPin = Point & { id: string; name: string; price: number | null; sample: boolean; stopNumber?: number; stale?: boolean; lowest?: boolean };
 
-export default function StationMap({ pins, center, centerLabel = 'Your location', selectedId, route = [], onSelect, onSearchArea }: {
+export default function StationMap({ pins, center, centerLabel = 'Your location', selectedId, route = [], onSelect, onSearchArea, dark = false, height = 370 }: {
   pins: MapPin[];
   center: Point | null;
   selectedId?: string | null;
@@ -16,6 +16,8 @@ export default function StationMap({ pins, center, centerLabel = 'Your location'
   onSelect: (id: string) => Promise<void>;
   centerLabel?: string;
   onSearchArea?: (point: Point) => Promise<void>;
+  dark?: boolean;
+  height?: number;
   dom?: import('expo/dom').DOMProps;
 }) {
   const container = useRef<HTMLDivElement>(null);
@@ -66,16 +68,17 @@ export default function StationMap({ pins, center, centerLabel = 'Your location'
     const group = layers.current;
     if (!ready || !instance || !L || !group) return;
     group.clearLayers();
-    if (route.length > 1) L.polyline(route.map((point) => [point.latitude, point.longitude]), { color: '#245A4B', weight: 5 }).addTo(group);
-    if (center) L.circleMarker([center.latitude, center.longitude], { radius: 7, color: '#FFFEF9', weight: 3, fillColor: '#2373CE', fillOpacity: 1 }).bindTooltip(centerLabel).addTo(group);
+    if (route.length > 1) L.polyline(route.map((point) => [point.latitude, point.longitude]), { color: '#005FCC', weight: 5, opacity: 0.85 }).addTo(group);
+    if (center) L.circleMarker([center.latitude, center.longitude], { radius: 7, color: '#FFFFFF', weight: 3, fillColor: '#005FCC', fillOpacity: 1 }).bindTooltip(centerLabel).addTo(group);
     for (const pin of pins) {
       const label = document.createElement('span');
-      label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}${pin.stale ? ' stale' : ''}`;
+      const lowest = pin.lowest && pin.price !== null && !pin.sample && !pin.stale;
+      label.className = `station-pin${pin.id === selectedId ? ' selected' : ''}${pin.sample ? ' example' : ''}${pin.stale ? ' stale' : ''}${pin.price === null ? ' unknown' : ''}${lowest ? ' lowest' : ''}`;
       label.textContent = `${pin.stopNumber ? `${pin.stopNumber} · ` : ''}${pin.price === null ? 'N/A' : `$${pin.price.toFixed(3)}`}${pin.sample && pin.price !== null ? '*' : ''}${pin.stale ? ' · Old' : ''}`;
-      const description = `${pin.name} · ${pin.price === null ? 'Price not reported' : `${pin.stale ? 'Old report ' : pin.sample ? 'Sample price ' : 'Unverified price '}$${pin.price.toFixed(3)} per gallon`}`;
+      const description = `${pin.name} · ${pin.price === null ? 'Price unavailable' : `${lowest ? 'Lowest recent report. ' : ''}${pin.stale ? 'Old report ' : pin.sample ? 'Sample price ' : 'Unverified price '}$${pin.price.toFixed(3)} per gallon`}`;
       const tooltip = document.createElement('span');
       tooltip.textContent = description;
-      const width = pin.stopNumber || pin.stale ? 124 : 88;
+      const width = pin.stopNumber || pin.stale ? 124 : pin.price === null ? 68 : 88;
       const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: label, className: 'station-marker', iconSize: [width, 44], iconAnchor: [width / 2, 22] }), title: description, alt: description })
         .bindTooltip(tooltip).on('click', () => { void onSelect(pin.id); }).addTo(group);
       if (pin.id === selectedId) marker.setZIndexOffset(1000);
@@ -93,12 +96,15 @@ export default function StationMap({ pins, center, centerLabel = 'Your location'
     instance.invalidateSize({ pan: false });
   }, [ready, pins, center, centerLabel, route, selectedId, onSelect]);
 
-  return <div className="station-map-shell">
+  return <div className={`station-map-shell${dark ? ' map-dark' : ''}`} style={{ height }}>
     <div className="station-map" ref={container} aria-label="Gas station map. Select a price marker to view station details." />
     {!ready && !error && <div className="map-message">Opening map…</div>}
     {error && <div className="map-message" role="status">{error} <button onClick={() => { setError(''); tiles.current?.redraw(); }}>Retry</button></div>}
     {onSearchArea && searchPoint && (!center || Math.abs(searchPoint.latitude - center.latitude) + Math.abs(searchPoint.longitude - center.longitude) > 0.001) && <button className="map-search-area" disabled={searching} onClick={() => { setSearching(true); void onSearchArea(searchPoint).catch(() => setError('Could not search this area. Try again.')).finally(() => setSearching(false)); }}>{searching ? 'Searching…' : 'Search this area'}</button>}
-    {pins.some((pin) => pin.sample) && <div className="map-legend">* Sample price</div>}
-    {pins.some(pin => pin.stale) && <div className="map-legend">Old: over 24h or report time unavailable</div>}
+    {pins.some(pin => pin.sample || pin.stale || pin.price === null) && <div className="map-legend">
+      {pins.some(pin => pin.price === null) && <span>N/A · Price unavailable</span>}
+      {pins.some(pin => pin.sample) && <span>* Sample price</span>}
+      {pins.some(pin => pin.stale) && <span>Old · Over 24h or report time unavailable</span>}
+    </div>}
   </div>;
 }

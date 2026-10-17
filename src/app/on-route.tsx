@@ -1,4 +1,4 @@
-import { themedStyles, useThemeRevision , colors } from '@/theme';
+import { themedStyles, useThemeRevision, isDarkTheme, colors } from '@/theme';
 import { reviewRoutedLegs, detourEconomics } from '@/features/stations/tripReview';
 import { formatMoney } from '@/lib/money';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
@@ -222,7 +222,7 @@ export default function OnRouteScreen() {
           {mapsApp === 'google' && googleSegments.map((segment, index) => <Pressable key={segment.url} accessibilityRole="button" style={styles.primary} onPress={() => void openMaps(segment.url)}><Text style={styles.primaryText}>{googleSegments.length > 1 ? `Google Maps · part ${index + 1}/${googleSegments.length}${segment.firstStop <= segment.lastStop ? ` · stops ${segment.firstStop}–${segment.lastStop}` : ''}${segment.reachesDestination ? ' + destination' : ''}` : `Google Maps · ${stops.length} stops + destination`} ↗</Text></Pressable>)}
           {mapsApp === 'google' && googleSegments.length > 1 && <Text style={styles.note}>Google mobile links limit waypoints. All stops are kept in these parts; open the next part after finishing the previous one.</Text>}
         </View>}
-        <View style={styles.mapFrame}><StationMap pins={mapPins} center={origin} route={mapRoute} selectedId={selectedStop} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: 370 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} /></View>
+        <View style={styles.mapFrame}><StationMap dark={isDarkTheme()} pins={mapPins} center={origin} route={mapRoute} selectedId={selectedStop} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: 370 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} /></View>
         {!!warning && <Text style={styles.error}>{warning}</Text>}
         {stops.map(({ station, legMiles }, index) => {
           const price = station.prices.find((item) => item.fuelType === fuelType && item.source !== 'sample');

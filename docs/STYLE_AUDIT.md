@@ -1,5 +1,7 @@
 # GasFinder appearance audit
 
+**October 17 follow-up:** The app now has a new shared visual system and Gas Finder layout. See [implementation and verification](GAS_REDESIGN.md). The October 16 findings and captures below remain the historical baseline.
+
 **Date:** October 16, 2026 · **Baseline:** `6ee23b2` · **Scope:** the current private app, including its companion surfaces.
 
 ## Verdict

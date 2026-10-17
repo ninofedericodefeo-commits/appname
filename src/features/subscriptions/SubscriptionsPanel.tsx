@@ -6,7 +6,7 @@ import CancellationControls from './CancellationControls';
 import { subscriptionScheduleAlerts } from './scheduleEvidence';
 import { billingChannels } from './billing';
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { AppState, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
@@ -81,7 +81,7 @@ export default function SubscriptionsPanel() {
   }
 
   return <View style={styles.content}>
-    <View><Text accessibilityRole="header" style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Your renewals, all in one place.</Text></View>
+    <View><Text accessibilityRole="header" style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Review upcoming charges.</Text></View>
     {sampleMode && <View style={styles.review}><Text style={styles.reviewText}>Test subscriptions are on</Text><Text style={styles.note}>Sample renewals appear here for testing. Phone reminders only include your real subscriptions.</Text><SubscriptionButton label="Manage test mode in Settings" onPress={() => router.push('/settings')} /></View>}
     <SubscriptionCosts subscriptions={subscriptions} today={today} />
     {!!due.length && <View style={styles.card}><Text accessibilityRole="header" style={styles.sectionTitle}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))}</Text><Text style={styles.note}>{snoozed.length ? `${snoozed.length} review${snoozed.length === 1 ? '' : 's'} snoozed. Next returns ${snoozeEndLabel}. You can still review the cards below.` : 'Review the cards below, or snooze the reminder banner.'}</Text><View style={styles.actions}><SubscriptionButton label="Later · 2h" grow onPress={() => snoozeReviews('two-hours')} /><SubscriptionButton label="Hide for today" grow onPress={() => snoozeReviews('today')} /></View>{!!snoozed.length && <SubscriptionButton label="Show renewal banner again" onPress={resumeReviews} />}</View>}
@@ -93,7 +93,7 @@ export default function SubscriptionsPanel() {
     {scheduleAlerts.map(alert => <View key={alert.id} style={styles.card}><Text style={styles.name}>{alert.subscription.name} · billing schedule review</Text><Text style={styles.note}>Three posted charges suggest {alert.cadence} billing near day {alert.day}. Your saved schedule is {alert.subscription.cadence}, day {alert.subscription.day}. Posting delays can differ from the actual billing date.</Text><Text style={styles.note}>{alert.evidence.map(row => new Date(row.purchasedAt).toLocaleDateString()).join(' · ')}</Text><View style={styles.actions}><SubscriptionButton label="Review suggested date" tone="primary" grow onPress={() => setEditor({ subscription: { ...alert.subscription, cadence: alert.cadence, day: alert.day, month: alert.month } })} /><SubscriptionButton label="Keep my schedule" grow onPress={() => dismissBankAlert(alert.id)} /></View></View>)}
     <View style={styles.heading}><Text accessibilityRole="header" style={styles.sectionTitle}>Upcoming · {active.length}</Text><SubscriptionButton label="Add" accessibilityLabel="Add subscription" tone="primary" disabled={!subsReady} onPress={() => setEditor({})} /></View>
     {!active.length && <View style={styles.card}><Text style={styles.name}>No upcoming subscriptions</Text><Text style={styles.note}>Add one to keep track of its price and next renewal.</Text></View>}
-    <View style={styles.actions}><SubscriptionButton label="List" grow tone={scheduleView === 'list' ? 'primary' : 'secondary'} accessibilityState={{ selected: scheduleView === 'list' }} onPress={() => setScheduleView('list')} /><SubscriptionButton label="Calendar" grow tone={scheduleView === 'calendar' ? 'primary' : 'secondary'} accessibilityState={{ selected: scheduleView === 'calendar' }} onPress={() => setScheduleView('calendar')} /></View>
+    <View style={styles.segmented}>{(['list', 'calendar'] as const).map(view => <Pressable key={view} accessibilityRole="button" accessibilityLabel={view === 'list' ? 'List' : 'Calendar'} accessibilityState={{ selected: scheduleView === view }} aria-pressed={scheduleView === view} onPress={() => setScheduleView(view)} style={({ pressed }) => [styles.segment, scheduleView === view && styles.segmentActive, pressed && styles.pressed]}><Text style={[styles.segmentLabel, scheduleView === view && styles.segmentLabelActive]}>{view === 'list' ? 'List' : 'Calendar'}</Text></Pressable>)}</View>
     {scheduleView === 'calendar' && active.some(item => item.cancelBy) && <Text style={styles.note}>Switch to List to finish cancellation follow-ups.</Text>}
     {scheduleView === 'calendar' ? <SubscriptionCalendar subscriptions={visibleSubscriptions} today={today} includeSamples={sampleMode} onEdit={subscription => setEditor({ subscription })} /> : active.map(card)}
     {!!inactive.length && <><Text accessibilityRole="header" style={styles.sectionTitle}>Canceled · {inactive.length}</Text>{inactive.map(card)}</>}
@@ -118,13 +118,14 @@ export default function SubscriptionsPanel() {
   </View>;
 }
 const styles = themedStyles(() => ({
-  content: { gap: 14 }, title: { color: colors.ink, fontSize: 32, fontWeight: '800', letterSpacing: -1 }, intro: { color: colors.muted, fontSize: 15, marginTop: 5 },
-  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, sectionTitle: { color: colors.ink, fontSize: 17, fontWeight: '800', flexShrink: 1 },
-  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 16, padding: 16, gap: 8 },
-  name: { color: colors.ink, fontSize: 17, fontWeight: '800', flex: 1 }, amount: { color: colors.ink, fontSize: 20, fontWeight: '800', fontVariant: ['tabular-nums'] },
-  meta: { color: colors.muted, fontSize: 13 }, badges: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' }, badge: { color: colors.inkSoft, fontSize: 11, fontWeight: '700', backgroundColor: colors.paleGreen, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }, appName: { color: colors.muted, fontSize: 12 },
-  actions: { flexWrap: 'wrap', flexDirection: 'row', gap: 8, marginTop: 4 }, note: { color: colors.muted, fontSize: 12, lineHeight: 18 },
-  manage: { borderTopWidth: 1, borderColor: colors.line, paddingTop: 10, gap: 10, marginTop: 4 }, confirm: { backgroundColor: colors.dangerPale, borderRadius: 10, padding: 12, gap: 8 }, confirmText: { color: colors.danger, fontSize: 13, fontWeight: '700' },
-  review: { backgroundColor: colors.paleOrange, borderRadius: 10, padding: 12, gap: 10, marginVertical: 4 }, reviewText: { color: colors.accentDark, fontSize: 13, fontWeight: '700' },
-  bankSection: { marginTop: 10, borderTopWidth: 1, borderColor: colors.line, paddingTop: 20 }, suggestions: { gap: 14, marginTop: 14 }, suggestion: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, borderRadius: 16, padding: 16, gap: 8 }, footer: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  content: { gap: 16 }, title: { color: colors.ink, fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 }, intro: { color: colors.muted, fontSize: 15, lineHeight: 22, marginTop: 5 },
+  heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }, sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '600', flexShrink: 1 },
+  card: { backgroundColor: colors.surface, borderRadius: 20, padding: 18, gap: 10 },
+  name: { color: colors.ink, fontSize: 17, fontWeight: '600', flex: 1 }, amount: { color: colors.ink, fontSize: 22, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  meta: { color: colors.muted, fontSize: 14, lineHeight: 20 }, badges: { flexDirection: 'row', gap: 10, alignItems: 'center', flexWrap: 'wrap' }, badge: { color: colors.inkSoft, fontSize: 12, fontWeight: '600', backgroundColor: colors.paper, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }, appName: { color: colors.muted, fontSize: 13 },
+  actions: { flexWrap: 'wrap', flexDirection: 'row', gap: 8, marginTop: 4 }, note: { color: colors.muted, fontSize: 13, lineHeight: 20 },
+  segmented: { flexDirection: 'row', padding: 3, gap: 3, borderRadius: 14, backgroundColor: colors.line }, segment: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 11, paddingHorizontal: 12, paddingVertical: 8 }, segmentActive: { backgroundColor: colors.surface }, segmentLabel: { color: colors.inkSoft, fontSize: 14, lineHeight: 20, fontWeight: '500' }, segmentLabelActive: { color: colors.primary, fontWeight: '700' }, pressed: { opacity: 0.65 },
+  manage: { borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line, paddingTop: 12, gap: 10, marginTop: 4 }, confirm: { backgroundColor: colors.dangerPale, borderRadius: 12, padding: 14, gap: 8 }, confirmText: { color: colors.danger, fontSize: 14, fontWeight: '600' },
+  review: { backgroundColor: colors.tint, borderRadius: 14, padding: 14, gap: 10, marginVertical: 4 }, reviewText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
+  bankSection: { marginTop: 10, borderTopWidth: StyleSheet.hairlineWidth, borderColor: colors.line, paddingTop: 20 }, suggestions: { gap: 14, marginTop: 14 }, suggestion: { backgroundColor: colors.surface, borderRadius: 18, padding: 18, gap: 10 }, footer: { color: colors.muted, fontSize: 13, lineHeight: 20, marginTop: 5 },
 }));

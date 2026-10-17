@@ -1,4 +1,4 @@
-import { themedStyles, useThemeRevision } from '@/theme';
+import { colors, themedStyles, useThemeRevision } from '@/theme';
 import { useState } from 'react';
 import { Link } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
@@ -20,7 +20,7 @@ export default function GoalProgressCard({ goal, onEdit, editing }: {
     <View style={styles.top}>
       <Text style={styles.date}>{goal.deadline ? new Date(`${goal.deadline}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : ''}</Text>
       <View style={styles.actions}>
-        {editing ? <Text style={styles.date}>Editing below</Text> : <IconButton icon="edit" label="Edit goal" inverse onPress={onEdit} />}
+        {editing ? <Text style={styles.date}>Editing below</Text> : <IconButton icon="edit" label="Edit goal" onPress={onEdit} />}
       </View>
     </View>
     <Text accessibilityRole="header" style={styles.title}>{goal.title}</Text>
@@ -46,18 +46,18 @@ export default function GoalProgressCard({ goal, onEdit, editing }: {
 }
 
 const styles = themedStyles(() => ({
-  card: { backgroundColor: '#173A35', borderRadius: 15, padding: 20, gap: 10 },
+  card: { backgroundColor: colors.surface, borderRadius: 20, padding: 20, gap: 12 },
   top: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  date: { color: '#D7E7A7', fontSize: 12, flex: 1 },
+  date: { color: colors.muted, fontSize: 13, lineHeight: 20, flex: 1 },
   actions: { flexWrap: 'wrap', flexDirection: 'row', gap: 6 },
-  title: { color: '#FFFEF9', fontSize: 22, fontWeight: '700', lineHeight: 29 },
-  product: { gap: 4 }, productLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, productText: { color: '#D7E7A7', fontSize: 13, fontWeight: '700' },
+  title: { color: colors.ink, fontSize: 22, fontWeight: '600', lineHeight: 29 },
+  product: { gap: 4 }, productLink: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' }, productText: { color: colors.primary, fontSize: 15, fontWeight: '600' },
   totalButton: { minHeight: 54, justifyContent: 'center', paddingVertical: 6 },
-  saved: { color: '#FFFEF9', fontSize: 37, lineHeight: 47, fontWeight: '800', letterSpacing: -1, fontVariant: ['tabular-nums'] },
-  target: { color: '#D7E7A7', fontSize: 25, fontWeight: '500', letterSpacing: -0.5 },
-  remaining: { color: '#D7E7A7', fontSize: 14, paddingBottom: 4 },
+  saved: { color: colors.ink, fontSize: 37, lineHeight: 47, fontWeight: '700', letterSpacing: -1, fontVariant: ['tabular-nums'] },
+  target: { color: colors.muted, fontSize: 22, fontWeight: '400', letterSpacing: -0.5 },
+  remaining: { color: colors.muted, fontSize: 14, lineHeight: 21, paddingBottom: 4 },
   progress: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 7 },
-  bar: { flex: 1, height: 7, backgroundColor: '#38574F', borderRadius: 4, overflow: 'hidden' },
-  fill: { height: '100%', backgroundColor: '#D7E7A7' },
-  percent: { color: '#D7E7A7', fontSize: 12, fontWeight: '700', fontVariant: ['tabular-nums'] },
+  bar: { flex: 1, height: 8, backgroundColor: colors.line, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: '100%', backgroundColor: colors.success },
+  percent: { color: colors.success, fontSize: 13, fontWeight: '600', fontVariant: ['tabular-nums'] },
 }));

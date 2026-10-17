@@ -1,12 +1,13 @@
 import { useSystemAccessibility } from '@/features/accessibility/systemPreferences';
-import { themedStyles, useThemeRevision , colors } from '@/theme';
+import { themedStyles, useThemeRevision, isDarkTheme, colors } from '@/theme';
 import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, Image, Platform, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GasStationCard } from '@/components/GasStationCard';
+import { AppIcon } from '@/components/AppIcon';
 import { PageToolbar } from '@/components/SettingsButton';
 import MyCarsSection from '@/features/vehicles/MyCarsSection';
 import AreaSearchSheet from '@/features/location/AreaSearchSheet';
@@ -29,6 +30,8 @@ import type { FuelType } from '@/types/stations';
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
   useThemeRevision();
+  const { width, fontScale } = useWindowDimensions();
+  const wide = width >= 900 && fontScale < 1.4;
   const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'nearby' | 'online'>('nearby');
   const savedView = useSettingsStore(state => state.gasView);
@@ -114,131 +117,105 @@ export default function GasScreen() {
   const selectedStation = stations.find((station) => station.id === selectedStationId);
   const mapPins = useMemo(() => stations.map((station) => ({
     id: station.id, name: station.name, latitude: station.latitude, longitude: station.longitude,
-    price: station.prices.find((price) => price.fuelType === selectedFuelType)?.price ?? null, sample: false,
+    price: station.prices.find((price) => price.fuelType === selectedFuelType)?.price ?? null, sample: false, lowest: station.id === cheapest?.id,
     stale: !!station.prices.find(price => price.fuelType === selectedFuelType) && !isRecentPrice(station.prices.find(price => price.fuelType === selectedFuelType), now),
-  })), [stations, selectedFuelType, now]);
+  })), [stations, selectedFuelType, now, cheapest?.id]);
   const selectPin = useCallback(async (id: string) => setSelectedStationId(id), []);
 
+  const filterCount = Number(selectedRadius !== 5) + Number(sortOrder !== 'price') + Number(priceQualifier !== 'standard') + Number(recentPricesOnly) + Number(hideUnpricedStations) + Number(mode !== 'nearby');
+  const fuelLabel = selectedFuelType.charAt(0).toUpperCase() + selectedFuelType.slice(1);
+  const searching = canShowResults && (isLoading || isFetching);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <PageToolbar />
+    <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+      <PageToolbar maxWidth={1120} />
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
-          <Text accessibilityRole="header" style={styles.title}>Gas stations</Text>
-          <Text style={styles.headerNote}>Find nearby stations and record prices you see.</Text>
+          <View style={styles.headerCopy}>
+            <Text accessibilityRole="header" style={[styles.title, fontScale >= 1.4 && styles.largeTextTitle]}>Gas stations</Text>
+            <Text style={styles.headerNote}>Compare nearby fuel prices.</Text>
+          </View>
+          {fontScale < 1.4 && <Link href="/report-price" asChild><Pressable accessibilityRole="button" accessibilityLabel="Report a price or refill" style={styles.addButton}><AppIcon name="plus" color={colors.primary} size={24} /></Pressable></Link>}
         </View>
 
-        <View style={styles.areaCard}>
-          <Text style={styles.areaLabel}>SEARCH NEAR</Text>
-          <Text numberOfLines={2} style={styles.areaName}>{location?.label ?? 'Choose a search area'}</Text>
-          <View style={styles.areaActions}><SubscriptionButton grow label={location ? 'Change area' : 'Search an area'} disabled={!ready} onPress={() => setAreaSearchOpen(true)} /><SubscriptionButton grow label={locationStatus === 'loading' ? 'Getting GPS…' : 'Use GPS'} disabled={!ready || locationStatus === 'loading'} onPress={() => void startLocationSearch()} /></View>
-        </View>
-        {(locationStatus === 'denied' || locationStatus === 'unavailable') && <View style={styles.statusBox}><Text style={styles.statusTitle}>{locationStatus === 'denied' ? 'Location access is off' : 'Could not get GPS location'}</Text><Text style={styles.statusText}>{location ? 'Your selected search area is still in use. ' : ''}Search by city or ZIP, choose a saved area, or pan the map and tap Search this area.</Text></View>}
-        {(locationStatus === 'loading' || canShowResults && (isLoading || isFetching)) && <View style={styles.loadingBox}><ActivityIndicator size="small" color={colors.accent} /><Text style={styles.loadingText}>{locationStatus === 'loading' ? 'Getting GPS. You can also search an area.' : isCached ? 'Showing saved stations · refreshing…' : isPartial ? `Stations within ${coveredRadius} mi · searching out to ${selectedRadius} mi…` : 'Finding stations in this area…'}</Text></View>}
-        {canShowResults && isCached && <View style={styles.statusBox}><Text style={styles.statusTitle}>{refreshFailed ? 'Station refresh unavailable' : 'Saved station results'}</Text><Text style={styles.statusText}>Saved {fetchedAt ? new Date(fetchedAt).toLocaleString() : 'earlier'}{coveredRadius < selectedRadius ? ` · covers ${coveredRadius} mi` : ''}. Distances are from your search center. Prices keep their original report dates.</Text>{refreshFailed && <SubscriptionButton label="Retry search" onPress={() => void refetch()} />}</View>}
-        {canShowResults && expansionFailed && <Text style={styles.noPriceNote}>Wider search unavailable. Showing stations within {coveredRadius} mi.</Text>}
-        {canShowResults && isError && <View style={styles.statusBox}><Text style={styles.statusTitle}>Station search unavailable</Text><Text style={styles.statusText}>{searchError instanceof Error ? searchError.message : 'Check your connection and try again.'} Your search area is kept. Saved report locations can still appear below.</Text><SubscriptionButton label="Retry search" onPress={() => void refetch()} /></View>}
-        <View style={styles.filters}>
-          <Pressable accessibilityRole="button" accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={styles.filterToggle}>
-            <View style={{ flex: 1 }}><Text style={styles.filterToggleTitle}>Filters</Text><Text style={styles.filterSummary}>{selectedFuelType} · {priceQualifier} · {selectedRadius} mi · {sortOrder}{recentPricesOnly ? ' · last 24h' : hideUnpricedStations ? ' · prices only' : ''}</Text></View>
-            <Text style={styles.filterChevron}>{filtersOpen ? '−' : '+'}</Text>
+        <View style={styles.searchBar}>
+          <Pressable accessibilityRole="button" accessibilityLabel={location ? `Change search area, currently ${location.label}` : 'Search a city, ZIP or address'} accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={() => setAreaSearchOpen(true)} style={({ pressed }) => [styles.searchControl, pressed && styles.pressed]}>
+            <AppIcon name="search" color={colors.muted} size={21} />
+            <View style={styles.searchCopy}><Text style={styles.searchLabel}>{location ? 'Search near' : 'Where are you headed?'}</Text><Text style={styles.areaName}>{location?.label ?? 'City, ZIP or address'}</Text></View>
+            <AppIcon name="chevron-down" color={colors.muted} size={16} />
           </Pressable>
-          {filtersOpen && <SubscriptionButton label="Reset gas filters" onPress={() => { setSelectedFuelType('regular'); setSelectedRadius(5); setSortOrder('price'); setHideUnpricedStations(false); setRecentPricesOnly(false); setPriceQualifier('standard'); }} />}
-      {filtersOpen && <>
+          <Pressable accessibilityRole="button" accessibilityLabel="Use current location" accessibilityState={{ disabled: !ready || locationStatus === 'loading', busy: locationStatus === 'loading' }} disabled={!ready || locationStatus === 'loading'} onPress={() => void startLocationSearch()} style={({ pressed }) => [styles.locationButton, pressed && styles.pressed]}>
+            {locationStatus === 'loading' ? <ActivityIndicator color={colors.primary} /> : <AppIcon name="location" color={colors.primary} size={22} />}
+          </Pressable>
+        </View>
+
+        <View accessibilityLabel="Fuel type" style={styles.fuelControl}>
+          {fuelOptions.map(fuel => <Pressable key={fuel} accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} onPress={() => setSelectedFuelType(fuel)} style={({ pressed }) => [styles.fuelOption, (width < 360 || fontScale > 1.2) && styles.fuelOptionNarrow, selectedFuelType === fuel && styles.selectedFuel, pressed && styles.pressed]}>
+            <Text style={[styles.fuelText, selectedFuelType === fuel && styles.selectedFuelText]}>{fuel.charAt(0).toUpperCase() + fuel.slice(1)}</Text>
+          </Pressable>)}
+        </View>
+
+        <View style={styles.filterBar}>
+          <Text style={styles.filterSummary}>Within {selectedRadius} mi · {sortOrder === 'price' ? 'Lowest price' : 'Nearest first'}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel={`Filters${filterCount ? `, ${filterCount} changed` : ''}`} accessibilityState={{ expanded: filtersOpen }} onPress={() => setFiltersOpen(!filtersOpen)} style={({ pressed }) => [styles.filterButton, filtersOpen && styles.filterButtonActive, pressed && styles.pressed]}>
+            <AppIcon name="sliders" color={colors.primary} size={18} /><Text style={styles.filterButtonText}>Filters{filterCount ? ` (${filterCount})` : ''}</Text>
+          </Pressable>
+        </View>
+
+        {filtersOpen && <View style={styles.filters}>
+          <View style={styles.filterHeading}><Text accessibilityRole="header" style={styles.sectionTitle}>Search filters</Text><SubscriptionButton label="Reset" onPress={() => { setSelectedRadius(5); setSortOrder('price'); setHideUnpricedStations(false); setRecentPricesOnly(false); setPriceQualifier('standard'); setMode('nearby'); }} /></View>
+          <Text style={styles.fieldLabel}>Price type</Text>
           <View style={styles.pillRow}>{priceQualifiers.map(value => <Pressable key={value.id} accessibilityRole="button" accessibilityState={{ selected: priceQualifier === value.id }} style={[styles.pill, priceQualifier === value.id && styles.activePill]} onPress={() => setPriceQualifier(value.id)}><Text style={[styles.pillText, priceQualifier === value.id && styles.activePillText]}>{value.label}</Text></Pressable>)}</View>
-          <Pressable accessibilityRole="checkbox" accessibilityLabel="Recent prices only" accessibilityState={{ checked: recentPricesOnly }} aria-checked={recentPricesOnly} onPress={() => setRecentPricesOnly(!recentPricesOnly)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Only prices reported in the last 24 hours</Text><Text style={styles.filterChevron}>{recentPricesOnly ? '☑' : '☐'}</Text></Pressable>
-          <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.filterToggle}><Text style={[styles.pillText, { flex: 1 }]}>Hide stations without a price</Text><Text style={styles.filterChevron}>{hideUnpricedStations ? '☑' : '☐'}</Text></Pressable>
-          <Text style={styles.noPriceNote}>Applies to {selectedFuelType} prices on the map and in the list. N/A means no price saved.</Text>
-          {!!stationApiBaseUrl && <View style={styles.pillRow}><Pressable accessibilityRole="button" style={styles.pill} onPress={() => setMode('nearby')}><Text style={styles.pillText}>Nearby map</Text></Pressable><Pressable accessibilityRole="button" style={styles.pill} onPress={() => { setViewMode('list'); setMode('online'); }}><Text style={styles.pillText}>Google prices</Text></Pressable></View>}
-          <View style={styles.filterPanel}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>Fuel</Text>
-            <View style={styles.pillRow}>
-              {fuelOptions.map((fuel) => (
-                <Pressable
-                  key={fuel}
-                  accessibilityRole="button" accessibilityState={{ selected: selectedFuelType === fuel }} style={[styles.pill, selectedFuelType === fuel && styles.activePill]}
-                  onPress={() => setSelectedFuelType(fuel)}
-                >
-                  <Text style={[styles.pillText, selectedFuelType === fuel && styles.activePillText]}>{fuel}</Text>
-                </Pressable>
-              ))}
+          <Text style={styles.fieldLabel}>Distance</Text>
+          <View style={styles.pillRow}>{[5, 10, 25].map(radius => <Pressable key={radius} accessibilityRole="button" accessibilityState={{ selected: selectedRadius === radius }} style={[styles.pill, selectedRadius === radius && styles.activePill]} onPress={() => setSelectedRadius(radius)}><Text style={[styles.pillText, selectedRadius === radius && styles.activePillText]}>{radius} mi</Text></Pressable>)}</View>
+          <Text style={styles.fieldLabel}>Sort by</Text>
+          <View style={styles.pillRow}>{(['price', 'distance'] as const).map(sort => <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: sortOrder === sort }} style={[styles.pill, sortOrder === sort && styles.activePill]} onPress={() => setSortOrder(sort)}><Text style={[styles.pillText, sortOrder === sort && styles.activePillText]}>{sort === 'price' ? 'Lowest price' : 'Distance'}</Text></Pressable>)}</View>
+          <Pressable accessibilityRole="checkbox" accessibilityLabel="Recent prices only" accessibilityState={{ checked: recentPricesOnly }} aria-checked={recentPricesOnly} onPress={() => setRecentPricesOnly(!recentPricesOnly)} style={styles.checkRow}><View style={styles.checkCopy}><Text style={styles.checkTitle}>Recent prices only</Text><Text style={styles.checkNote}>Reported in the last 24 hours</Text></View><View style={[styles.checkbox, recentPricesOnly && styles.checked]}>{recentPricesOnly && <AppIcon name="check" size={16} color={colors.surface} />}</View></Pressable>
+          <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.checkRow}><Text style={[styles.checkTitle, styles.checkCopy]}>Hide stations without a price</Text><View style={[styles.checkbox, hideUnpricedStations && styles.checked]}>{hideUnpricedStations && <AppIcon name="check" size={16} color={colors.surface} />}</View></Pressable>
+          {!!stationApiBaseUrl && <><Text style={styles.fieldLabel}>Station source</Text><View style={styles.pillRow}>{(['nearby', 'online'] as const).map(source => <Pressable key={source} accessibilityRole="button" accessibilityState={{ selected: mode === source }} style={[styles.pill, mode === source && styles.activePill]} onPress={() => { setMode(source); if (source === 'online') setViewMode('list'); }}><Text style={[styles.pillText, mode === source && styles.activePillText]}>{source === 'nearby' ? 'OpenStreetMap' : 'Google prices'}</Text></Pressable>)}</View></>}
+          <Text style={styles.footnote}>Filters apply to {fuelLabel.toLowerCase()} prices in both views.</Text>
+          <SubscriptionButton label="Show results" tone="primary" onPress={() => setFiltersOpen(false)} />
+        </View>}
+
+        <View style={[styles.body, wide && styles.wideBody]}>
+          <View style={styles.results}>
+            <View style={styles.resultsHeading}>
+              <View style={styles.resultsCopy}><Text accessibilityRole="header" style={styles.sectionTitle}>{canShowResults ? 'Nearby stations' : 'Find stations'}</Text><Text accessibilityLiveRegion="polite" style={styles.resultCount}>{!canShowResults ? 'Choose an area to get started' : searching && !stations.length ? 'Searching…' : `${stations.length} station${stations.length === 1 ? '' : 's'} · ${fuelLabel}`}</Text></View>
+              <View style={styles.viewToggle}>{(['map', 'list'] as const).map(view => <Pressable key={view} accessibilityRole="button" accessibilityLabel={view === 'map' ? 'Map view' : 'List view'} aria-pressed={viewMode === view} accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.selectedView, mode === 'online' && view === 'map' && styles.disabled]}><AppIcon name={view} color={viewMode === view ? colors.ink : colors.muted} size={18} /><Text style={[styles.viewText, viewMode === view && styles.selectedViewText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}</View>
             </View>
+
+            {(locationStatus === 'denied' || locationStatus === 'unavailable') && <View style={styles.statusBox}><Text style={styles.statusTitle}>{locationStatus === 'denied' ? 'Location access is off' : 'Location unavailable'}</Text><Text style={styles.statusText}>{location ? 'Your selected area is still in use. ' : ''}Search by city or ZIP to find stations.</Text></View>}
+            {(locationStatus === 'loading' || searching) && <View accessibilityLiveRegion="polite" style={styles.loadingBox}><ActivityIndicator size="small" color={colors.primary} /><Text style={styles.loadingText}>{locationStatus === 'loading' ? 'Finding your location…' : isCached ? 'Refreshing saved stations…' : isPartial ? `Searching beyond ${coveredRadius} mi…` : 'Finding stations…'}</Text></View>}
+            {canShowResults && isCached && <View style={styles.cacheNotice}><Text style={styles.footnote}>{refreshFailed ? 'Refresh unavailable. ' : ''}Saved results{fetchedAt ? ` from ${new Date(fetchedAt).toLocaleString()}` : ''}{coveredRadius < selectedRadius ? ` · within ${coveredRadius} mi` : ''}. Price dates have not changed.</Text>{refreshFailed && <SubscriptionButton label="Retry" onPress={() => void refetch()} />}</View>}
+            {canShowResults && expansionFailed && <Text style={styles.footnote}>Wider search unavailable. Showing stations within {coveredRadius} mi.</Text>}
+            {canShowResults && isError && <View style={styles.statusBox}><Text style={styles.statusTitle}>Station search unavailable</Text><Text style={styles.statusText}>{searchError instanceof Error ? searchError.message : 'Check your connection and try again.'} Saved report locations can still appear.</Text><SubscriptionButton label="Retry search" onPress={() => void refetch()} /></View>}
+            {mode === 'online' && <Text style={styles.footnote}>Google prices are shown in List. Switch the station source in Filters to use the map.</Text>}
+
+            {!canShowResults && viewMode === 'list' && locationStatus !== 'loading' && <View style={styles.emptyCard}><View style={styles.emptyIcon}><AppIcon name="fuel" size={32} color={colors.primary} /></View><Text style={styles.emptyTitle}>Start with a location</Text><Text style={styles.emptyText}>Search an area or use your current location to see nearby gas stations.</Text><SubscriptionButton label="Search an area" tone="primary" disabled={!ready} onPress={() => setAreaSearchOpen(true)} /></View>}
+            {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && <View style={styles.emptyCard}><AppIcon name="search" size={30} color={colors.muted} /><Text style={styles.emptyTitle}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? `No matching ${selectedFuelType} prices` : 'No stations found'}</Text><Text style={styles.emptyText}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? 'Try including older prices or stations without a price.' : `Try a wider radius or another search area.`}</Text>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? <SubscriptionButton label="Show all stations" onPress={() => { setHideUnpricedStations(false); setRecentPricesOnly(false); }} /> : <SubscriptionButton label="Adjust filters" onPress={() => setFiltersOpen(true)} />}</View>}
+
+            {viewMode === 'map' && <>
+              <View style={styles.mapFrame}><StationMap key={`${mode}-${selectedRadius}`} dark={isDarkTheme()} height={wide ? 450 : 340} pins={mapPins} center={location} centerLabel="Search center" onSearchArea={searchMapArea} selectedId={selectedStationId} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: wide ? 450 : 340 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} /></View>
+              {selectedStation ? <GasStationCard key={selectedStation.id} station={selectedStation} fuelType={selectedFuelType} isCheapest={selectedStation.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} /> : <Text style={styles.footnote}>Select a station for directions and price details.</Text>}
+            </>}
+            {viewMode === 'list' && canShowResults && !isLoading && stations.length > 0 && <View style={styles.listSection}>
+              {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
+              {!cheapest && <Text style={styles.footnote}>No recent {selectedFuelType} prices. Older reports may appear below.</Text>}
+              {stations.map(station => <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} />)}
+            </View>}
+            {canShowResults && <Text style={styles.sourceNote}>Distances are from your search center. Reported prices are unverified.{mode === 'nearby' ? ' Station locations © OpenStreetMap contributors.' : ''}</Text>}
           </View>
 
-          <View style={styles.filterPanel}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>Sort</Text>
-            <View style={styles.pillRow}>
-              {(['price', 'distance'] as const).map((sort) => (
-                <Pressable key={sort} accessibilityRole="button" accessibilityState={{ selected: sortOrder === sort }} style={[styles.pill, sortOrder === sort && styles.activePill]} onPress={() => setSortOrder(sort)}>
-                  <Text style={[styles.pillText, sortOrder === sort && styles.activePillText]}>{sort}</Text>
-                </Pressable>
-              ))}
+          <View style={[styles.tools, wide && styles.wideTools]}>
+            <Text accessibilityRole="header" style={styles.sectionTitle}>Your next fill-up</Text>
+            <View style={styles.actionGroup}>
+              <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={StyleSheet.flatten([styles.actionRow, styles.rowDivider])}><View style={styles.actionIcon}><AppIcon name="route" color={colors.primary} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Plan a drive</Text><Text style={styles.actionNote}>Find fuel stops along your route</Text></View><AppIcon name="chevron-right" size={17} color={colors.muted} /></Pressable></Link>
+              <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.actionRow}><View style={styles.actionIcon}><AppIcon name="plus" color={colors.primary} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Report a price or refill</Text><Text style={styles.actionNote}>Save what you paid at the pump</Text></View><AppIcon name="chevron-right" size={17} color={colors.muted} /></Pressable></Link>
             </View>
+            <MyCarsSection />
+            <Link href="/report-receipt" asChild><Pressable accessibilityRole="button" style={styles.receiptCard}><View style={styles.actionIcon}><AppIcon name="receipt" color={colors.primary} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Reports & receipts</Text><Text style={styles.actionNote}>{receiptCount ? `${receiptCount} saved report${receiptCount === 1 ? '' : 's'}` : 'Your saved prices and fill-ups'}</Text></View><AppIcon name="chevron-right" size={17} color={colors.muted} /></Pressable></Link>
           </View>
-
-          <View style={styles.filterPanel}>
-            <Text accessibilityRole="header" style={styles.sectionTitle}>Radius</Text>
-            <View style={styles.pillRow}>
-              {[5, 10, 25].map((radius) => (
-                <Pressable
-                  key={radius}
-                  accessibilityRole="button" accessibilityState={{ selected: selectedRadius === radius }}
-                  style={[styles.pill, selectedRadius === radius && styles.activePill]}
-                  onPress={() => setSelectedRadius(radius)}
-                >
-                  <Text style={[styles.pillText, selectedRadius === radius && styles.activePillText]}>{radius} mi</Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-          </>}
         </View>
-
-        {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyTitle}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? `No saved ${selectedFuelType} prices` : isCached ? 'No saved stations in this area' : 'No stations found in this radius'}</Text>
-            <Text style={styles.emptyText}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? 'Stations are hidden by your price filters. Try another price type or include older/unpriced stations.' : 'Try expanding your search radius.'}</Text>
-            {(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 && <Pressable accessibilityRole="button" style={styles.retryButton} onPress={() => { setHideUnpricedStations(false); setRecentPricesOnly(false); }}><Text style={styles.retryText}>Show all stations</Text></Pressable>}
-          </View>
-        )}
-
-        <View style={styles.viewToggle}>
-          {(['map', 'list'] as const).map((view) => <Pressable key={view} accessibilityRole="button" aria-pressed={viewMode === view} accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.activePill]}><Text style={[styles.pillText, viewMode === view && styles.activePillText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}
-          <Text style={styles.mapCount}>{stations.length} station{stations.length === 1 ? '' : 's'}</Text>
-        </View>
-        {mode === 'online' && <Text style={styles.noPriceNote}>Google results are available in List. Choose Nearby map in Filters for the free map.</Text>}
-        {viewMode === 'map' && <>
-          <View style={styles.mapFrame}>
-            <StationMap key={`${mode}-${selectedRadius}`} pins={canShowResults ? mapPins : []} center={location} centerLabel="Search center" onSearchArea={searchMapArea} selectedId={selectedStationId} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: 370 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} />
-          </View>
-          {selectedStation ? <GasStationCard key={selectedStation.id} station={selectedStation} fuelType={selectedFuelType} isCheapest={selectedStation.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} /> : <Text style={styles.noPriceNote}>Tap a station marker for directions, reports and price history. Map locations are from OpenStreetMap; reported prices are unverified.</Text>}
-        </>}
-
-        <View style={styles.quickActions}>
-          <Link href="/report-price" asChild><Pressable accessibilityRole="button" style={styles.quickReport}><Text style={styles.quickReportText}>+ Report price / refill</Text></Pressable></Link>
-          <Link href="/on-route" asChild><Pressable accessibilityRole="button" style={styles.quickRoute}><Text style={styles.quickRouteText}>Gas on your drive ↗</Text></Pressable></Link>
-        </View>
-        {viewMode === 'list' && canShowResults && !isLoading && stations.length > 0 && (
-          <View style={styles.listSection}>
-            <Text style={styles.sectionEyebrow}>Stations</Text>
-            {mode === 'online' && data?.provider === 'Google Maps' && <Image source={require('../../../assets/google-maps-logo.png')} style={styles.googleLogo} accessibilityLabel="Google Maps" />}
-            {!cheapest && <Text style={styles.noPriceNote}>No recent {selectedFuelType} prices in these results. Older saved prices may still be shown.</Text>}
-            {stations.map((station) => (
-              <GasStationCard key={station.id} station={station} fuelType={selectedFuelType} isCheapest={station.id === cheapest?.id} isDemo={false} now={now} canReport={false} canOpenMaps canAddReceipt canFavorite={mode === 'nearby'} distanceLabel="from search center" onReported={() => void refetch()} />
-            ))}
-          </View>
-        )}
-
-        <MyCarsSection />
-
-        <Text style={styles.sectionEyebrow}>Your gas reports</Text>
-        <Link href="/report-receipt" asChild>
-          <Pressable accessibilityRole="button" style={styles.receiptCard}>
-            <View style={styles.receiptCopy}><Text style={styles.receiptTitle}>Fuel reports & receipts</Text><Text style={styles.receiptText}>{receiptCount === 0 ? 'Add a price, refill or receipt on this device.' : `${receiptCount} saved report${receiptCount === 1 ? '' : 's'} · add or review`}</Text></View>
-            <Text style={styles.receiptArrow}>›</Text>
-          </Pressable>
-        </Link>
-
       </ScrollView>
       {areaSearchOpen && <AreaSearchSheet onChoose={chooseArea} onClose={() => setAreaSearchOpen(false)} />}
     </SafeAreaView>
@@ -246,64 +223,74 @@ export default function GasScreen() {
 }
 
 const styles = themedStyles(() => ({
-  areaCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, gap: 8, marginBottom: 10 },
-  areaLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1 }, areaName: { color: colors.ink, fontSize: 15, fontWeight: '700', lineHeight: 21 }, areaActions: { flexWrap: 'wrap', flexDirection: 'row', gap: 8 },
-  statusBox: { padding: 12, borderRadius: 10, backgroundColor: colors.paleOrange, gap: 7, marginBottom: 10 }, statusTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' }, statusText: { color: colors.inkSoft, fontSize: 13, lineHeight: 19 },
-  viewToggle: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
-  viewButton: { minHeight: 44, minWidth: 70, justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7 },
-  mapCount: { marginLeft: 'auto', color: colors.muted, fontSize: 12 },
-  mapFrame: { borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 12, overflow: 'hidden', marginBottom: 10 },
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56 },
-  headerRow: { marginBottom: 12 },
-  brand: { fontSize: 11, fontWeight: '800', letterSpacing: 2.1, color: colors.accentDark, marginBottom: 12 },
-  title: { fontSize: 39, lineHeight: 44, letterSpacing: -1.7, fontWeight: '800', color: colors.ink },
-  headerNote: { fontSize: 15, color: colors.muted, marginTop: 7 },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 15 },
-  quickReport: { borderRadius: 6, backgroundColor: colors.accentDark, minHeight: 44, justifyContent: 'center', paddingHorizontal: 15 },
-  quickReportText: { color: colors.surface, fontSize: 13, fontWeight: '800' },
-  quickRoute: { borderRadius: 6, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, minHeight: 44, justifyContent: 'center', paddingHorizontal: 13 },
-  quickRouteText: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  receiptCard: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 10, padding: 16, marginBottom: 15, minHeight: 72, flexDirection: 'row', alignItems: 'center' },
-  receiptCopy: { flex: 1 },
-  receiptTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  receiptText: { color: colors.muted, fontSize: 12, marginTop: 4 },
-  receiptArrow: { color: colors.accentDark, fontSize: 28, marginLeft: 12 },
-  reportList: { marginBottom: 16 },
-  reportListToggle: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 8, minHeight: 52, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  reportListTitle: { color: colors.ink, fontWeight: '800', fontSize: 14 },
-  reportListChevron: { color: colors.accentDark, fontSize: 24 },
-  savedReport: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 7, padding: 13, marginBottom: 7 },
-  savedReportTop: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
-  savedReportName: { color: colors.ink, fontWeight: '800', fontSize: 14, flex: 1 },
-  savedReportPrice: { color: colors.accentDark, fontWeight: '800', fontSize: 16 },
-  savedReportMeta: { color: colors.muted, fontSize: 12, marginTop: 5, textTransform: 'capitalize' },
-  savedReportActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 20, marginTop: 11 },
-  savedReportAction: { color: colors.accentDark, fontSize: 12, fontWeight: '700' },
-  savedReportDelete: { color: colors.danger, fontSize: 12, fontWeight: '800' },
-  sourceText: { color: colors.inkSoft, fontSize: 12, lineHeight: 18 },
-  sectionEyebrow: { fontSize: 15, fontWeight: '800', color: colors.ink, marginBottom: 14 },
-  filters: { backgroundColor: colors.surface, borderRadius: 10, borderWidth: 1, borderColor: colors.line, paddingHorizontal: 12, paddingVertical: 6, marginBottom: 10 },
-  filterToggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 45 },
-  filterToggleTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
-  filterSummary: { color: colors.muted, fontSize: 12, textTransform: 'capitalize', marginTop: 3 },
-  filterChevron: { color: colors.accentDark, fontSize: 23, fontWeight: '500', paddingHorizontal: 7 },
-  filterPanel: { paddingTop: 12, paddingBottom: 13, borderTopWidth: 1, borderColor: colors.line },
-  sectionTitle: { fontSize: 12, color: colors.muted, marginBottom: 9, fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1 },
+  content: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
+  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
+  headerCopy: { flex: 1 },
+  title: { fontSize: 34, lineHeight: 41, letterSpacing: -1.1, fontWeight: '700', color: colors.ink },
+  largeTextTitle: { fontSize: 24, lineHeight: 30, letterSpacing: -0.5 },
+  headerNote: { fontSize: 15, lineHeight: 22, color: colors.muted, marginTop: 4 },
+  addButton: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface },
+  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: 16, marginBottom: 16 },
+  searchControl: { flex: 1, minHeight: 68, paddingVertical: 12, paddingLeft: 16, paddingRight: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  searchCopy: { flex: 1, gap: 3 },
+  searchLabel: { color: colors.muted, fontSize: 12, lineHeight: 16 },
+  areaName: { color: colors.ink, fontSize: 16, lineHeight: 22, fontWeight: '600' },
+  locationButton: { minWidth: 52, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderLeftWidth: 1, borderLeftColor: colors.line, marginRight: 4 },
+  fuelControl: { flexDirection: 'row', flexWrap: 'wrap', padding: 4, gap: 4, borderRadius: 14, backgroundColor: colors.line },
+  fuelOption: { flexGrow: 1, flexBasis: '20%', minHeight: 44, paddingHorizontal: 4, paddingVertical: 10, alignItems: 'center', justifyContent: 'center', borderRadius: 10 },
+  fuelOptionNarrow: { flexBasis: '40%' },
+  selectedFuel: { backgroundColor: colors.surface },
+  fuelText: { color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: '500' },
+  selectedFuelText: { color: colors.ink, fontWeight: '600' },
+  filterBar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 4, marginTop: 4, marginBottom: 14 },
+  filterSummary: { color: colors.muted, fontSize: 13, lineHeight: 19, flexShrink: 1, paddingVertical: 8 },
+  filterButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 10, borderRadius: 10 },
+  filterButtonActive: { backgroundColor: colors.surface },
+  filterButtonText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
+  filters: { backgroundColor: colors.surface, borderRadius: 18, padding: 18, gap: 12, marginBottom: 24 },
+  filterHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  fieldLabel: { color: colors.muted, fontSize: 13, fontWeight: '600', marginTop: 6 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { borderRadius: 5, borderWidth: 1, borderColor: colors.lineStrong, minHeight: 44, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: colors.surface },
-  activePill: { backgroundColor: colors.ink, borderColor: colors.ink },
-  pillText: { fontSize: 13, fontWeight: '700', textTransform: 'capitalize', color: colors.inkSoft },
-  activePillText: { color: colors.surface },
-  loadingBox: { backgroundColor: colors.surface, borderRadius: 8, padding: 12, alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 14 },
-  loadingText: { flex: 1, color: colors.muted, fontSize: 14 },
-  listSection: { marginTop: 4 },
-  googleLogo: { width: 98, height: 18, marginVertical: 9 },
-  noPriceNote: { color: colors.inkSoft, fontSize: 13, lineHeight: 19, marginBottom: 12 },
-  emptyCard: { marginBottom: 12, backgroundColor: colors.surface, borderRadius: 8, padding: 12, alignItems: 'center' },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: colors.ink },
-  emptyText: { marginTop: 8, color: colors.muted },
-  retryButton: { marginTop: 14, backgroundColor: colors.ink, borderRadius: 6, paddingVertical: 11, paddingHorizontal: 16 },
-  retryText: { color: colors.surface, fontWeight: '700' },
+  pill: { minHeight: 44, paddingHorizontal: 14, paddingVertical: 10, justifyContent: 'center', borderRadius: 10, backgroundColor: colors.paper },
+  activePill: { backgroundColor: colors.primary },
+  pillText: { color: colors.inkSoft, fontSize: 14, fontWeight: '500' },
+  activePillText: { color: colors.surface, fontWeight: '600' },
+  checkRow: { minHeight: 56, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderTopColor: colors.line },
+  checkCopy: { flex: 1 },
+  checkTitle: { color: colors.ink, fontSize: 15, lineHeight: 21 },
+  checkNote: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
+  checkbox: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  checked: { backgroundColor: colors.primary, borderColor: colors.primary },
+  body: { gap: 28 }, wideBody: { flexDirection: 'row', alignItems: 'flex-start' },
+  results: { flex: 1, minWidth: 0 },
+  resultsHeading: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 },
+  resultsCopy: { flexGrow: 1, flexShrink: 1 },
+  sectionTitle: { color: colors.ink, fontSize: 20, lineHeight: 26, fontWeight: '700', letterSpacing: -0.3 },
+  resultCount: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 3 },
+  viewToggle: { flexDirection: 'row', padding: 3, borderRadius: 12, backgroundColor: colors.line, gap: 2 },
+  viewButton: { flexDirection: 'row', minHeight: 44, minWidth: 66, paddingHorizontal: 10, paddingVertical: 8, alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: 9 },
+  selectedView: { backgroundColor: colors.surface }, viewText: { color: colors.muted, fontSize: 13, fontWeight: '500' }, selectedViewText: { color: colors.ink, fontWeight: '600' },
+  disabled: { opacity: 0.4 },
+  statusBox: { padding: 16, borderRadius: 14, backgroundColor: colors.paleOrange, gap: 6, marginBottom: 14 },
+  statusTitle: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' }, statusText: { color: colors.inkSoft, fontSize: 14, lineHeight: 21 },
+  loadingBox: { alignItems: 'center', flexDirection: 'row', gap: 10, marginBottom: 16 }, loadingText: { flex: 1, color: colors.muted, fontSize: 14, lineHeight: 21 },
+  cacheNotice: { gap: 4, marginBottom: 12 },
+  mapFrame: { borderRadius: 18, overflow: 'hidden', marginBottom: 12, borderWidth: 1, borderColor: colors.line },
+  listSection: { gap: 2 }, googleLogo: { width: 98, height: 18, marginVertical: 10 },
+  footnote: { color: colors.muted, fontSize: 13, lineHeight: 19, marginBottom: 8 },
+  sourceNote: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 8 },
+  emptyCard: { backgroundColor: colors.surface, borderRadius: 18, paddingVertical: 32, paddingHorizontal: 24, alignItems: 'center', gap: 14, marginBottom: 14 },
+  emptyIcon: { width: 64, height: 64, borderRadius: 20, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  emptyTitle: { color: colors.ink, fontSize: 20, lineHeight: 26, fontWeight: '600', textAlign: 'center' },
+  emptyText: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center', maxWidth: 330 },
+  tools: { gap: 14 }, wideTools: { width: 310 },
+  actionGroup: { backgroundColor: colors.surface, borderRadius: 18, overflow: 'hidden' },
+  actionRow: { minHeight: 80, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  rowDivider: { borderBottomWidth: 1, borderBottomColor: colors.line },
+  actionIcon: { width: 36, height: 36, borderRadius: 10, backgroundColor: colors.paper, alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { flex: 1, gap: 4 }, actionTitle: { color: colors.ink, fontSize: 16, lineHeight: 22, fontWeight: '600' }, actionNote: { color: colors.muted, fontSize: 13, lineHeight: 19 },
+  receiptCard: { backgroundColor: colors.surface, borderRadius: 18, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 80 },
+  pressed: { opacity: 0.6 },
 }));

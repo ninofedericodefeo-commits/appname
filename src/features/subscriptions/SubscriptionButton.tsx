@@ -14,10 +14,10 @@ export default function SubscriptionButton({ label, onPress, tone = 'secondary',
   </Pressable>;
 }
 const styles = themedStyles(() => ({
-  button: { minHeight: 46, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 14,
+  button: { minHeight: 48, borderWidth: 1, borderColor: colors.line, borderRadius: 12, paddingHorizontal: 16,
     paddingVertical: 11, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, maxWidth: '100%' },
   grow: { flex: 1 }, primary: { backgroundColor: colors.primary, borderColor: colors.primary },
   danger: { backgroundColor: colors.dangerPale, borderColor: colors.danger }, dim: { opacity: .55 },
-  label: { color: colors.ink, fontSize: 13, fontWeight: '700', textAlign: 'center', lineHeight: 19 },
-  primaryLabel: { color: colors.surface }, dangerLabel: { color: colors.danger },
+  label: { color: colors.primary, fontSize: 15, fontWeight: '600', textAlign: 'center', lineHeight: 21 },
+  primaryLabel: { color: colors.onPrimary }, dangerLabel: { color: colors.danger },
 }));

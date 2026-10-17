@@ -3,11 +3,12 @@ import { matchCandidates, bankDuplicateCandidates } from '@/features/pocket/reco
 import BalanceExplanation from '@/features/pocket/BalanceExplanation';
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
-import { Keyboard, Pressable, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 
 import { FormScrollView } from '@/components/FormScrollView';
+import { AppIcon } from '@/components/AppIcon';
 import { PageToolbar } from '@/components/SettingsButton';
 import { availableCents, parseBankBalance } from '@/features/pocket/logic';
 import { PocketTransactions } from '@/features/pocket/PocketTransactions';
@@ -21,7 +22,7 @@ import SavingsAdjustmentSheet from '@/features/goals/SavingsAdjustmentSheet';
 function AccountAction({ label, path, onPress }: { label: string; path: string; onPress: () => void }) {
   useThemeRevision();
   return <Pressable accessibilityRole="button" onPress={onPress} style={({ pressed }) => [styles.action, pressed && styles.pressed]}>
-    <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.actionCircle}><Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d={path} /></Svg></View>
+    <View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.actionCircle}><Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.primary} strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><Path d={path} /></Svg></View>
     <Text style={styles.actionLabel}>{label}</Text>
   </Pressable>;
 }
@@ -53,7 +54,7 @@ export default function PocketScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
       <View style={styles.balanceCard}>
-        <View style={styles.accountHeading}><View aria-hidden accessibilityElementsHidden importantForAccessibility="no-hide-descendants"><Svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="#D7E7A7" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"><Path d="M4 7V5h14v3M4 7h16v14H4V7Zm12 6h4v4h-4v-4Z" /></Svg></View><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
+        <View style={styles.accountHeading}><AppIcon name="wallet" color={colors.primary} /><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
         <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
         {!!estimate.snapshotDay && <Text style={styles.snapshot}>{balanceSource === 'citizens-pdf' ? 'Statement balance from' : 'Bank balance checked'} {new Date(`${estimate.snapshotDay}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</Text>}
         <Text accessibilityLabel={available === null ? 'Available to spend: add your bank balance' : `Available to spend: ${money(available)}`} style={[styles.balanceMain, { fontSize: balanceFontSize }, available !== null && available < 0 && styles.balanceNegative]} >{availableLabel}</Text>
@@ -61,7 +62,7 @@ export default function PocketScreen() {
         <View style={styles.pocketRow}><Text style={styles.pocketLabel}>Set aside</Text><Text style={styles.pocketValue}>{money(reservedCents)}</Text></View>
         <Pressable accessibilityRole="button" accessibilityLabel={showCurrentBalance ? 'Hide last bank balance' : 'Show last bank balance'} accessibilityState={{ expanded: showCurrentBalance }} onPress={() => setShowCurrentBalance(!showCurrentBalance)} style={styles.currentRow}>
           <Text style={styles.currentLabel}>Last bank balance</Text>
-          <View style={styles.currentValueGroup}><Text style={styles.currentValue}>{showCurrentBalance ? (reportedBalanceCents === null ? 'Not entered' : money(reportedBalanceCents)) : 'Show'}</Text><Text style={styles.reveal}>{showCurrentBalance ? '⌄' : '›'}</Text></View>
+          <View style={styles.currentValueGroup}><Text style={styles.currentValue}>{showCurrentBalance ? (reportedBalanceCents === null ? 'Not entered' : money(reportedBalanceCents)) : 'Show'}</Text><AppIcon name={showCurrentBalance ? 'chevron-down' : 'chevron-right'} size={17} color={colors.primary} /></View>
         </Pressable>
         {estimate.newerCount > 0 && <Text style={styles.updated}>{estimate.deltaCents < 0 ? '−' : '+'}{money(Math.abs(estimate.deltaCents))} from posted/logged activity since that balance. Unlogged activity may be missing.</Text>}
         {estimate.pendingCount > 0 && <Text style={styles.updated}>{estimate.pendingCount} pending bank transaction{estimate.pendingCount === 1 ? '' : 's'} excluded from this estimate.</Text>}
@@ -91,24 +92,24 @@ export default function PocketScreen() {
 }
 
 const styles = themedStyles(() => ({
-  safe: { flex: 1, backgroundColor: colors.paper }, content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 32, gap: 20 },
-  title: { color: colors.ink, fontSize: 34, fontWeight: '800', letterSpacing: -1.2 },
-  balanceCard: { backgroundColor: '#173A35', borderRadius: 20, padding: 22 }, accountHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 24 },
-  accountName: { color: '#FFFEF9', fontSize: 16, fontWeight: '700' }, balanceLabel: { color: '#FFFEF9', fontSize: 14, lineHeight: 21 },
-  balanceMain: { color: '#FFFEF9', fontSize: 46, lineHeight: 56, fontWeight: '800', letterSpacing: -1.6, fontVariant: ['tabular-nums'], marginTop: 4 }, balanceNegative: { color: '#FFB49A' },
-  snapshot: { color: '#D7E7A7', fontSize: 12, lineHeight: 18, marginTop: 5 },
-  formula: { color: '#C5D5CC', fontSize: 12, lineHeight: 18, marginTop: 5, marginBottom: 21 },
-  pocketRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 15, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.15)' },
-  pocketLabel: { color: '#D7E7A7', fontSize: 14 }, pocketValue: { color: '#D7E7A7', fontWeight: '700', fontSize: 17, fontVariant: ['tabular-nums'] },
-  currentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 44, gap: 12 }, currentLabel: { color: '#C5D5CC', fontSize: 12 },
-  currentValueGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 }, currentValue: { color: '#C5D5CC', fontSize: 13, fontVariant: ['tabular-nums'] }, reveal: { color: '#C5D5CC', fontSize: 21 },
-  updated: { color: '#C5D5CC', fontSize: 11, lineHeight: 16 }, balanceWarning: { color: '#FFB49A', fontSize: 12, lineHeight: 18, marginTop: 8 },
-  accountActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 6, marginTop: 22 }, action: { flex: 1, alignItems: 'center', gap: 8 },
-  actionCircle: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(215,231,167,0.12)', alignItems: 'center', justifyContent: 'center' },
-  actionLabel: { color: '#FFFEF9', fontSize: 11, lineHeight: 16, fontWeight: '600', textAlign: 'center' }, pressed: { opacity: 0.65 },
-  card: { backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1, borderRadius: 14, padding: 18, gap: 12 }, section: { color: colors.ink, fontSize: 19, fontWeight: '800' },
-  hint: { color: colors.muted, fontSize: 12, lineHeight: 18 }, input: { color: colors.ink, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, padding: 12, minHeight: 46, fontSize: 16 },
-  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, button: { backgroundColor: colors.primary, borderRadius: 7, padding: 13, minHeight: 44, justifyContent: 'center' }, buttonText: { color: colors.surface, fontWeight: '800', fontSize: 13 },
-  secondary: { borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 7, padding: 13, minHeight: 44, justifyContent: 'center' }, secondaryText: { color: colors.ink, fontWeight: '700', fontSize: 13 },
-  error: { color: colors.danger, fontSize: 12, lineHeight: 18 }, textButton: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' }, link: { color: colors.primary, fontWeight: '700', fontSize: 13 },
+  safe: { flex: 1, backgroundColor: colors.paper }, content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 32, gap: 20 },
+  title: { color: colors.ink, fontSize: 34, lineHeight: 41, fontWeight: '700', letterSpacing: -0.8 },
+  balanceCard: { backgroundColor: colors.surface, borderRadius: 20, padding: 20 }, accountHeading: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 22 },
+  accountName: { color: colors.inkSoft, fontSize: 15, fontWeight: '600', flexShrink: 1 }, balanceLabel: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  balanceMain: { color: colors.ink, fontSize: 46, lineHeight: 58, fontWeight: '700', letterSpacing: -1.6, fontVariant: ['tabular-nums'], marginTop: 4 }, balanceNegative: { color: colors.danger },
+  snapshot: { color: colors.muted, fontSize: 12, lineHeight: 18, marginTop: 5 },
+  formula: { color: colors.muted, fontSize: 13, lineHeight: 20, marginTop: 5, marginBottom: 22 },
+  pocketRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  pocketLabel: { color: colors.inkSoft, fontSize: 15 }, pocketValue: { color: colors.ink, fontWeight: '600', fontSize: 17, fontVariant: ['tabular-nums'] },
+  currentRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', minHeight: 48, gap: 12 }, currentLabel: { color: colors.muted, fontSize: 13 },
+  currentValueGroup: { flexDirection: 'row', alignItems: 'center', gap: 6 }, currentValue: { color: colors.primary, fontSize: 14, fontVariant: ['tabular-nums'] },
+  updated: { color: colors.muted, fontSize: 12, lineHeight: 18 }, balanceWarning: { color: colors.danger, fontSize: 13, lineHeight: 20, marginTop: 8 },
+  accountActions: { flexDirection: 'row', justifyContent: 'space-between', gap: 8, marginTop: 22 }, action: { flex: 1, minWidth: 44, minHeight: 80, alignItems: 'center', gap: 8 },
+  actionCircle: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.tint, alignItems: 'center', justifyContent: 'center' },
+  actionLabel: { color: colors.primary, fontSize: 12, lineHeight: 18, fontWeight: '600', textAlign: 'center' }, pressed: { opacity: 0.65 },
+  card: { backgroundColor: colors.surface, borderRadius: 18, padding: 18, gap: 12 }, section: { color: colors.ink, fontSize: 20, fontWeight: '600' },
+  hint: { color: colors.muted, fontSize: 13, lineHeight: 20 }, input: { color: colors.ink, borderColor: colors.lineStrong, borderWidth: 1, borderRadius: 12, padding: 14, minHeight: 48, fontSize: 17 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 }, button: { backgroundColor: colors.primary, borderRadius: 12, padding: 14, minHeight: 48, justifyContent: 'center' }, buttonText: { color: colors.onPrimary, fontWeight: '600', fontSize: 15 },
+  secondary: { backgroundColor: colors.surface, borderRadius: 14, padding: 14, minHeight: 48, justifyContent: 'center', gap: 4 }, secondaryText: { color: colors.primary, fontWeight: '600', fontSize: 15 },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 20 }, textButton: { minHeight: 48, justifyContent: 'center', alignSelf: 'flex-start' }, link: { color: colors.primary, fontWeight: '600', fontSize: 15 },
 }));

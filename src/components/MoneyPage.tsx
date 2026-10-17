@@ -16,5 +16,5 @@ export function MoneyPage({ children, scrollRef }: PropsWithChildren<{ scrollRef
 
 const styles = themedStyles(() => ({
   safe: { flex: 1, backgroundColor: colors.paper },
-  content: { paddingHorizontal: 20, paddingTop: 18, paddingBottom: 36, gap: 22 },
+  content: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 14, paddingBottom: 36, gap: 22 },
 }));

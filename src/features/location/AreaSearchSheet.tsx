@@ -43,10 +43,10 @@ export default function AreaSearchSheet({ onChoose, onClose }: { onChoose: (area
   return <Modal visible animationType={reduced ? 'none' : 'slide'} onRequestClose={close}><SafeAreaView style={styles.safe}>
     <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Search an area</Text><SubscriptionButton label="Close" onPress={close} /></View>
     <FormScrollView contentContainerStyle={styles.form}>
-      <Text style={styles.label}>City, ZIP, address or latitude, longitude</Text>
-      <TextInput accessibilityLabel="Gas search area" style={styles.input} value={query} maxLength={200} placeholder="Philadelphia, PA" autoCapitalize="words" returnKeyType="search" onSubmitEditing={() => void search()} onChangeText={value => { current.current?.abort(); setQuery(value); setMatches([]); setMessage(''); setUsingSaved(false); setBusy(false); }} />
+      <Text style={styles.label}>City, ZIP, address or coordinates</Text>
+      <TextInput accessibilityLabel="Gas search area" style={styles.input} value={query} maxLength={200} placeholder="City or ZIP code" placeholderTextColor={colors.muted} autoCapitalize="words" returnKeyType="search" onSubmitEditing={() => void search()} onChangeText={value => { current.current?.abort(); setQuery(value); setMatches([]); setMessage(''); setUsingSaved(false); setBusy(false); }} />
       <SubscriptionButton label={busy ? 'Finding places…' : 'Find area'} tone="primary" disabled={busy || query.trim().length < 2} onPress={() => void search()} />
-      <Text style={styles.note}>Place search sends only the text you submit to Photon. GPS permission is not needed. Coordinates and saved areas work without place lookup.</Text>
+      <Text style={styles.note}>Search text is sent to Photon. Coordinates and saved areas work offline.</Text>
       {!!message && <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>}
       {usingSaved && <SubscriptionButton label="Search online again" disabled={busy} onPress={() => void search(true)} />}
       {!!matches.length && <><Text style={styles.label}>Choose a place</Text>{matches.map(item => <View key={`${areaKey(item)}:${item.label}`} style={styles.match}><SubscriptionButton label={item.label} accessibilityLabel={`Search near ${item.label} at ${coordinateLabel(item)}`} onPress={() => choose(item)} /><Text style={styles.note}>{coordinateLabel(item)}</Text></View>)}</>}
@@ -56,4 +56,13 @@ export default function AreaSearchSheet({ onChoose, onClose }: { onChoose: (area
     </FormScrollView>
   </SafeAreaView></Modal>;
 }
-const styles = themedStyles(() => ({ safe: { flex: 1, backgroundColor: colors.paper }, header: { padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderColor: colors.line }, title: { flex: 1, fontSize: 24, color: colors.ink, fontWeight: '800' }, form: { padding: 20, gap: 14, paddingBottom: 40 }, label: { color: colors.ink, fontSize: 14, fontWeight: '700' }, input: { minHeight: 48, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: colors.ink, fontSize: 16, backgroundColor: colors.surface }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, match: { gap: 5 }, saved: { padding: 14, borderWidth: 1, borderColor: colors.line, borderRadius: 10, gap: 8 } }));
+const styles = themedStyles(() => ({
+  safe: { flex: 1, backgroundColor: colors.paper },
+  header: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 20, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  title: { flex: 1, fontSize: 28, lineHeight: 34, letterSpacing: -0.6, color: colors.ink, fontWeight: '700' },
+  form: { width: '100%', maxWidth: 760, alignSelf: 'center', padding: 20, gap: 16, paddingBottom: 40 },
+  label: { color: colors.ink, fontSize: 15, lineHeight: 21, fontWeight: '600' },
+  input: { minHeight: 52, borderRadius: 14, paddingHorizontal: 16, paddingVertical: 12, color: colors.ink, fontSize: 17, backgroundColor: colors.surface },
+  note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, match: { gap: 5 },
+  saved: { padding: 16, backgroundColor: colors.surface, borderRadius: 16, gap: 8 },
+}));
