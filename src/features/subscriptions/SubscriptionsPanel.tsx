@@ -87,7 +87,7 @@ export default function SubscriptionsPanel() {
   }
 
   return <View style={styles.content}>
-    <View><Text accessibilityRole="header" style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Review upcoming charges.</Text></View>
+    <View><Text accessibilityRole="header" style={styles.title}>Bills</Text><Text style={styles.intro}>Review upcoming subscription charges.</Text></View>
     <SampleDataControl compact />
     <SubscriptionCosts subscriptions={subscriptions} today={today} />
     {!!due.length && <View style={styles.card}><Text accessibilityRole="header" style={styles.sectionTitle}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))}</Text><Text style={styles.note}>{snoozed.length ? `${snoozed.length} review${snoozed.length === 1 ? '' : 's'} snoozed. Next returns ${snoozeEndLabel}. You can still review the cards below.` : 'Review the cards below, or snooze the reminder banner.'}</Text><View style={styles.actions}><SubscriptionButton label="Later · 2h" grow onPress={() => snoozeReviews('two-hours')} /><SubscriptionButton label="Hide for today" grow onPress={() => snoozeReviews('today')} /></View>{!!snoozed.length && <SubscriptionButton label="Show renewal banner again" onPress={resumeReviews} />}</View>}

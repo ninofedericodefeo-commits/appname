@@ -1,3 +1,5 @@
+import { SampleInsightsPreview } from '@/features/samples/SampleActivityPreviews';
+import SampleDataControl from '@/features/samples/SampleDataControl';
 import { monthlyBudgetPeriod } from '@/features/pocket/dateRanges';
 import { colors , useThemeRevision } from '@/theme';
 import { rangeCoverage } from '@/features/bank/coverage';
@@ -43,6 +45,7 @@ export default function InsightsScreen() {
   } catch (cause) { setError((cause as Error).message); } }
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={s.safe}><Stack.Screen options={{ title: 'Insights' }} /><FormScrollView contentContainerStyle={s.content}>
     <Text accessibilityRole="header" style={s.title}>Spending insights</Text><Text style={s.note}>Recorded posted/logged activity for this account, including hidden rows. Pending activity and savings assignments are excluded. Correct transfers/refunds in transaction details before relying on classifications.</Text>
+    <SampleDataControl compact /><SampleInsightsPreview />
     <TextInput accessibilityLabel="Insights start date" placeholder="From YYYY-MM-DD" style={s.input} value={from} onChangeText={setFrom} /><TextInput accessibilityLabel="Insights end date" placeholder="Through YYYY-MM-DD" style={s.input} value={to} onChangeText={setTo} />
     {!!validation && <Text style={s.danger}>{validation}</Text>}
     {summary && <><View style={s.card}><Text accessibilityRole="header" style={s.heading}>Recorded activity</Text><Pressable accessibilityRole="button" style={s.choice} onPress={() => openRows()}><Text style={s.choiceText}>View supporting transactions ›</Text></Pressable><Text style={s.body}>Spending {money(summary.spendingCents)}{'\n'}Income {money(summary.incomeCents)}{'\n'}Refunds {money(summary.refundCents)}{'\n'}Net transfers {money(summary.transferCents)}{'\n'}Net reversals {money(summary.reversalCents)}</Text><Text style={s.note}>{fullyCovered ? 'Saved statement periods cover this date range; check reconciliation in Saved imports.' : 'Coverage is incomplete or unknown. These totals may omit activity.'}{'\n'}Last confirmed balance date: {accountBalanceEstimate(pocket).snapshotDay ?? 'none'}.</Text></View>

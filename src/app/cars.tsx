@@ -1,3 +1,5 @@
+import { SampleCarsPreview } from '@/features/samples/SampleActivityPreviews';
+import SampleDataControl from '@/features/samples/SampleDataControl';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
 import { useDraftGuard } from '@/components/useDraftGuard';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
@@ -44,6 +46,7 @@ export default function CarsScreen() {
       <Text style={styles.kicker}>DRIVING PROFILE</Text><Text accessibilityRole="header" style={styles.title}>Your cars</Text>
       <Text style={styles.description}>Save each car once. Choose it when planning a drive, then enter just your fuel level.</Text>
       {!draft && <>
+        <SampleDataControl compact /><SampleCarsPreview />
         {cars.map((car) => <View key={car.id} style={styles.card}>
           <Text accessibilityRole="header" style={styles.heading}>{car.name}</Text><Text style={styles.description}>{car.model} · {car.mpg} MPG · {car.tankGallons} gal tank</Text>
           <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel={`Use ${car.name} for next drive`} accessibilityState={{ selected: selectedCarId === car.id }} onPress={() => selectCar(car.id)} style={styles.smallButton}><Text style={styles.link}>{selectedCarId === car.id ? '✓ Selected' : 'Use for next drive'}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => edit(car)} style={styles.smallButton}><Text style={styles.link}>Edit</Text></Pressable>

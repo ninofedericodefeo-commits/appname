@@ -16,6 +16,7 @@ import { AppState, Platform, View } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { Stack } from 'expo-router';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 
 import { syncGoalWidget } from '@/features/goals/widget';
 import { SettingsButton } from '@/components/SettingsButton';
@@ -40,7 +41,12 @@ if (Platform.OS !== 'web') {
 }
 
 export default function RootLayout() {
-  useThemeRevision(); return <><AppearanceBridge /><AccessibilityBridge /><DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate></>; }
+  useThemeRevision();
+  // Keep this provider mounted while storage recovers or privacy covers the app.
+  // Router's native provider measures asynchronously; seed the first frame so a
+  // cold launch already knows the status bar / Dynamic Island exclusion area.
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><AppearanceBridge /><AccessibilityBridge /><DataGate><PrivacyGate><ReadyLayout /></PrivacyGate></DataGate></SafeAreaProvider>;
+}
 
 function ReadyLayout() {
   useThemeRevision();

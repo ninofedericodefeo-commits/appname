@@ -4,7 +4,7 @@ import { FormScrollView as ScrollView } from '@/components/FormScrollView';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Image, Platform, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { Link } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenSafeArea as SafeAreaView } from '@/components/ScreenSafeArea';
 
 import { GasStationCard } from '@/components/GasStationCard';
 import { AppIcon } from '@/components/AppIcon';
@@ -26,6 +26,8 @@ import { useSettingsStore } from '@/stores/settingsStore';
 import { useReceiptStore } from '@/stores/receiptStore';
 import { usePriceReportStore } from '@/stores/priceReportStore';
 import type { FuelType } from '@/types/stations';
+import SampleDataControl from '@/features/samples/SampleDataControl';
+import SampleStationsPreview from '@/features/samples/SampleStationsPreview';
 
 const fuelOptions: FuelType[] = ['regular', 'midgrade', 'premium', 'diesel'];
 export default function GasScreen() {
@@ -138,6 +140,7 @@ export default function GasScreen() {
           {fontScale < 1.4 && <Link href="/report-price" asChild><Pressable accessibilityRole="button" accessibilityLabel="Report a price or refill" style={styles.addButton}><AppIcon name="plus" color={colors.primary} size={24} /></Pressable></Link>}
         </View>
 
+        <View style={styles.sampleControl}><SampleDataControl compact /></View>
         <View style={styles.searchBar}>
           <Pressable accessibilityRole="button" accessibilityLabel={location ? `Change search area, currently ${location.label}` : 'Search a city, ZIP or address'} accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={() => setAreaSearchOpen(true)} style={({ pressed }) => [styles.searchControl, pressed && styles.pressed]}>
             <AppIcon name="search" color={colors.muted} size={21} />
@@ -179,6 +182,7 @@ export default function GasScreen() {
 
         <View style={[styles.body, wide && styles.wideBody]}>
           <View style={styles.results}>
+            <SampleStationsPreview fuelType={selectedFuelType} />
             <View style={styles.resultsHeading}>
               <View style={styles.resultsCopy}><Text accessibilityRole="header" style={styles.sectionTitle}>{canShowResults ? 'Nearby stations' : 'Find stations'}</Text><Text accessibilityLiveRegion="polite" style={styles.resultCount}>{!canShowResults ? 'Choose an area to get started' : searching && !stations.length ? 'Searching…' : `${stations.length} station${stations.length === 1 ? '' : 's'} · ${fuelLabel}`}</Text></View>
               <View style={styles.viewToggle}>{(['map', 'list'] as const).map(view => <Pressable key={view} accessibilityRole="button" accessibilityLabel={view === 'map' ? 'Map view' : 'List view'} aria-pressed={viewMode === view} accessibilityState={{ selected: viewMode === view, disabled: mode === 'online' && view === 'map' }} disabled={mode === 'online' && view === 'map'} onPress={() => setViewMode(view)} style={[styles.viewButton, viewMode === view && styles.selectedView, mode === 'online' && view === 'map' && styles.disabled]}><AppIcon name={view} color={viewMode === view ? colors.ink : colors.muted} size={18} /><Text style={[styles.viewText, viewMode === view && styles.selectedViewText]}>{view === 'map' ? 'Map' : 'List'}</Text></Pressable>)}</View>
@@ -225,6 +229,7 @@ export default function GasScreen() {
 const styles = themedStyles(() => ({
   safeArea: { flex: 1, backgroundColor: colors.paper },
   container: { flex: 1 },
+  sampleControl: { marginBottom: 16 },
   content: { width: '100%', maxWidth: 1120, alignSelf: 'center', paddingHorizontal: 20, paddingTop: 8, paddingBottom: 32 },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 20 },
   headerCopy: { flex: 1 },

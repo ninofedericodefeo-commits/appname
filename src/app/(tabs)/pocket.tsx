@@ -6,7 +6,7 @@ import BalanceExplanation from '@/features/pocket/BalanceExplanation';
 import { useMemo, useState } from 'react';
 import { router } from 'expo-router';
 import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenSafeArea as SafeAreaView } from '@/components/ScreenSafeArea';
 import Svg, { Path } from 'react-native-svg';
 
 import { FormScrollView } from '@/components/FormScrollView';

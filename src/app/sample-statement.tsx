@@ -21,7 +21,7 @@ export default function SampleStatementScreen() {
     catch { setError('Could not share the sample PDF. Please try again.'); }
     finally { setBusy(false); }
   }
-  return <MoneyPage><Stack.Screen options={{ title: 'Sample Citizens statement' }} />
+  return <MoneyPage nativeHeader><Stack.Screen options={{ title: 'Sample Citizens statement' }} />
     <Text accessibilityRole="header" style={s.title}>Sample Citizens statement</Text>
     <Text style={s.note}>SAMPLE · NOT A REAL ACCOUNT. This synthetic September 2026 PDF has nine transactions and a closing balance of $3,280.54. The examples below match the document.</Text>
     <View style={s.card}><Text style={s.heading}>Synthetic PDF for testing</Text><Text style={s.note}>Previewing or sharing this file does not import it into your real account. If you import the downloaded PDF yourself, it will use the normal confirmation flow.</Text>

@@ -1,3 +1,4 @@
+import { SamplePastGoalsPreview } from '@/features/samples/SampleActivityPreviews';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
@@ -9,6 +10,7 @@ export default function PastGoals() {
   const goals = usePocketStore((state) => state.archivedGoals);
   const [limit, setLimit] = useState(3);
   return <View style={styles.section}>
+    <SamplePastGoalsPreview />
     {goals.length > 0 && <>
       <Text accessibilityRole="header" style={styles.title}>Past goals</Text>
       {goals.slice(0, limit).map((goal) => <View key={goal.id} style={styles.card}><Text style={styles.name}>{goal.title}</Text><Text style={styles.note}>{goal.result === 'reached' ? 'Reached' : 'Ended'} {new Date(goal.endedAt).toLocaleDateString()} · {formatMoney(goal.savedCents)} of {formatMoney(goal.targetCents)}</Text></View>)}

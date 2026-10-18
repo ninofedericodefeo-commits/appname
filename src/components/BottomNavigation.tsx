@@ -2,7 +2,7 @@ import TabKeyboardGroup from './TabKeyboardGroup';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useState } from 'react';
 import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenSafeArea as SafeAreaView } from './ScreenSafeArea';
 import { AppIcon, type AppIconName } from './AppIcon';
 
 export type Tab = 'index' | 'investment' | 'pocket' | 'subscriptions';
@@ -11,7 +11,7 @@ const tabs: readonly { id: Tab; label: string; icon: AppIconName }[] = [
   { id: 'index', label: 'Gas', icon: 'fuel' },
   { id: 'investment', label: 'Goals', icon: 'target' },
   { id: 'pocket', label: 'Account', icon: 'wallet' },
-  { id: 'subscriptions', label: 'Subs', icon: 'repeat' },
+  { id: 'subscriptions', label: 'Bills', icon: 'repeat' },
 ];
 
 export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSelect: (tab: Tab) => void }) {
@@ -30,7 +30,7 @@ export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSe
     <TabKeyboardGroup onSelect={index => onSelect(tabs[index].id)}><View style={styles.row} accessibilityRole="tablist" accessibilityLabel="Main navigation">
       {tabs.map((tab) => {
         const active = activeTab === tab.id;
-        return <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} accessibilityLabel={tab.id === 'subscriptions' ? 'Subscriptions' : tab.label} tabIndex={active ? 0 : -1} style={({ pressed }) => StyleSheet.flatten([styles.tab, active && styles.activeTab, pressed && styles.pressed])} onPress={() => { if (!active) onSelect(tab.id); }}>
+        return <Pressable key={tab.id} accessibilityRole="tab" accessibilityState={{ selected: active }} aria-selected={active} accessibilityLabel={tab.label} tabIndex={active ? 0 : -1} style={({ pressed }) => StyleSheet.flatten([styles.tab, active && styles.activeTab, pressed && styles.pressed])} onPress={() => { if (!active) onSelect(tab.id); }}>
           <View style={[styles.selectionMark, active && styles.activeMark]} />
           <AppIcon name={tab.icon} size={23} color={active ? colors.primary : colors.muted} />
           <Text maxFontSizeMultiplier={1.5} style={[styles.label, active && styles.activeLabel]}>{tab.label}</Text>

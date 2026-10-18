@@ -1,4 +1,5 @@
 import { Text, View } from 'react-native';
+import { router, usePathname } from 'expo-router';
 import { colors, themedStyles, useThemeRevision } from '@/theme';
 import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import { useSampleDataStore } from './store';
@@ -7,6 +8,7 @@ export default function SampleDataControl({ onPreviewStatement, compact = false,
   onPreviewStatement?: () => void; compact?: boolean; onVisibilityChange?: (visible: boolean) => void;
 }) {
   useThemeRevision();
+  const pathname = usePathname();
   const { visible, setVisible } = useSampleDataStore();
   return <View style={styles.card}>
     <View style={styles.header}><Text style={styles.title}>Sample data{visible ? ' is on' : ' is hidden'}</Text>
@@ -14,6 +16,7 @@ export default function SampleDataControl({ onPreviewStatement, compact = false,
         onPress={() => { setVisible(!visible); onVisibilityChange?.(!visible); }} /></View>
     {!compact && <Text style={styles.note}>{visible ? 'Invented records are labeled Sample. ' : ''}Your real records and balances stay unchanged.</Text>}
     {visible && onPreviewStatement && <SubscriptionButton label="View sample Citizens statement" onPress={onPreviewStatement} />}
+    {visible && pathname !== '/sample-data' && <SubscriptionButton label="Explore sample data" onPress={() => router.push('/sample-data')} />}
   </View>;
 }
 const styles = themedStyles(() => ({

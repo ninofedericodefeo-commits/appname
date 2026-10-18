@@ -1,15 +1,15 @@
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import type { PropsWithChildren, RefObject } from 'react';
 import type { ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenSafeArea as SafeAreaView } from './ScreenSafeArea';
 
 import { FormScrollView } from '@/components/FormScrollView';
 import { PageToolbar } from '@/components/SettingsButton';
 
-export function MoneyPage({ children, scrollRef }: PropsWithChildren<{ scrollRef?: RefObject<ScrollView | null> }>) {
+export function MoneyPage({ children, scrollRef, nativeHeader = false }: PropsWithChildren<{ scrollRef?: RefObject<ScrollView | null>; nativeHeader?: boolean }>) {
   useThemeRevision();
-  return <SafeAreaView edges={['top', 'left', 'right']} style={styles.safe}>
-    <PageToolbar />
+  return <SafeAreaView edges={nativeHeader ? ['left', 'right', 'bottom'] : ['top', 'left', 'right']} style={styles.safe}>
+    {!nativeHeader && <PageToolbar />}
     <FormScrollView scrollRef={scrollRef} contentContainerStyle={styles.content}>{children}</FormScrollView>
   </SafeAreaView>;
 }
