@@ -1,7 +1,9 @@
 import { manualCredit } from '@/features/pocket/manualMovement';
 import { bankDuplicateCandidates, matchCandidates, separationEvidence, isCurrentReviewRevision } from '@/features/pocket/reconciliation';
 import type { BankDuplicateRevision, MatchRevision, SeparatePurchaseDecision } from '@/features/pocket/reconciliation';
-import { merchantAliasKey, validateDetails, revisionCanUndo } from '@/features/pocket/repository';
+import { merchantAliasKey, validateDetails, revisionCanUndo, getTransactionDetails } from '@/features/pocket/repository';
+import { getMerchantAlias, setMerchantAlias, migrateLegacyMerchantAliases } from '@/features/pocket/merchantAliases';
+import { mergePersistedState } from '@/lib/persistedState';
 import type { TransactionDetails, TransactionRevision } from '@/features/pocket/repository';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
@@ -9,7 +11,7 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import type { AccountTransaction, TransactionDirections } from '@/features/pocket/transactions';
-import { clearInvalidBankDuplicates, hideTransactionFromHistory, pocketTransactions, setTransactionDirection } from '@/features/pocket/transactions';
+import { clearInvalidBankDuplicates, hideTransactionFromHistory, pocketTransactions, setTransactionDirection, getTransactionDirection } from '@/features/pocket/transactions';
 import { canReserve } from '@/features/pocket/logic';
 import { applyAccountImport } from '@/features/bank/accountImport';
 import type { AccountImportOptions } from '@/features/bank/accountImport';
@@ -149,18 +151,18 @@ export const usePocketStore = create<PocketState>()(
         const row = pocketTransactions(state.accountTransactions, state.purchases, state.entries).find(row => row.id === id);
         if (!row) throw new Error('This transaction could not be found.');
         const details = validateDetails(input), key = merchantAliasKey(row);
-        const before: TransactionRevision['before'] = { details: state.transactionDetails[id] ?? null, ...(applyAlias ? { alias: { key, value: state.merchantAliases[key] ?? null } } : {}) };
+        const before: TransactionRevision['before'] = { details: getTransactionDetails(state.transactionDetails, id) ?? null, ...(applyAlias ? { alias: { key, value: getMerchantAlias(state.merchantAliases, key) ?? null } } : {}) };
         const after: TransactionRevision['after'] = { details, ...(applyAlias ? { alias: { key, value: details.merchant || null } } : {}) };
-        const aliases = { ...state.merchantAliases }; if (applyAlias) { if (details.merchant) aliases[key] = details.merchant; else delete aliases[key]; }
+        const aliases = applyAlias ? setMerchantAlias(state.merchantAliases, key, details.merchant || null) : state.merchantAliases;
         return { transactionDetails: { ...state.transactionDetails, [id]: details }, merchantAliases: aliases,
           correctionHistory: [...state.correctionHistory, { id: `edit-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before, after }] };
       }),
       undoCorrection: id => {
         const state = get(), revision = state.correctionHistory.find(item => item.id === id);
         if (!revision || !revisionCanUndo(revision, state)) return false;
-        const details = { ...state.transactionDetails }, aliases = { ...state.merchantAliases };
+        const details = { ...state.transactionDetails };
+        const aliases = revision.before.alias ? setMerchantAlias(state.merchantAliases, revision.before.alias.key, revision.before.alias.value) : state.merchantAliases;
         if ('details' in revision.before) { if (revision.before.details) details[revision.transactionId] = revision.before.details; else delete details[revision.transactionId]; }
-        if (revision.before.alias) { if (revision.before.alias.value !== null) aliases[revision.before.alias.key] = revision.before.alias.value; else delete aliases[revision.before.alias.key]; }
         const directions = 'direction' in revision.before ? setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, revision.transactionId, revision.before.direction ?? null) : state.transactionDirections;
         set({ transactionDetails: details, merchantAliases: aliases, transactionDirections: directions,
           accountTransactions: clearInvalidBankDuplicates(state.accountTransactions, directions),
@@ -169,7 +171,7 @@ export const usePocketStore = create<PocketState>()(
       correctTransactionDirection: (id, direction) => set(state => {
         const directions = setTransactionDirection(pocketTransactions(state.accountTransactions, state.purchases, state.entries), state.transactionDirections, id, direction);
         if (directions === state.transactionDirections) return state;
-        return { transactionDirections: directions, accountTransactions: clearInvalidBankDuplicates(state.accountTransactions, directions), correctionHistory: [...state.correctionHistory, { id: `direction-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before: { direction: state.transactionDirections[id] ?? null }, after: { direction } }] };
+        return { transactionDirections: directions, accountTransactions: clearInvalidBankDuplicates(state.accountTransactions, directions), correctionHistory: [...state.correctionHistory, { id: `direction-${Date.now()}-${Math.random().toString(36).slice(2)}`, transactionId: id, createdAt: new Date().toISOString(), before: { direction: getTransactionDirection(state.transactionDirections, id) ?? null }, after: { direction } }] };
       }),
       removeTransactionFromHistory: (id) => {
         const state = get();
@@ -298,12 +300,13 @@ export const usePocketStore = create<PocketState>()(
       } })),
     }); },
     {
-      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), version: 15,
+      name: 'gasfinder-savings-pocket', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 16,
       migrate: (persisted, version) => {
         const previous = (persisted && typeof persisted === 'object' ? persisted : {}) as Partial<PocketState>;
-        if (version < 2) return { ...previous, activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
+        if (version < 2) return { ...previous, merchantAliases: migrateLegacyMerchantAliases(previous.merchantAliases), activeGoal: null, archivedGoals: [], purchases: [], accountTransactions: [], bankImportKeys: [], bankImportAccountLabel: 'Main account', goalSettings: DEFAULT_GOAL_SETTINGS };
         return {
           ...previous,
+          merchantAliases: version < 16 ? migrateLegacyMerchantAliases(previous.merchantAliases) : previous.merchantAliases ?? {},
           linkedBankAccount: inferLinkedAccount({ ...previous, accountTransactions: previous.accountTransactions ?? [], purchases: previous.purchases ?? [] }),
           balanceIncludedTransactionIds: previous.balanceIncludedTransactionIds ?? [],
           balanceAsOf: previous.balanceAsOf ?? null,

@@ -1,7 +1,8 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { useThemeRevision } from '@/theme';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Modal, Text, TextInput, View } from 'react-native';
+import { Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import AreaSearchSheet from '@/features/location/AreaSearchSheet';

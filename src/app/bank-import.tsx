@@ -1,3 +1,4 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { useSavedDraft } from '@/features/drafts/useSavedDraft';
@@ -7,7 +8,7 @@ import { readScannedStatement, scannedReadingAvailable } from '@/features/bank/s
 import { findBatchItem, batchBalanceAllowed, batchDecisionMade, updateBatch, startBatch } from '@/features/bank/batch';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Keyboard, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';

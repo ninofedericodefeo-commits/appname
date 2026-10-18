@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { create } from 'zustand';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
@@ -148,7 +149,7 @@ export const useInvestmentStore = create<InvestmentState>()(
     }); },
     {
       name: 'gasfinder-investment-demo',
-      storage: createJSONStorage(() => appStorage),
+      storage: createJSONStorage(() => appStorage), merge: mergePersistedState,
       version: 5,
       migrate: (persistedState, version) => {
         if (version === 1) {

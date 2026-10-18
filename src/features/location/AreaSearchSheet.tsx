@@ -1,7 +1,8 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useRef, useState } from 'react';
-import { Keyboard, Modal, Platform, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';

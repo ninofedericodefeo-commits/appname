@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { accessibilityDefaults, validAccessibilityPreferences } from '@/features/accessibility/preferences';
 import type { AccessibilityPreferences } from '@/features/accessibility/preferences';
 import { appStorage } from '@/lib/appStorage';
@@ -67,4 +68,4 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   setSelectedFuelType: (selectedFuelType) => set({ selectedFuelType }),
   setSelectedRadius: (selectedRadius) => set({ selectedRadius }),
   setSortOrder: (sortOrder) => set({ sortOrder }),
-}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), version: 5, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));
+}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 5, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));

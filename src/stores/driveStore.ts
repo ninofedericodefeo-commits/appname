@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -32,4 +33,4 @@ export const useDriveStore = create<DriveState>()(persist((rawSet) => { const se
   deleteCar: (id) => set((state) => ({ cars: state.cars.filter((car) => car.id !== id), selectedCarId: state.selectedCarId === id ? state.cars.find((car) => car.id !== id)?.id ?? null : state.selectedCarId })),
   selectCar: (id) => set((state) => state.cars.some((car) => car.id === id) ? { selectedCarId: id } : {}),
   setDestination: (lastDestination) => set({ lastDestination: lastDestination.trim().slice(0, 4000) }),
-}); }, { name: 'gasfinder-drive-profile', storage: createJSONStorage(() => appStorage), version: 2, migrate: state => ({ destinations: [], preferredStationIds: [], avoidedStationIds: [], ...(state as object) }) }));
+}); }, { name: 'gasfinder-drive-profile', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 2, migrate: state => ({ destinations: [], preferredStationIds: [], avoidedStationIds: [], ...(state as object) }) }));

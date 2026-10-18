@@ -1,3 +1,4 @@
+import { isFinancialRoute } from './financialRoutes';
 import { useAmountsHidden, useAmountVisibility } from '@/features/preferences/amountVisibility';
 import { router, usePathname } from 'expo-router';
 import { useThemeRevision , colors } from '@/theme';
@@ -9,7 +10,7 @@ import { dataStyles as s } from '@/features/data/styles';
 export function PrivacyGate({ children }: { children: ReactNode }) {
   useThemeRevision();
   const pathname = usePathname(), hiddenAmounts = useAmountsHidden();
-  const financialScreen = ['/pocket','/investment','/subscriptions','/insights','/account-transactions','/account-review','/bank-import','/bank-batch','/backup','/settings/savings','/settings/widgets'].includes(pathname);
+  const financialScreen = isFinancialRoute(pathname);
   const amountCover = hiddenAmounts && financialScreen;
   const { enabled, hidePreview, relockSeconds } = useDevicePrivacy();
   const { unlocked } = usePrivacySession();
@@ -42,11 +43,12 @@ export function PrivacyGate({ children }: { children: ReactNode }) {
     void sync(); return () => { active = false; };
   }, [hidePreview, hydrated]);
   const locked = Platform.OS !== 'web' && hydrated && enabled && !unlocked;
+  const covered = amountCover || locked || (Platform.OS !== 'web' && inactive && (hidePreview || enabled || hiddenAmounts));
   async function unlock() {
     setBusy(true); setError(''); authenticating.current = true;
     try { await authenticateDevice(); leftAt.current = null; } catch (cause) { setError(cause instanceof Error ? cause.message : 'Could not unlock.'); }
     finally { authenticating.current = false; setBusy(false); }
   }
   if (!hydrated) return <View style={{ flex: 1, backgroundColor: colors.paper }} />;
-  return <><View accessibilityElementsHidden={amountCover || locked || inactive && (hidePreview || enabled)} importantForAccessibility={amountCover || locked ? 'no-hide-descendants' : 'auto'} aria-hidden={amountCover || locked} style={{ flex: 1, opacity: amountCover || locked ? 0 : 1 }}>{children}</View><Modal visible={amountCover || locked || (Platform.OS !== 'web' && inactive && (hidePreview || enabled || hiddenAmounts))} animationType="none" onRequestClose={() => { if (!locked && amountCover) router.navigate('/'); }}><View style={{ flex: 1, justifyContent: 'center', padding: 28, gap: 18, backgroundColor: colors.paper }}><Text accessibilityRole="header" style={s.title}>GasFinder</Text><Text style={s.note}>{locked ? 'Unlock to view your account and saved records.' : amountCover ? 'Financial amounts are hidden. Reveal them for this session to continue.' : 'Your records are hidden while the app is in the background.'}</Text>{locked && !inactive && <Pressable accessibilityRole="button" style={s.button} disabled={busy} onPress={() => void unlock()}><Text style={s.buttonText}>{busy ? 'Unlocking…' : 'Unlock with device authentication'}</Text></Pressable>}{amountCover && !locked && !inactive && <><Pressable accessibilityRole="button" accessibilityLabel="Reveal financial amounts for this session" style={s.button} onPress={() => useAmountVisibility.setState({ revealed: true })}><Text style={s.buttonText}>Show amounts</Text></Pressable><Pressable accessibilityRole="button" style={s.choice} onPress={() => router.navigate('/')}><Text style={s.choiceText}>Go to Gas</Text></Pressable></>}{!!error && <Text style={s.danger}>{error}</Text>}</View></Modal></>;
+  return <><View accessibilityElementsHidden={covered} importantForAccessibility={covered ? 'no-hide-descendants' : 'auto'} aria-hidden={covered} style={{ flex: 1, opacity: covered ? 0 : 1 }}>{children}</View><Modal visible={covered} animationType="none" onRequestClose={() => { if (!locked && amountCover) router.navigate('/'); }}><View style={{ flex: 1, justifyContent: 'center', padding: 28, gap: 18, backgroundColor: colors.paper }}><Text accessibilityRole="header" style={s.title}>GasFinder</Text><Text style={s.note}>{locked ? 'Unlock to view your account and saved records.' : amountCover ? 'Financial amounts are hidden. Reveal them for this session to continue.' : 'Your records are hidden while the app is in the background.'}</Text>{locked && !inactive && <Pressable accessibilityRole="button" style={s.button} disabled={busy} onPress={() => void unlock()}><Text style={s.buttonText}>{busy ? 'Unlocking…' : 'Unlock with device authentication'}</Text></Pressable>}{amountCover && !locked && !inactive && <><Pressable accessibilityRole="button" accessibilityLabel="Reveal financial amounts for this session" style={s.button} onPress={() => useAmountVisibility.setState({ revealed: true })}><Text style={s.buttonText}>Show amounts</Text></Pressable><Pressable accessibilityRole="button" style={s.choice} onPress={() => router.navigate('/')}><Text style={s.choiceText}>Go to Gas</Text></Pressable></>}{!!error && <Text style={s.danger}>{error}</Text>}</View></Modal></>;
 }

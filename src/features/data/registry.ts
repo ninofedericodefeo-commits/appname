@@ -11,6 +11,7 @@ import { useShortcutSetupStore } from '@/stores/shortcutSetupStore';
 import { useStatementAutomationStore } from '@/stores/statementAutomationStore';
 import type { StoreRecord } from './backupFormat';
 import { validateStoreState } from './validation';
+import { assertNoPersistedActions, mergePersistedState } from '@/lib/persistedState';
 
 type ManagedStore = {
   getState: () => Record<string, unknown>;
@@ -37,18 +38,29 @@ export async function prepareStores(records: Record<string, StoreRecord>) {
   for (const store of managedStores) {
     const options = store.persist.getOptions(), record = records[options.name];
     if (!record || !Number.isInteger(record.version) || record.version < 0 || record.version > (options.version ?? 0)) throw new Error(`Missing or unsupported data version: ${options.name}.`);
-    const defaults = persisted(store, store.getInitialState());
+    const initial = store.getInitialState(), defaults = persisted(store, initial);
+    assertNoPersistedActions(record.state, initial, options.name);
     const migrated = record.version === (options.version ?? 0) ? record.state : options.migrate ? await options.migrate(record.state, record.version) : null;
     if (!migrated || typeof migrated !== 'object' || Array.isArray(migrated)) throw new Error(`Cannot migrate ${options.name}.`);
-    if (record.version === (options.version ?? 0)) validateStoreState(options.name, serial(migrated), defaults);
-    const state = { ...defaults, ...serial(migrated) };
+    assertNoPersistedActions(migrated, initial, options.name);
+    const migratedData = serial(migrated);
+    if (record.version === (options.version ?? 0)) validateStoreState(options.name, migratedData, defaults);
+    const state = { ...defaults, ...migratedData };
     validateStoreState(options.name, state, defaults);
-    prepared[options.name] = { version: options.version ?? 0, state };
+    prepared[options.name] = { version: options.version ?? 0, state: serial(state) };
   }
   return prepared;
 }
 export function applyStores(records: Record<string, StoreRecord>) {
-  for (const store of managedStores) store.setState({ ...store.getInitialState(), ...records[store.persist.getOptions().name].state }, true);
+  // Validate the entire replacement before the first store can be changed.
+  const replacements = managedStores.map(store => {
+    const options = store.persist.getOptions(), record = records[options.name], initial = store.getInitialState();
+    if (!record || record.version !== (options.version ?? 0)) throw new Error(`Missing or unsupported data version: ${options.name}.`);
+    assertNoPersistedActions(record.state, initial, options.name);
+    validateStoreState(options.name, record.state, persisted(store, initial));
+    return { store, state: mergePersistedState(record.state, initial) };
+  });
+  for (const { store, state } of replacements) store.setState(state, true);
 }
 export async function rehydrateStores() {
   await Promise.all(managedStores.map(async store => { await store.persist.rehydrate(); if (!store.persist.hasHydrated()) throw new Error('Saved data could not be read. Restore a known backup or retry.'); }));

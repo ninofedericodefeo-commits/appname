@@ -29,8 +29,18 @@ function searchInput(url) {
 }
 
 export function createStationsServer({ key = apiKey, search = searchGooglePlaces } = {}) {
-  return createServer(async (request, response) => {
-    const url = new URL(request.url ?? '/', `http://${request.headers.host || 'localhost'}`);
+  async function handleRequest(request, response) {
+    let url;
+    try {
+      const target = request.url ?? '';
+      if (!target.startsWith('/') || target.startsWith('//') || /[\\#\u0000-\u0020\u007f]/.test(target) || /%(?![\da-f]{2})/i.test(target)) {
+        throw new TypeError('Invalid request target.');
+      }
+      url = new URL(target, 'http://localhost');
+    } catch {
+      send(response, 400, { error: 'Invalid request target.' });
+      return;
+    }
     if (request.method === 'GET' && url.pathname === '/health') {
       send(response, 200, { status: key ? 'ready' : 'missing-key' });
       return;
@@ -62,6 +72,17 @@ export function createStationsServer({ key = apiKey, search = searchGooglePlaces
       console.error('Station provider request failed:', error);
       send(response, 502, { error: 'Could not get station data right now. Try again later.' });
     }
+  }
+
+  return createServer((request, response) => {
+    void handleRequest(request, response).catch((error) => {
+      console.error('Station service request failed:', error);
+      if (!response.headersSent) {
+        send(response, 500, { error: 'Could not process this request.' });
+      } else {
+        response.destroy();
+      }
+    });
   });
 }
 

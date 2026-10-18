@@ -1,3 +1,4 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useDialogFocus } from '@/components/useDialogFocus';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
 import { AccessibleField } from '@/components/AccessibleField';
@@ -5,7 +6,7 @@ import { useDraftGuard } from '@/components/useDraftGuard';
 import { useReducedMotion } from '@/components/useReducedMotion';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useState, useSyncExternalStore } from 'react';
-import { Keyboard, Modal, Text, View } from 'react-native';
+import { Keyboard, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import { accountBalanceEstimate } from '@/features/pocket/balanceEstimate';

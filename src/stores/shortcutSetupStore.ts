@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -26,7 +27,7 @@ export const useShortcutSetupStore = create<ShortcutSetupState>()(persist((rawSe
   restart: () => set({ stage: 'install', verificationStartedAt: null }),
 }); }, {
   name: 'gasfinder-shortcut-setup-v1',
-  storage: createJSONStorage(() => appStorage),
+  storage: createJSONStorage(() => appStorage), merge: mergePersistedState,
   version: 1, migrate: state => ({ captureLog: [], ...(state as object) }),
   partialize: ({ stage, verificationStartedAt, captureLog }) => ({ stage, verificationStartedAt, captureLog }),
 }));

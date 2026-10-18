@@ -105,7 +105,7 @@ export default function PurchaseAutomationScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>PURCHASE LOGGING</Text>
       <Text accessibilityRole="header" style={styles.title}>Connect Apple Pay</Text>
-      <Text style={styles.body}>Add our shortcut, connect your card, then your supported Wallet taps can update your goal automatically.</Text>
+      <Text style={styles.body}>Add our shortcut and connect your card. After a supported Wallet tap, review and save the purchase in GasFinder.</Text>
       {!isIPhone && <Text style={styles.notice}>Set this up in GasFinder on your iPhone. You can read the steps here; manual logging is available in Edit goal.</Text>}
       {!hydrated ? <Text style={styles.hint}>Loading your setup…</Text> : <>
         <View accessibilityLabel={`Setup step ${stepNumber} of 3`} style={styles.progress}>
@@ -145,9 +145,9 @@ export default function PurchaseAutomationScreen() {
             <Text style={styles.hint}>{unifiedAutomations ? 'Save the Transaction trigger. Enable automatic running if Shortcuts asks.' : `Choose Run Immediately, then Next. Under My Shortcuts, select “${PURCHASE_SHORTCUT_NAME}”. The ready-made shortcut handles the purchase details.`}</Text>
           </View>
           {unifiedAutomations && <View style={styles.instruction}>
-            <Text style={styles.subheading}>Allow running while locked</Text>
-            <TapPath labels={['Edit', 'ⓘ', 'Privacy']} />
-            <Text style={styles.hint}>Turn on Allow Running When Locked. Leave the logging actions as they are.</Text>
+            <Text style={styles.subheading}>Review each purchase</Text>
+            <TapPath labels={['GasFinder', 'Review purchase', 'Save purchase']} />
+            <Text style={styles.hint}>Check the merchant and amount before saving. Unlock GasFinder first if you use the app lock.</Text>
           </View>}
           <Button label="I saved the automation →" secondary onPress={() => { handoff.current = null; setError(''); awaitPurchase(); }} disabled={busy || !isIPhone} />
           <Pressable accessibilityRole="button" disabled={busy} onPress={startAgain} style={styles.textButton}><Text style={styles.link}>Didn’t add the shortcut? Go back</Text></Pressable>
@@ -156,11 +156,11 @@ export default function PurchaseAutomationScreen() {
           <Text style={styles.section}>{received ? 'Purchase received' : '3. Check your first purchase'}</Text>
           {received ? <>
             <Text style={styles.received}>{formatMoney(received.amountCents)} · {received.title}</Text>
-            <Text style={styles.body}>A purchase arrived from Shortcuts. Check that it matches your Wallet tap in Transactions, along with any set-aside from your goal’s rule.</Text>
+            <Text style={styles.body}>You saved a purchase from a link. Check that it matches your Wallet tap in Transactions, along with any set-aside from your goal’s rule.</Text>
             <Button label="Open Transactions" onPress={() => router.push('/account-transactions')} />
           </> : <>
-            <Text style={styles.body}>If you saved the Transaction automation, leave it enabled. After your next supported Apple Pay tap, the purchase will appear here and in Transactions.</Text>
-            <Text style={styles.waiting}>Waiting for a purchase from Shortcuts</Text>
+            <Text style={styles.body}>After your next supported Apple Pay tap, review the merchant and amount in GasFinder and tap Save purchase. It will then appear here and in Transactions.</Text>
+            <Text style={styles.waiting}>Waiting for a saved purchase</Text>
             <Text style={styles.hint}>Coming back from Shortcuts does not confirm the automation is on. There’s no need to make a purchase just to test it.</Text>
           </>}
           <Button label={isIPhone ? 'Finish or change card setup ↗' : 'Review card setup'} secondary disabled={busy} onPress={() => {

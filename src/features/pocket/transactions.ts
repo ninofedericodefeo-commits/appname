@@ -89,15 +89,23 @@ export function mergeAccountTransactions(existing: AccountTransaction[], incomin
   const replacements = new Map(replacedIds.map(pair => [pair.from,pair.to]));
   const resolved = [...transactions.values()].map(row => row.duplicateOf && replacements.has(row.duplicateOf) ? {...row,duplicateOf:replacements.get(row.duplicateOf)} : row);
   const corrected = { ...directions };
-  for (const replacement of replacedIds) if (corrected[replacement.from]) { corrected[replacement.to] = corrected[replacement.from]; delete corrected[replacement.from]; }
+  for (const replacement of replacedIds) {
+    const direction = getTransactionDirection(corrected, replacement.from);
+    if (direction) { corrected[replacement.to] = direction; delete corrected[replacement.from]; }
+  }
   return { transactions: clearInvalidBankDuplicates(resolved, corrected).sort((a, b) => Date.parse(b.occurredAt) - Date.parse(a.occurredAt)), added, updated, replacedIds };
 }
 
 export type SavingsAdjustment = { id: string; amountCents: number; createdAt: string; kind: 'reserve' | 'release' | 'assign'; goalId?: string; purchaseId?: string };
 
 export type TransactionDirections = Record<string, 'in' | 'out'>;
+export function getTransactionDirection(directions: TransactionDirections, id: string): 'in' | 'out' | undefined {
+  if (!Object.prototype.hasOwnProperty.call(directions, id)) return undefined;
+  const value = directions[id];
+  return value === 'in' || value === 'out' ? value : undefined;
+}
 export function effectiveBankTransaction(row: AccountTransaction, directions: TransactionDirections = {}): AccountTransaction & { directionCorrected?: boolean } {
-  const direction = directions[row.id] ?? directions[row.linkedPurchaseId ?? ''];
+  const direction = getTransactionDirection(directions, row.id) ?? getTransactionDirection(directions, row.linkedPurchaseId ?? '');
   return direction ? { ...row, amountCents: Math.abs(row.amountCents) * (direction === 'in' ? 1 : -1), directionCorrected: true } : row;
 }
 export function clearInvalidBankDuplicates(rows: AccountTransaction[], directions: TransactionDirections = {}) {
@@ -130,8 +138,8 @@ export function pocketTransactions(bank: AccountTransaction[], purchases: Logged
   }
   const hidden = new Set(hiddenIds);
   return rows.map(row => {
-    const direction = directions[row.id] ?? directions[row.linkedPurchaseId ?? row.purchase?.id ?? ''];
-    if (!['csv', 'citizens-pdf'].includes(row.source) || !['in', 'out'].includes(direction)) return row;
+    const direction = getTransactionDirection(directions, row.id) ?? getTransactionDirection(directions, row.linkedPurchaseId ?? row.purchase?.id ?? '');
+    if (!['csv', 'citizens-pdf'].includes(row.source) || !direction) return row;
     return { ...row, amountCents: Math.abs(row.amountCents) * (direction === 'in' ? 1 : -1), directionCorrected: true };
   }).filter((row) => !hidden.has(row.id) && !hidden.has(row.linkedPurchaseId ?? row.purchase?.id ?? '') &&
     // A deleted purchase can leave its savings entry visible. Keep that entry
@@ -180,6 +188,7 @@ export function filterTransactions(rows: PocketTransaction[], query: string, fil
 }
 
 export function transactionDisplayName(transaction: Pick<PocketTransaction, 'title' | 'source' | 'displayMerchant'>) {
-  if (transaction.displayMerchant) return transaction.displayMerchant;
-  return transaction.source === 'citizens-pdf' || transaction.source === 'csv' ? bankTransactionName(transaction.title) : transaction.title;
+  if (typeof transaction.displayMerchant === 'string' && transaction.displayMerchant) return transaction.displayMerchant;
+  const title = typeof transaction.title === 'string' ? transaction.title : '';
+  return transaction.source === 'citizens-pdf' || transaction.source === 'csv' ? bankTransactionName(title) : title;
 }

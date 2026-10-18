@@ -1,8 +1,9 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useDialogFocus } from './useDialogFocus';
 import { useNavigation } from 'expo-router';
 import { usePreventRemove } from 'expo-router/react-navigation';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Modal, Platform, Text, View } from 'react-native';
+import { AccessibilityInfo, Platform, Text, View } from 'react-native';
 import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import { dataStyles as s } from '@/features/data/styles';
 import { useReducedMotion } from './useReducedMotion';

@@ -13,6 +13,7 @@ import type { FuelType, GasStation } from '@/types/stations';
 import { priceDescription, reportStationPrice } from '@/features/stations/data';
 import { formatFuelPrice, isRecentPrice } from '@/features/stations/logic';
 import { appleMapsDirections, googleMapsDirections } from '@/features/stations/maps';
+import { webUrl } from '@/lib/webUrl';
 
 export function GasStationCard({
   station,
@@ -66,7 +67,9 @@ export function GasStationCard({
   async function openMap(url: string, errorMessage = 'Could not open the maps app on this device.') {
     setMapsError('');
     try {
-      await Linking.openURL(url);
+      const destination = webUrl(url);
+      if (!destination) throw new Error('Unsupported website address.');
+      await Linking.openURL(destination);
     } catch {
       setMapsError(errorMessage);
     }

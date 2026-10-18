@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -20,6 +21,6 @@ export const usePriceReportStore = create<PriceReportState>()(
       })),
       removeReport: (id) => set((state) => ({ reports: state.reports.filter((item) => item.id !== id) })),
     }); },
-    { name: 'gasfinder-local-price-reports', storage: createJSONStorage(() => appStorage), version: 2, migrate: state => state },
+    { name: 'gasfinder-local-price-reports', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 2, migrate: state => state },
   ),
 );

@@ -9,6 +9,7 @@ import type { Subscription } from '../subscriptions/logic.ts';
 import { validSetAsideRule } from '../goals/logic.ts';
 import type { SetAsideRule } from '../goals/logic.ts';
 import { validateJson } from './backupFormat.ts';
+import { parseStationsResponse } from '../stations/logic.ts';
 const object = (value: unknown): value is Record<string, unknown> => !!value && typeof value === 'object' && !Array.isArray(value);
 function requireValue(test: unknown, message: string): asserts test { if (!test) throw new Error(`Backup validation failed: ${message}.`); }
 function shape(value: Record<string, unknown>, template: Record<string, unknown>, path: string) {
@@ -30,6 +31,14 @@ function rows(state: Record<string, unknown>, key: string) {
 const nonnegative = (value: unknown): value is number => typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
 export function validateStoreState(name: string, state: Record<string, unknown>, defaults: Record<string, unknown>) {
   validateJson(state); shape(state, defaults, name);
+  if (name === 'gasfinder-gas-search') {
+    parseStationsResponse({ stations: state.favorites });
+    requireValue(Array.isArray(state.stationCaches), 'station caches');
+    for (const cache of state.stationCaches) {
+      requireValue(object(cache), 'station cache');
+      parseStationsResponse({ stations: cache.stations });
+    }
+  }
   if (name === 'gasfinder-savings-pocket') {
     requireValue(nonnegative(state.reservedCents), 'set-aside amount');
     requireValue(state.reportedBalanceCents === null || Number.isSafeInteger(state.reportedBalanceCents), 'bank balance');

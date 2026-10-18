@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -25,6 +26,6 @@ export const useStatementAutomationStore = create<State>()(persist((rawSet, get)
     set({ confirmedAccountIdentifier: strongestStatementIdentifier(state.confirmedAccountIdentifier, accountIdentifier), lastImport: receipt });
   },
 }); }, {
-  name: 'gasfinder-statement-automation-v1', storage: createJSONStorage(() => appStorage),
+  name: 'gasfinder-statement-automation-v1', storage: createJSONStorage(() => appStorage), merge: mergePersistedState,
   partialize: ({ enabled, accountLabel, confirmedAccountIdentifier, lastImport }) => ({ enabled, accountLabel, confirmedAccountIdentifier, lastImport }),
 }));

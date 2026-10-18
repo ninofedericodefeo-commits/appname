@@ -1,3 +1,4 @@
+import { PrivacyModal as Modal } from '@/features/privacy/PrivacyModal';
 import { useDialogFocus } from '@/components/useDialogFocus';
 import { useValidationAnnouncement } from '@/components/useValidationAnnouncement';
 import { RecurringDayField } from '@/components/RecurringDayField';
@@ -7,7 +8,7 @@ import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useRef, useState, useSyncExternalStore } from 'react';
 import { AccessibleField } from '@/components/AccessibleField';
 import { useFieldErrorFocus } from '@/components/useFieldErrorFocus';
-import { Modal, Pressable, Text, TextInput, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FormScrollView } from '@/components/FormScrollView';
 import { CalendarDateField } from '@/components/CalendarDateField';

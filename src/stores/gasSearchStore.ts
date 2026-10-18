@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -25,4 +26,4 @@ export const useGasSearchStore = create<GasSearchState>()(persist(rawSet => { co
   saveStations: cache => set(state => ({ stationCaches: rememberStations(state.stationCaches, cache) })),
   savePlaces: (query, matches) => set(state => ({ placeCaches: [{ query: placeQueryKey(query), matches, fetchedAt: new Date().toISOString() }, ...state.placeCaches.filter(item => item.query !== placeQueryKey(query))].slice(0, 20) })),
   toggleFavorite: station => set(state => ({ favorites: toggleFavorite(state.favorites, station) })),
-}); }, { name: 'gasfinder-gas-search', storage: createJSONStorage(() => appStorage), version: 1 }));
+}); }, { name: 'gasfinder-gas-search', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 1 }));

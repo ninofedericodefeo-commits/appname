@@ -1,3 +1,4 @@
+import { mergePersistedState } from '@/lib/persistedState';
 import { appStorage } from '@/lib/appStorage';
 import { guardedSet } from '@/features/data/writeBarrier';
 import { create } from 'zustand';
@@ -105,7 +106,7 @@ export const useSubscriptionStore = create<SubscriptionState>()(
     }); },
     {
       name: 'gasfinder-subscriptions',
-      storage: createJSONStorage(() => appStorage),
+      storage: createJSONStorage(() => appStorage), merge: mergePersistedState,
       version: 6,
       migrate: (persisted, version) => ({ ...(persisted as SubscriptionState),
         ...migrateReviewPreferences(persisted as SubscriptionState),

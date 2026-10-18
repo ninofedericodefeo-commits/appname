@@ -1,4 +1,5 @@
 import type { FuelType, GasPrice, GasStation, SortOption } from '@/types/stations';
+import { webUrl } from '../../lib/webUrl.ts';
 
 export type StationSearch = { latitude: number; longitude: number; radius: number; fuelType: FuelType; sortOrder: SortOption };
 type Coordinates = Pick<StationSearch, 'latitude' | 'longitude'>;
@@ -64,7 +65,7 @@ function isStation(value: unknown): value is GasStation {
   const validAttributions = value.attributions === undefined ||
     (Array.isArray(value.attributions) && value.attributions.every((item: unknown) =>
       isRecord(item) && typeof item.provider === 'string' && item.provider.length > 0 &&
-      (item.providerUri === undefined || (typeof item.providerUri === 'string' && /^https?:\/\//i.test(item.providerUri)))));
+      (item.providerUri === undefined || webUrl(item.providerUri) !== null)));
   return typeof value.id === 'string' && value.id.length > 0 &&
     typeof value.name === 'string' && value.name.length > 0 &&
     typeof value.address === 'string' && typeof value.city === 'string' && typeof value.state === 'string' &&
