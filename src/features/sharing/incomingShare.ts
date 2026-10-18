@@ -1,4 +1,5 @@
 import { parseAmazonLink } from '../goals/amazonLink.ts';
+import { parseAmazonInput } from '../goals/amazonInput.ts';
 
 type SharedPayload = { shareType: string; value: string; mimeType?: string | null };
 type RegisterFile = (uri: string, mimeType?: string, now?: number, shareCopy?: boolean) => string | null;
@@ -10,15 +11,7 @@ const nextHandoff = () => `${Date.now().toString(36)}-${++delivery}`;
 const productRoute = (url: string, handoff: string) => `/amazon-goal?product=${encodeURIComponent(url)}&handoff=${encodeURIComponent(handoff)}`;
 
 export function incomingAmazonUrl(text: string): string | null {
-  if (text.length > 16_384) return null;
-  // Amazon's Android share commonly includes a title before the URL; iOS can
-  // supply separate text and URL attachments. Inspect every URL, not just the first.
-  const urls = text.match(/https?:\/\/[^\s<>"\u0000-\u001f]+/gi) ?? [];
-  for (const value of urls.slice(0, 32)) {
-    const parsed = parseAmazonLink(value.replace(/[),.;!\]}]+$/, '')).value;
-    if (parsed) return parsed.sourceUrl;
-  }
-  return null;
+  return parseAmazonInput(text).value?.sourceUrl ?? null;
 }
 
 export function sharedPayloadRoute(payloads: unknown, registerFile: RegisterFile, handoff = nextHandoff()): string {

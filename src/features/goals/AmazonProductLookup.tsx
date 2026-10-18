@@ -13,7 +13,7 @@ const script = `(function () {
   function read() {
     try {
       var product = readAmazonDocument(document, location.href);
-      if (product.priceCents !== null || product.problem === 'blocked' || product.problem === 'unavailable' || product.problem === 'unsupported-currency' || product.problem === 'manual-vehicle-price' || ++attempts >= 12) {
+      if (product.priceCents !== null || product.problem === 'blocked' || product.problem === 'unavailable' || product.problem === 'unsupported-currency' || ++attempts >= 12) {
         window.ReactNativeWebView.postMessage(JSON.stringify(product));
       } else { setTimeout(read, 500); }
     } catch (_) { window.ReactNativeWebView.postMessage('{}'); }

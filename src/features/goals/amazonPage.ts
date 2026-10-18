@@ -6,6 +6,7 @@ export type AmazonPageData = {
   title: string;
   variant: string;
   priceCents: number | null;
+  priceKind?: 'vehicle-cash';
   problem?: 'blocked' | 'missing-price' | 'unavailable' | 'unsupported-currency' | 'manual-vehicle-price';
 };
 export type AmazonLookupResult = { draft: AmazonProductDraft; message?: string };
@@ -23,15 +24,14 @@ export function draftFromAmazonPage(link: AmazonLink, data: unknown, now = new D
   const draft = amazonProductDraft(resolved);
   if (typeof page.title === 'string' && page.title.length <= 1000) draft.title = page.title.replace(/[\s\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 80).trim();
   if (typeof page.variant === 'string') draft.variant = page.variant.replace(/[\s\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 120).trim();
-  // Vehicle pages mix cash, financing, rebates, leases and down payments.
-  // Keep the listing/name, but require an explicit full vehicle target.
-  if (resolved.kind === 'auto') return { draft, message: 'Amazon Autos vehicle linked. Enter and confirm the full vehicle price in USD, including any taxes and fees you want to save for. Monthly payments, down payments and lease offers are not the vehicle price.' };
+  // Require the reader's explicit cash-card evidence for vehicles.
+  if (resolved.kind === 'auto' && page.priceKind !== 'vehicle-cash') return { draft, message: 'Amazon Autos vehicle linked. Enter and confirm the full vehicle price in USD, including any taxes and fees you want to save for. Monthly payments, down payments and lease offers are not the vehicle price.' };
   const price = page.priceCents;
   if (!page.problem && draft.title && typeof price === 'number' && Number.isSafeInteger(price) && price > 0 && price <= 100_000_000) {
     draft.priceCents = price;
     draft.priceReadAt = now.toISOString();
     draft.priceSource = 'amazon-page';
-    return { draft };
+    return { draft, ...(resolved.kind === 'auto' ? { message: 'The Amazon Autos cash vehicle price is filled in. Review it before saving; taxes, dealer fees and other checkout costs may be extra.' } : {}) };
   }
   const message = page.problem === 'unsupported-currency' ? 'Amazon showed a different currency. Enter the full USD price to continue.' :
     page.problem === 'unavailable' ? 'Amazon lists this item as unavailable. Enter a USD savings target if you still want to save for it.' :

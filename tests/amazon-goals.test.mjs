@@ -41,7 +41,7 @@ test('Autos preserves the VIN detail listing instead of changing it into a retai
   assert.equal(goal.sourceUrl, sourceUrl);
   assert.equal(goal.priceSource, 'manual');
   assert.equal(validAmazonProductGoal(goal), true);
-  assert.equal(validAmazonProductGoal({ ...goal, priceSource: 'amazon-page' }), false);
+  assert.equal(validAmazonProductGoal({ ...goal, priceSource: 'amazon-page' }), true);
   for (const source of ['https://amazon.com/autos', 'https://amazon.com/s?i=vehicles', 'https://amazon.com/vindp/SHORT',
     'https://amazon.com/vindp/B0HK2T5GPL/checkout', 'https://amazon.com.evil.test/vindp/B0HK2T5GPL',
     'https://user@amazon.com/vindp/B0HK2T5GPL', 'https://amazon.com:8443/vindp/B0HK2T5GPL']) {

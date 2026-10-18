@@ -7,7 +7,8 @@ import { ActivityIndicator, Keyboard, Pressable, Text, TextInput, View } from 'r
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
-import { amazonProductDraft, parseAmazonLink } from '@/features/goals/amazonLink';
+import { amazonProductDraft } from '@/features/goals/amazonLink';
+import { MAX_AMAZON_INPUT_LENGTH, parseAmazonInput } from '@/features/goals/amazonInput';
 import type { AmazonLink, AmazonProductDraft } from '@/features/goals/amazonLink';
 import AmazonProductLookup from '@/features/goals/AmazonProductLookup';
 import GoalEditor from '@/features/goals/GoalEditor';
@@ -39,8 +40,8 @@ export default function AmazonGoalScreen() {
     const handoff = params.handoff || params.product;
     if (!ready || activeGoal || !params.product || consumedProduct.current === handoff) return;
     consumedProduct.current = handoff ?? params.product;
-    const parsed = parseAmazonLink(params.product);
-    void Promise.resolve().then(() => { if (!parsed.value) { setError(parsed.error); return; } const id = ++request.current; setLink(params.product!); setBusy(false); setDraft(null); setLookupMessage(''); setError(''); setLookup({link:parsed.value,id}); });
+    const parsed = parseAmazonInput(params.product);
+    void Promise.resolve().then(() => { if (!parsed.value) { setError(parsed.error); return; } const id = ++request.current; setLink(parsed.value.sourceUrl); setBusy(false); setDraft(null); setLookupMessage(''); setError(''); setLookup({link:parsed.value,id}); });
   }, [ready,activeGoal,params.product,params.handoff]);
   useEffect(() => () => { request.current++; }, []);
 
@@ -52,8 +53,9 @@ export default function AmazonGoalScreen() {
   function review(text: string) {
     const id = ++request.current;
     setBusy(false); setLookup(null); setDraft(null); setLookupMessage('');
-    const parsed = parseAmazonLink(text);
+    const parsed = parseAmazonInput(text);
     if (!parsed.value) { setError(parsed.error); setDraft(null); return; }
+    setLink(parsed.value.sourceUrl);
     setLookup({ link: parsed.value, id }); setError(''); Keyboard.dismiss();
   }
 
@@ -63,7 +65,7 @@ export default function AmazonGoalScreen() {
     try {
       const text = await Clipboard.getStringAsync();
       if (current !== request.current) return;
-      setLink(text.slice(0, 2048));
+      setLink(text.slice(0, MAX_AMAZON_INPUT_LENGTH));
       setBusy(false);
       review(text);
     } catch {
@@ -102,14 +104,14 @@ export default function AmazonGoalScreen() {
       </> : <>
         {!draft ? <View style={styles.card}>
           <Text accessibilityRole="header" style={styles.heading}>Add an Amazon link</Text>
-          <TextInput accessibilityLabel="Amazon product or vehicle link" value={link} onChangeText={(text) => { request.current++; setBusy(false); setLookup(null); setLink(text); setError(''); }} style={styles.input} placeholder="https://www.amazon.com/dp/…" autoCapitalize="none" autoCorrect={false} keyboardType="url" maxLength={2048} onSubmitEditing={() => review(link)} />
+          <TextInput accessibilityLabel="Amazon product or vehicle link" accessibilityHint="You can paste the product name and link together. The Amazon link is extracted automatically." value={link} onChangeText={(text) => { request.current++; setBusy(false); setLookup(null); setLink(text); setError(''); }} style={styles.input} placeholder="Paste Amazon link or product name + link" autoCapitalize="none" autoCorrect={false} keyboardType="url" multiline submitBehavior="blurAndSubmit" returnKeyType="go" textAlignVertical="top" maxLength={MAX_AMAZON_INPUT_LENGTH} onSubmitEditing={() => review(link)} />
           <View style={styles.row}><Button label={busy ? 'Reading clipboard…' : 'Paste link'} secondary disabled={busy || !!lookup} onPress={() => void paste()} /><Button label="Get product details" disabled={busy || !!lookup} onPress={() => review(link)} /></View>
           {lookup && <View style={styles.notice}>
             <View style={styles.row}><ActivityIndicator color={colors.primary} /><Text accessibilityLiveRegion="polite" style={styles.body}>Reading the product name and price…</Text></View>
             <Text style={styles.hint}>This can take a few seconds. You can review and edit the details before creating a goal.</Text>
             <View style={styles.row}><Button label="Enter details manually" secondary onPress={() => { request.current++; setDraft(amazonProductDraft(lookup.link)); setLookup(null); setLookupMessage('Enter the product name and full USD price you see on Amazon.'); }} /><Button label="Cancel lookup" secondary onPress={() => { request.current++; setLookup(null); }} /></View>
           </View>}
-          <Text style={styles.hint}>Supports amazon.com products, Amazon Autos vehicle listings and a.co short links. Vehicle goals need a confirmed full USD price. Clipboard access happens only when you tap Paste link.</Text>
+          <Text style={styles.hint}>Paste the name and link together; we find the Amazon link automatically. Supports amazon.com products, Amazon Autos vehicle listings and a.co short links. Vehicle goals need a confirmed full USD price. Clipboard access happens only when you tap Paste link.</Text>
           {error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
         </View> : <>
           <View style={styles.notice}>
@@ -139,7 +141,7 @@ const styles = themedStyles(() => ({
   kicker: { color: colors.accentDark, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 }, title: { color: colors.ink, fontSize: 34, fontWeight: '800', lineHeight: 40, letterSpacing: -1 },
   heading: { color: colors.ink, fontSize: 19, lineHeight: 26, fontWeight: '800' }, body: { color: colors.inkSoft, fontSize: 15, lineHeight: 22 }, hint: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, borderRadius: 9, padding: 18, gap: 12 }, notice: { backgroundColor: colors.paleGreen, borderRadius: 9, padding: 18, gap: 12 }, warning: { backgroundColor: colors.paleOrange, borderRadius: 8, padding: 14, gap: 12 },
-  input: { backgroundColor: colors.surface, color: colors.ink, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, padding: 12, minHeight: 48, fontSize: 15 },
+  input: { backgroundColor: colors.surface, color: colors.ink, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 7, padding: 12, minHeight: 88, fontSize: 15 },
   row: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10 }, button: { backgroundColor: colors.accentDark, borderRadius: 6, paddingHorizontal: 14, paddingVertical: 13, minHeight: 46, justifyContent: 'center', alignSelf: 'flex-start' }, buttonText: { color: colors.surface, fontWeight: '800', fontSize: 13 },
   secondary: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.lineStrong }, secondaryText: { color: colors.ink }, disabled: { opacity: 0.45 }, error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
 }));

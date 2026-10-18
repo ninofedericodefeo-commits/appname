@@ -7,12 +7,42 @@ export const AMAZON_READER_SCRIPT = String.raw`function readAmazonDocument(doc, 
     /robot check|service unavailable|sign.in/i.test(clean(doc.querySelector('title')?.textContent))) {
     result.problem = 'blocked'; return result;
   }
+  const usdCents = (text) => {
+    const match = clean(text).match(/^(?:US\$|USD\s*\$?|\$)\s*((?:\d{1,3}(?:,\d{3})+|\d+))(?:\.(\d{2}))?$/);
+    if (!match) return null;
+    const cents = Number(match[1].replace(/,/g, '')) * 100 + Number(match[2] ?? '0');
+    return Number.isSafeInteger(cents) && cents > 0 && cents <= 100_000_000 ? cents : null;
+  };
+  const hidden = (node) => {
+    let current = node;
+    while (current) {
+      if (current.hasAttribute('hidden') || current.getAttribute('aria-hidden') === 'true' ||
+        /(?:^|\s)(?:aok-hidden|a-hidden|a-text-price)(?:\s|$)/.test(current.className) ||
+        /display\s*:\s*none|visibility\s*:\s*hidden/i.test(current.getAttribute('style') ?? '')) return true;
+      current = current.parentElement;
+    }
+    return false;
+  };
   const vehicle = pageUrl.match(/\/vindp\/([a-zA-Z0-9]{10})(?:[/?#]|$)/);
   if (vehicle) {
     const pageAsin = doc.querySelector('input#ASIN, input[name="ASIN"]')?.getAttribute('value');
     if (pageAsin && pageAsin.toUpperCase() !== vehicle[1].toUpperCase()) { result.problem = 'blocked'; return result; }
     result.title = clean(doc.querySelector('#productTitle, #title_feature_div h1')?.textContent || doc.querySelector('title')?.textContent).replace(/^Amazon\.com\s*:\s*|\s*[:|–-]\s*Amazon\.com$/gi, '');
-    result.problem = 'manual-vehicle-price';
+    // Amazon Autos exposes the full vehicle amount on a distinct CASH deal
+    // card. Never read a finance/lease card, MSRP, payment or down payment.
+    const cashPrices = [];
+    for (const card of doc.querySelectorAll('[data-deal-type="CASH"][aria-label="Cash deal"]')) {
+      if (hidden(card)) continue;
+      const amount = usdCents(card.getAttribute('data-vehicle-price'));
+      const matchingVisibleAmount = Array.from(card.querySelectorAll('[aria-label]')).some(node =>
+        !hidden(node) && usdCents(node.getAttribute('aria-label')) === amount && usdCents(node.textContent) === amount);
+      if (amount === null || !matchingVisibleAmount) { result.problem = 'manual-vehicle-price'; return result; }
+      if (!cashPrices.includes(amount)) cashPrices.push(amount);
+    }
+    if (cashPrices.length === 1 && result.title) {
+      result.priceCents = cashPrices[0];
+      result.priceKind = 'vehicle-cash';
+    } else result.problem = 'manual-vehicle-price';
     return result;
   }
   const asin = pageUrl.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-zA-Z0-9]{10})(?:[/?#]|$)/)?.[1].toUpperCase();
@@ -32,27 +62,12 @@ export const AMAZON_READER_SCRIPT = String.raw`function readAmazonDocument(doc, 
     result.problem = 'unavailable'; return result;
   }
 
-  const usdCents = (text) => {
-    const match = clean(text).match(/^(?:US\$|USD\s*\$?|\$)\s*((?:\d{1,3}(?:,\d{3})+|\d+))(?:\.(\d{2}))?$/);
-    if (!match) return null;
-    const cents = Number(match[1].replace(/,/g, '')) * 100 + Number(match[2] ?? '0');
-    return Number.isSafeInteger(cents) && cents > 0 && cents <= 100_000_000 ? cents : null;
-  };
-  const hidden = (node) => {
-    let current = node;
-    while (current) {
-      if (current.hasAttribute('hidden') || current.getAttribute('aria-hidden') === 'true' ||
-        /(?:^|\s)(?:aok-hidden|a-hidden|a-text-price)(?:\s|$)/.test(current.className) ||
-        /display\s*:\s*none|visibility\s*:\s*hidden/i.test(current.getAttribute('style') ?? '')) return true;
-      current = current.parentElement;
-    }
-    return false;
-  };
   // Limit reading to the selected offer. Related products, list prices, coupons,
   // used offers and installment amounts must never become the savings target.
   const selectors = [
     '#corePriceDisplay_desktop_feature_div .a-price:not(.a-text-price)',
     '#corePriceDisplay_mobile_feature_div .a-price:not(.a-text-price)',
+    '#corePrice_mobile_feature_div .a-price:not(.a-text-price)',
     '#corePrice_feature_div .a-price:not(.a-text-price)',
     '#apex_desktop .priceToPay', '#apex_mobile .priceToPay',
     '#priceblock_dealprice', '#priceblock_ourprice', '#newBuyBoxPrice', '#price_inside_buybox',
@@ -63,8 +78,23 @@ export const AMAZON_READER_SCRIPT = String.raw`function readAmazonDocument(doc, 
   for (const selector of selectors) {
     for (const node of doc.querySelectorAll(selector)) {
       if (hidden(node) || node.getAttribute('data-a-strike') === 'true') continue;
-      const context = clean(node.parentElement?.textContent);
-      if (/\bfrom\b|starting at|\/\s*(?:mo(?:nth)?|each)\b|per month|monthly|installment|\$[\d,.]+\s*[-–]\s*\$/i.test(context)) continue;
+      let ancestor = node;
+      let excluded = false;
+      while (ancestor) {
+        if (ancestor.getAttribute('data-csa-c-buying-option-type') === 'USED' ||
+          /usedAccordionRow|usedBuySection|pricePerUnit|basisPrice|installment|monthlyPayment|coupon/i.test(String(ancestor.id) + ' ' + String(ancestor.className))) excluded = true;
+        ancestor = ancestor.parentElement;
+      }
+      if (excluded) continue;
+      // A core-price block can also contain a separate installment widget.
+      // Inspect nearby prose, excluding separately priced widgets, so that a
+      // valid full price is not rejected just because financing is offered.
+      const parent = node.parentElement;
+      const context = clean(Array.from(parent?.childNodes ?? []).filter(sibling =>
+        sibling === node || sibling.nodeType === 3 ||
+        (!/^(?:STYLE|SCRIPT)$/.test(sibling.tagName ?? '') && !sibling.querySelector?.('.a-price') && !sibling.matches?.('.a-price'))
+      ).map(sibling => sibling.textContent).join(' '));
+      if (/\bfrom\b|starting at|\/\s*(?:mo(?:nth)?|each)\b|per month|monthly|installment|\$[\d,.]+\s*[-–]\s*\$|(?:^|\s)[-–]\s*\$/i.test(context)) continue;
       let text = clean(node.querySelector('.a-offscreen')?.textContent ?? node.textContent);
       if (!node.querySelector('.a-offscreen') && node.querySelector('.a-price-whole')) {
         text = clean(node.querySelector('.a-price-symbol')?.textContent) +

@@ -189,3 +189,57 @@ test('Short links resolve to Autos and both lookup types pin route and listing a
   }));
   assert.equal(count, 2);
 });
+
+
+// Minimal markup matching the public cash deal card inspected on the supplied
+// /vindp/B0HGBW2WQ3 listing. Finance, tax and fee amounts are deliberately nearby.
+const cashCard = (amount = '$24,885', visibleAmount = amount, attributes = '') =>
+  `<div data-deal-type="CASH" aria-label="Cash deal" data-vehicle-price="${amount}" ${attributes}><span>Cash</span><span aria-label="${visibleAmount}"><span>${visibleAmount}</span></span><div aria-hidden="true">Listed price excludes government taxes and dealer fees.</div></div>`;
+const autoUrl = 'https://www.amazon.com/vindp/B0HGBW2WQ3';
+const autoHtml = body => `<html><head><title>Used 2023 Toyota Prius LE</title></head><body>${body}</body></html>`;
+
+test('Observed Autos CASH card fills full vehicle price and confirms with Amazon provenance', () => {
+  const page = readAmazonHtml(autoHtml('<div data-deal-type="FINANCE" data-vehicle-price="$483"><span>$483 /mo</span><span>$3,000 down</span></div>' + cashCard() + '<div id="cash-price-breakdown-estimated-order-total">$27,093</div>'), autoUrl);
+  assert.equal(page.title, 'Used 2023 Toyota Prius LE');
+  assert.equal(page.priceCents, 2488500);
+  assert.equal(page.priceKind, 'vehicle-cash');
+  assert.equal(page.problem, undefined);
+  const result = draftFromAmazonPage(parseAmazonLink(autoUrl).value, page, now);
+  assert.equal(result.draft.priceCents, 2488500);
+  assert.equal(result.draft.priceSource, 'amazon-page');
+  assert.match(result.message, /taxes, dealer fees/);
+  const confirmed = confirmAmazonProduct(result.draft, result.draft.title, 2488500, '', now);
+  assert.equal(confirmed.priceSource, 'amazon-page');
+  assert.equal(createGoalFromInput({ title: confirmed.title, kind: 'item', targetCents: confirmed.priceCents, deadline: null, setAsideRule: { mode: 'fixed', cents: 100 }, product: confirmed }, 0, true, 'auto-goal', now).product.priceCents, 2488500);
+});
+
+test('Autos rejects hidden, conflicting, unsupported, mismatched and finance-only cash evidence', () => {
+  for (const body of [
+    cashCard('$483 /mo'), cashCard('$3,000 down'), cashCard('CA$24,885'), cashCard('$24,885', '$24,000'),
+    cashCard('$24,885', '$24,885', 'hidden'), cashCard() + cashCard('$25,000'),
+    '<div data-deal-type="FINANCE" aria-label="Finance deal" data-vehicle-price="$24,885"><span aria-label="$24,885">$24,885</span></div>',
+    '<span id="cash-header-details-vehicle-price">$24,885</span>',
+    '<div data-deal-type="CASH" aria-label="Cash deal" data-vehicle-price="$24,885"><span aria-label="$24,885" aria-hidden="true">$24,885</span></div>',
+  ]) assert.equal(readAmazonHtml(autoHtml(body), autoUrl).priceCents, null, body);
+  const page = readAmazonHtml(autoHtml(cashCard()), autoUrl);
+  assert.equal(draftFromAmazonPage(parseAmazonLink(autoUrl).value, { ...page, priceKind: undefined }).draft.priceCents, null);
+  assert.equal(readAmazonHtml(autoHtml('<input id="ASIN" value="B0WRONG123">' + cashCard()), autoUrl).priceCents, null);
+});
+
+test('Mobile full-price offer survives a separate financing widget and ignores per-unit and used accordion amounts', () => {
+  const page = readAmazonHtml(html('<div id="corePrice_mobile_feature_div">' + price('$79.99') + '<div class="installment-widget">' + price('$6.67') + ' per month</div><span class="pricePerUnit">' + price('$0.20') + ' /ounce</span></div><div data-csa-c-buying-option-type="USED"><div id="corePrice_feature_div">' + price('$39.99') + '</div></div>'), url);
+  assert.equal(page.priceCents, 7999);
+  const used = readAmazonHtml(html('<div id="apex_desktop_usedAccordionRow"><div id="corePrice_feature_div">' + price('$39.99') + '</div></div>'), url);
+  assert.equal(used.priceCents, null);
+});
+
+
+test('Nested full-price qualifiers remain disqualifying across block and inline elements', () => {
+  for (const tag of ['div', 'section', 'span']) {
+    for (const qualifier of ['per month for 12 months', 'Starting at', 'From', ' - $19.99']) {
+      for (const body of [price('$9.99') + `<${tag}>${qualifier}</${tag}>`, `<${tag}>${qualifier}</${tag}>` + price('$9.99')]) {
+        assert.equal(readAmazonHtml(html(core(body)), url).priceCents, null, body);
+      }
+    }
+  }
+});

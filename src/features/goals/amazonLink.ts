@@ -57,7 +57,7 @@ export function validAmazonProductGoal(product: AmazonProductGoal) {
   const link = parseAmazonLink(product.sourceUrl).value;
   return !!link && link.sourceUrl === product.sourceUrl && link.asin === product.asin &&
     validText(product.title, 80, true) && validText(product.variant, 120) && product.currency === 'USD' &&
-    (product.priceSource === 'manual' || (product.priceSource === 'amazon-page' && link.kind === 'product')) && Number.isSafeInteger(product.priceCents) && product.priceCents > 0 && product.priceCents <= 100_000_000 &&
+    (product.priceSource === 'manual' || (product.priceSource === 'amazon-page' && link.kind !== 'short')) && Number.isSafeInteger(product.priceCents) && product.priceCents > 0 && product.priceCents <= 100_000_000 &&
     typeof product.priceReadAt === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(product.priceReadAt) && Number.isFinite(Date.parse(product.priceReadAt));
 }
 
