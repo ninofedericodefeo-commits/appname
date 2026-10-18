@@ -1,4 +1,4 @@
-import { amazonProductDraft, parseAmazonLink } from './amazonLink.ts';
+import { amazonProductDraft, mayFollowAmazonLink, parseAmazonLink } from './amazonLink.ts';
 import type { AmazonLink, AmazonProductDraft } from './amazonLink.ts';
 
 export type AmazonPageData = {
@@ -6,7 +6,7 @@ export type AmazonPageData = {
   title: string;
   variant: string;
   priceCents: number | null;
-  problem?: 'blocked' | 'missing-price' | 'unavailable' | 'unsupported-currency';
+  problem?: 'blocked' | 'missing-price' | 'unavailable' | 'unsupported-currency' | 'manual-vehicle-price';
 };
 export type AmazonLookupResult = { draft: AmazonProductDraft; message?: string };
 export function amazonLookupFallback(link: AmazonLink, message = 'Could not read Amazon right now. You can retry or enter the product name and full USD price.'): AmazonLookupResult {
@@ -17,12 +17,15 @@ export function draftFromAmazonPage(link: AmazonLink, data: unknown, now = new D
   if (!data || typeof data !== 'object') return amazonLookupFallback(link);
   const page = data as Partial<AmazonPageData>;
   const resolved = typeof page.url === 'string' ? parseAmazonLink(page.url).value : undefined;
-  if (!resolved || resolved.kind !== 'product' || (link.asin && resolved.asin !== link.asin) || page.problem === 'blocked') {
+  if (!resolved || resolved.kind === 'short' || !mayFollowAmazonLink(link, resolved) || page.problem === 'blocked') {
     return amazonLookupFallback(link, 'Amazon did not provide this product page. Retry or enter its name and full USD price.');
   }
   const draft = amazonProductDraft(resolved);
   if (typeof page.title === 'string' && page.title.length <= 1000) draft.title = page.title.replace(/[\s\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 80).trim();
   if (typeof page.variant === 'string') draft.variant = page.variant.replace(/[\s\x00-\x1f\x7f]+/g, ' ').trim().slice(0, 120).trim();
+  // Vehicle pages mix cash, financing, rebates, leases and down payments.
+  // Keep the listing/name, but require an explicit full vehicle target.
+  if (resolved.kind === 'auto') return { draft, message: 'Amazon Autos vehicle linked. Enter and confirm the full vehicle price in USD, including any taxes and fees you want to save for. Monthly payments, down payments and lease offers are not the vehicle price.' };
   const price = page.priceCents;
   if (!page.problem && draft.title && typeof price === 'number' && Number.isSafeInteger(price) && price > 0 && price <= 100_000_000) {
     draft.priceCents = price;

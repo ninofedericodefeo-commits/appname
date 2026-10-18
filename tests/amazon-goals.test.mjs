@@ -29,6 +29,26 @@ test('Short links remain unresolved and never invent product data', () => {
   assert.equal(confirmAmazonProduct(short, 'Headphones', 9999, '', now).sourceUrl, 'https://a.co/a1Bc23');
 });
 
+test('Autos preserves the VIN detail listing instead of changing it into a retail product', () => {
+  const sourceUrl = 'https://www.amazon.com/vindp/B0HK2T5GPL';
+  for (const source of [sourceUrl, 'https://amazon.com/vindp/b0hk2t5gpl/ref=sr_1_1?searchAlias=vehicles#details']) {
+    assert.deepEqual(parseAmazonLink(source).value, { sourceUrl, asin: 'B0HK2T5GPL', kind: 'auto' });
+  }
+  assert.deepEqual(parseAmazonLink('https://www.amazon.com/vindp/B0HGBW2WQ3/ref=sr_1_1?ref_=cm_sw_r_cp_ud_vindp_AKCW3EMXBT6BA3HR4P3H').value,
+    { sourceUrl: 'https://www.amazon.com/vindp/B0HGBW2WQ3', asin: 'B0HGBW2WQ3', kind: 'auto' });
+  const vehicle = amazonProductDraft(parseAmazonLink(sourceUrl).value);
+  const goal = confirmAmazonProduct(vehicle, '2026 Chevrolet Trax', 2409400, 'Summit White', now);
+  assert.equal(goal.sourceUrl, sourceUrl);
+  assert.equal(goal.priceSource, 'manual');
+  assert.equal(validAmazonProductGoal(goal), true);
+  assert.equal(validAmazonProductGoal({ ...goal, priceSource: 'amazon-page' }), false);
+  for (const source of ['https://amazon.com/autos', 'https://amazon.com/s?i=vehicles', 'https://amazon.com/vindp/SHORT',
+    'https://amazon.com/vindp/B0HK2T5GPL/checkout', 'https://amazon.com.evil.test/vindp/B0HK2T5GPL',
+    'https://user@amazon.com/vindp/B0HK2T5GPL', 'https://amazon.com:8443/vindp/B0HK2T5GPL']) {
+    assert.ok(parseAmazonLink(source).error, source);
+  }
+});
+
 test('Links reject deceptive hosts, credentials, private destinations and nonproduct paths', () => {
   for (const source of [
     '', 'not a link', 'http://amazon.com/dp/B0ABC12345', 'javascript:alert(1)',

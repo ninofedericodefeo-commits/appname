@@ -7,11 +7,12 @@ import { useSubscriptionStore } from '@/stores/subscriptionStore';
 import { formatMoney } from '@/lib/money';
 import { pendingRenewalReviews } from './reviewPreferences';
 import SubscriptionButton from './SubscriptionButton';
+import { isSampleRecord } from '@/features/samples/fixtures';
 
 export default function RenewalBanner() {
   useThemeRevision();
   const amountsHidden = useAmountsHidden();
-  const { subscriptions, sampleMode, reviewSnoozes, snoozeReviews } = useSubscriptionStore();
+  const { subscriptions, reviewSnoozes, snoozeReviews } = useSubscriptionStore();
   const ready = useSyncExternalStore(useSubscriptionStore.persist.onFinishHydration, useSubscriptionStore.persist.hasHydrated, () => false);
   const pathname = usePathname();
   const [now, setNow] = useState(() => new Date());
@@ -19,11 +20,10 @@ export default function RenewalBanner() {
     const listener = AppState.addEventListener('change', state => { if (state === 'active') setNow(new Date()); });
     return () => { clearInterval(timer); listener.remove(); };
   }, []);
-  const due = ready ? pendingRenewalReviews(subscriptions, sampleMode, reviewSnoozes, now) : [];
+  const due = ready ? pendingRenewalReviews(subscriptions.filter(subscription => !isSampleRecord(subscription)), false, reviewSnoozes, now) : [];
   if (!due.length || pathname === '/subscriptions') return null;
   return <View style={styles.banner}>
     <Text accessibilityRole="header" style={styles.title}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow{!amountsHidden && ` · ${formatMoney(due.reduce((total, item) => total + item.subscription.amountCents, 0))}`}</Text>
-    {due.some(item => item.subscription.isSample) && <Text style={styles.note}>Test subscriptions included</Text>}
     <View style={styles.actions}><SubscriptionButton label="Review" accessibilityLabel="Review tomorrow’s subscriptions" tone="primary" grow onPress={() => router.navigate('/subscriptions')} /><SubscriptionButton label="Later · 2h" accessibilityLabel="Snooze renewal reviews for two hours" grow onPress={() => snoozeReviews('two-hours')} /></View>
   </View>;
 }

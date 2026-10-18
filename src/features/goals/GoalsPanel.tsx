@@ -10,6 +10,9 @@ import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import type { Goal } from './logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
+import SampleDataControl from '@/features/samples/SampleDataControl';
+import { SampleGoalPreview } from '@/features/samples/SamplePreviews';
+import { useSampleDataStore } from '@/features/samples/store';
 
 function GoalActions({ goal }: { goal: Goal }) {
   useThemeRevision();
@@ -35,6 +38,7 @@ function GoalActions({ goal }: { goal: Goal }) {
 
 export default function GoalsPanel() {
   useThemeRevision();
+  const samplesVisible = useSampleDataStore(state => state.visible);
   const { activeGoal, reservedCents, createGoal, updateGoal } = usePocketStore();
   const ready = useSyncExternalStore(usePocketStore.persist.onFinishHydration, usePocketStore.persist.hasHydrated, () => false);
   const [creating, setCreating] = useState(false);
@@ -45,6 +49,7 @@ export default function GoalsPanel() {
   return <View style={styles.content}>
     <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Goals</Text><IconButton icon="activity" label="View transactions" onPress={() => router.push('/account-transactions')} /></View>
     <Text style={styles.intro}>Your savings stay in your bank account.</Text>
+    <SampleDataControl compact />
     <Link href="/amazon-goal" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Goal from Amazon link ↗</Text></Pressable></Link>
     {activeGoal ? <>
       <GoalProgressCard key={activeGoal.id} goal={activeGoal} editing={editing} onEdit={() => editing ? closeEditor() : setEditingId(activeGoal.id)} />
@@ -57,6 +62,7 @@ export default function GoalsPanel() {
       <Link href="/purchase-automation" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Connect Apple Pay purchases ↗</Text><Text style={styles.note}>Install the logging shortcut, then choose your card in Shortcuts.</Text></Pressable></Link>
     </> : creating ? <GoalEditor goal={null} reservedCents={reservedCents} onSave={(input, assignAll) => { const saved = createGoal(input, assignAll); if (saved) setCreating(false); return saved; }} onCancel={() => { Keyboard.dismiss(); setCreating(false); }} />
       : <View style={styles.card}><Text style={styles.section}>Start a savings goal</Text><Text style={styles.note}>Choose a target and a rule you can edit any time.</Text><SubscriptionButton label="Set a goal" tone="primary" disabled={!ready} onPress={() => setCreating(true)} /></View>}
+    {samplesVisible && <SampleGoalPreview />}
     {adjustment && <SavingsAdjustmentSheet initialDestination="goal" initialAction={adjustment} onClose={() => setAdjustment(null)} />}
   </View>;
 }

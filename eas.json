@@ -15,6 +15,7 @@
     },
     "personal-stable": { "extends": "personal-preview", "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "0", "EXPO_PUBLIC_BUILD_TRACK": "personal-stable" } },
     "enrolled-preview": { "extends": "personal-preview", "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "1", "EXPO_PUBLIC_BUILD_TRACK": "enrolled-preview" } },
+    "sharing-preview": { "extends": "personal-preview", "env": { "EXPO_ENABLE_IOS_CAPABILITIES": "0", "EXPO_ENABLE_IOS_SHARING": "1", "EXPO_PUBLIC_BUILD_TRACK": "sharing-preview" } },
     "simulator-preview": { "extends": "personal-preview", "ios": { "simulator": true, "buildConfiguration": "Release" } }
   }
 }

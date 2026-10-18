@@ -7,12 +7,13 @@ import { getSubscriptionReminderStatus, requestSubscriptionReminderPermission, s
 import { describeReminderStatus } from './reminderStatus';
 import type { ReminderStatus } from './reminderStatus';
 import SubscriptionButton from './SubscriptionButton';
+import SampleDataControl from '@/features/samples/SampleDataControl';
 
 export default function SubscriptionSettingsPanel() {
   useThemeRevision();
   const { reminderHour, reminderLeadDays, configure } = useSettingsStore();
   const [timeOpen,setTimeOpen] = useState(false);
-  const { subscriptions, remindersEnabled, setRemindersEnabled, resetSamples, removeSamples, sampleMode, setSampleMode } = useSubscriptionStore();
+  const { subscriptions, remindersEnabled, setRemindersEnabled } = useSubscriptionStore();
   const ready = useSyncExternalStore(useSubscriptionStore.persist.onFinishHydration, useSubscriptionStore.persist.hasHydrated, () => false);
   const [busy, setBusy] = useState(false);
   const changing = useRef(false);
@@ -62,12 +63,7 @@ export default function SubscriptionSettingsPanel() {
       </View>}
       {!!message && <Text accessibilityLiveRegion="polite" style={styles.note}>{message}</Text>}
     </View>
-    <View style={styles.card}><Text accessibilityRole="header" style={styles.heading}>Test subscriptions</Text>
-      <View style={styles.row}><Text style={styles.label}>Show sample subscriptions</Text><Switch accessibilityLabel="Test subscriptions mode" disabled={!ready} value={sampleMode} onValueChange={setSampleMode} trackColor={{ true: colors.primary, false: colors.lineStrong }} /></View>
-      <Text style={styles.note}>Invented services for testing in-app reviews. Turning this off hides their test cards and renewals. Cost totals always exclude samples. Your real subscriptions and balance stay the same.</Text>
-      <View style={styles.actions}><SubscriptionButton grow disabled={!ready} label={subscriptions.some(item => item.isSample) ? 'Reset samples' : 'Add samples'} onPress={resetSamples} />{subscriptions.some(item => item.isSample) && <SubscriptionButton grow disabled={!ready} label="Remove samples" onPress={removeSamples} />}</View>
-      <Text style={styles.note}>Resetting turns on test mode and makes Music Plus renew tomorrow.</Text>
-    </View>
+    <SampleDataControl />
   </>;
 }
 const styles = themedStyles(() => ({ card: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: 16, borderRadius: 10, gap: 12 }, heading: { color: colors.ink, fontSize: 18, fontWeight: '800' }, row: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', gap: 12 }, label: { color: colors.ink, fontSize: 15, flex: 1 }, note: { color: colors.muted, fontSize: 13, lineHeight: 19 }, status: { color: colors.ink, fontWeight: '700', fontSize: 13, lineHeight: 19 }, actions: { flexWrap: 'wrap', flexDirection: 'row', gap: 8 } }));

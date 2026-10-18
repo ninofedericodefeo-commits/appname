@@ -1,3 +1,4 @@
+import SampleDataControl from '@/features/samples/SampleDataControl';
 import { useThemeRevision , colors } from '@/theme';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { router, useFocusEffect } from 'expo-router';
@@ -27,6 +28,7 @@ export default function BankImportsScreen() {
   function choice(label: string, action: () => void, chosen = false) { return <Pressable key={label} accessibilityRole="button" disabled={busy} accessibilityState={{ selected: chosen, disabled: busy }} style={[s.choice, chosen && s.selected]} onPress={action}><Text style={s.choiceText}>{label}</Text></Pressable>; }
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={s.safe}><FlatList data={filtered} keyExtractor={entry => entry.id} contentContainerStyle={s.content}
     ListHeaderComponent={<View style={{ gap: 12 }}><Text accessibilityRole="header" style={s.title}>Saved imports</Text><Text style={s.note}>Originals live in the app’s Imports folder. Trash hides files from this library and can be undone here. Transactions and duplicate protection remain saved.</Text>
+      <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
       <Pressable accessibilityRole="button" style={s.button} onPress={() => router.push('/bank-import')}><Text style={s.buttonText}>Import a statement</Text></Pressable>
       <TextInput accessibilityLabel="Search saved imports" placeholder="Search name, account or period" value={query} onChangeText={setQuery} style={s.input} />
       <View style={s.row}>{choice('Files', () => { setTrash(false); setSelected([]); }, !trash)}{choice(`Trash (${entries.filter(item => item.trashedAt).length})`, () => { setTrash(true); setSelected([]); }, trash)}</View>

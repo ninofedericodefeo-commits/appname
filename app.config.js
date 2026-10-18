@@ -2,6 +2,9 @@
 // Keep those capabilities opt-in for builds signed by an enrolled developer team.
 module.exports = ({ config }) => {
   const enableIosCapabilities = process.env.EXPO_ENABLE_IOS_CAPABILITIES === '1';
+  // Sharing alone can be enabled for an enrolled team without push or widgets.
+  // It still requires App Groups and cannot be signed by a free Personal Team.
+  const enableIosSharing = process.env.EXPO_ENABLE_IOS_SHARING === '1' || enableIosCapabilities;
   const plugins = enableIosCapabilities
     ? config.plugins
     : [
@@ -23,13 +26,14 @@ module.exports = ({ config }) => {
       LSSupportsOpeningDocumentsInPlace: false,
     } },
     plugins: [...plugins, ['expo-sharing', {
-      ios: { enabled: enableIosCapabilities, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1, supportsFileWithMaxCount: 1 } },
+      ios: { enabled: enableIosSharing, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1, supportsFileWithMaxCount: 1 } },
       android: { enabled: true, singleShareMimeTypes: ['text/plain', 'application/pdf', 'text/csv'] },
     }]],
     extra: {
       ...config.extra,
       goalWidgetAvailable: enableIosCapabilities,
-      mapsShareAvailable: enableIosCapabilities,
+      mapsShareAvailable: enableIosSharing,
+      amazonShareAvailable: enableIosSharing,
     },
   };
 };

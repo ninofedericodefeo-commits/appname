@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
-import { parseAmazonLink } from './amazonLink';
+import { mayFollowAmazonLink, parseAmazonLink } from './amazonLink';
 import { amazonLookupFallback, draftFromAmazonPage } from './amazonPage';
 import type { AmazonLookupProps, AmazonLookupResult } from './amazonPage';
 import { AMAZON_READER_SCRIPT } from './amazonReaderScript';
@@ -13,7 +13,7 @@ const script = `(function () {
   function read() {
     try {
       var product = readAmazonDocument(document, location.href);
-      if (product.priceCents !== null || product.problem === 'blocked' || product.problem === 'unavailable' || product.problem === 'unsupported-currency' || ++attempts >= 12) {
+      if (product.priceCents !== null || product.problem === 'blocked' || product.problem === 'unavailable' || product.problem === 'unsupported-currency' || product.problem === 'manual-vehicle-price' || ++attempts >= 12) {
         window.ReactNativeWebView.postMessage(JSON.stringify(product));
       } else { setTimeout(read, 500); }
     } catch (_) { window.ReactNativeWebView.postMessage('{}'); }
@@ -25,11 +25,13 @@ export default function AmazonProductLookup({ link, onResult }: AmazonLookupProp
   const callback = useRef(onResult);
   useEffect(() => { callback.current = onResult; }, [onResult]);
   const done = useRef(false);
+  const selection = useRef(link);
   function finish(result: AmazonLookupResult) {
     if (!done.current) { done.current = true; callback.current(result); }
   }
   useEffect(() => {
     done.current = false;
+    selection.current = link;
     const timeout = setTimeout(() => {
       if (!done.current) { done.current = true; callback.current(amazonLookupFallback(link)); }
     }, 20_000);
@@ -43,7 +45,10 @@ export default function AmazonProductLookup({ link, onResult }: AmazonLookupProp
       onShouldStartLoadWithRequest={(navigation) => {
         if (navigation.isTopFrame === false) return false;
         const allowed = parseAmazonLink(navigation.url).value;
-        if (allowed && (!link.asin || allowed.asin === link.asin)) return true;
+        if (allowed && mayFollowAmazonLink(selection.current, allowed)) {
+          if (allowed.kind !== 'short') selection.current = allowed;
+          return true;
+        }
         finish(amazonLookupFallback(link, 'Amazon redirected away from this product. Enter its name and full USD price, or try another product link.'));
         return false;
       }}

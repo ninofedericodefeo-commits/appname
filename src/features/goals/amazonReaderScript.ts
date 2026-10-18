@@ -7,6 +7,14 @@ export const AMAZON_READER_SCRIPT = String.raw`function readAmazonDocument(doc, 
     /robot check|service unavailable|sign.in/i.test(clean(doc.querySelector('title')?.textContent))) {
     result.problem = 'blocked'; return result;
   }
+  const vehicle = pageUrl.match(/\/vindp\/([a-zA-Z0-9]{10})(?:[/?#]|$)/);
+  if (vehicle) {
+    const pageAsin = doc.querySelector('input#ASIN, input[name="ASIN"]')?.getAttribute('value');
+    if (pageAsin && pageAsin.toUpperCase() !== vehicle[1].toUpperCase()) { result.problem = 'blocked'; return result; }
+    result.title = clean(doc.querySelector('#productTitle, #title_feature_div h1')?.textContent || doc.querySelector('title')?.textContent).replace(/^Amazon\.com\s*:\s*|\s*[:|–-]\s*Amazon\.com$/gi, '');
+    result.problem = 'manual-vehicle-price';
+    return result;
+  }
   const asin = pageUrl.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-zA-Z0-9]{10})(?:[/?#]|$)/)?.[1].toUpperCase();
   if (!asin) { result.problem = 'blocked'; return result; }
   const pageAsin = doc.querySelector('input#ASIN, input[name="ASIN"]')?.getAttribute('value');

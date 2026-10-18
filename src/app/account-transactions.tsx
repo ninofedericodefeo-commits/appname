@@ -1,3 +1,5 @@
+import SampleAccountPreview from '@/features/samples/SampleAccountPreview';
+import SampleDataControl from '@/features/samples/SampleDataControl';
 import { activityClassification } from '@/features/insights/logic';
 import { historyDateRange } from '@/features/pocket/dateRanges';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
@@ -42,6 +44,7 @@ export default function AccountTransactionsScreen() {
         ListHeaderComponent={<View style={styles.header}>
           <View style={styles.heading}><Text accessibilityRole="header" style={styles.title}>Transactions</Text><Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/bank-import')}><Text style={styles.link}>Import</Text></Pressable></View>
           {transactionId && <View style={ds.card}><Text accessibilityRole="header" style={ds.heading}>Related charge{reportName ? ` · ${reportName}` : ''}</Text><Text style={ds.note}>Showing the linked record, including a row hidden from normal history. Use Back to return to the report.</Text><Pressable accessibilityRole="button" style={ds.choice} onPress={() => router.setParams({ transactionId: undefined, reportName: undefined })}><Text style={ds.choiceText}>Show full history</Text></Pressable></View>}
+          <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
           <LogPurchase />{evidence && <Text style={styles.note}>Supporting financial records include hidden history and exclude pending items and savings assignments. {evidence === 'spending' ? 'Refunds, transfers and reversals are excluded from spending.' : ''}</Text>}
           <Pressable accessibilityRole="button" style={styles.linkButton} onPress={() => router.push('/account-review')}><Text style={styles.link}>Review matches & hidden history ›</Text></Pressable>
           {linkedBankAccount && <Text style={styles.note}>{showLegacyAccounts ? 'All saved account histories' : linkedBankAccount.nickname}</Text>}
@@ -57,6 +60,7 @@ export default function AccountTransactionsScreen() {
           <Text style={styles.note}>{filtered.length} transaction{filtered.length === 1 ? '' : 's'} · bank history, purchases and savings</Text>
         </View>}
         renderItem={({ item }) => <View style={styles.item}><TransactionRow initiallyExpanded={!!transactionId} transaction={item} onRemove={removal.remove} /></View>}
+        ListFooterComponent={!importId && !transactionId && !evidence && !from && !to && source === 'all' && category === 'all' ? <View style={{ marginTop: 20 }}><SampleAccountPreview full query={query} filter={filter} /></View> : null}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         ListEmptyComponent={<Text style={styles.empty}>{transactions.length ? 'No transactions match this search or filter.' : 'Import a statement or log a purchase to start your history.'}</Text>}
       />

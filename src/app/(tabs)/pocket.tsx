@@ -1,3 +1,5 @@
+import SampleAccountPreview from '@/features/samples/SampleAccountPreview';
+import SampleDataControl from '@/features/samples/SampleDataControl';
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { matchCandidates, bankDuplicateCandidates } from '@/features/pocket/reconciliation';
 import BalanceExplanation from '@/features/pocket/BalanceExplanation';
@@ -53,6 +55,7 @@ export default function PocketScreen() {
     <PageToolbar />
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
+      <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
       <View style={styles.balanceCard}>
         <View style={styles.accountHeading}><AppIcon name="wallet" color={colors.primary} /><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
         <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
@@ -86,6 +89,7 @@ export default function PocketScreen() {
       {reviewCount > 0 && <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/account-review')}><Text style={styles.secondaryText}>Review {reviewCount > 100 ? '100+' : reviewCount} possible transaction match{reviewCount === 1 ? '' : 'es'} ›</Text><Text style={styles.hint}>Similar charges stay separate until reviewed.</Text></Pressable>}
       <Pressable accessibilityRole="button" style={styles.secondary} onPress={() => router.push('/insights')}><Text style={styles.secondaryText}>Spending insights & exports ›</Text></Pressable>
       <PocketTransactions transactions={transactions} />
+      <SampleAccountPreview />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
     </FormScrollView>
   </SafeAreaView>;

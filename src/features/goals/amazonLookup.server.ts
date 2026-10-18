@@ -1,6 +1,6 @@
 import { parseHTML } from 'linkedom';
 
-import { parseAmazonLink } from './amazonLink.ts';
+import { mayFollowAmazonLink, parseAmazonLink } from './amazonLink.ts';
 import type { AmazonLink } from './amazonLink.ts';
 import type { AmazonPageData } from './amazonPage.ts';
 import { AMAZON_READER_SCRIPT } from './amazonReaderScript.ts';
@@ -37,11 +37,13 @@ export async function fetchAmazonPage(link: AmazonLink, fetcher: typeof fetch = 
   signal?.addEventListener('abort', abort, { once: true });
   const timeout = setTimeout(abort, 15_000);
   let url = link.sourceUrl;
+  let selected = link;
   try {
     for (let redirects = 0; redirects <= 4; redirects++) {
       // Validate every destination before fetching it, including short links.
       const destination = parseAmazonLink(url).value;
-      if (!destination || (link.asin && destination.asin !== link.asin)) throw new Error('Unsupported redirect');
+      if (!destination || !mayFollowAmazonLink(selected, destination)) throw new Error('Unsupported redirect');
+      if (destination.kind !== 'short') selected = destination;
       const response = await fetcher(url, {
         redirect: 'manual', signal: controller.signal,
         headers: { Accept: 'text/html', 'User-Agent': 'GasFinder/1.0 (product savings goal preview)' },

@@ -139,3 +139,53 @@ test('Server rejects ASIN changes, loops, blocked/oversized/non-HTML responses a
   controller.abort();
   await assert.rejects(fetchAmazonPage(link, async (_, options) => { options.signal.throwIfAborted(); return response(''); }, controller.signal));
 });
+
+test('Autos fills the vehicle name but never uses financing, lease, deposit or listed amounts as a full target', () => {
+  const vehicleUrl = 'https://www.amazon.com/vindp/B0HK2T5GPL';
+  const vehicle = parseAmazonLink(vehicleUrl).value;
+  const body = '<html><head><title>New 2026 Chevrolet Trax FWD LS</title></head><body>' +
+    core(price('$396.00') + '/mo') + '<div>$5,000 down · Lease $375 /mo · Deposit $500</div>' +
+    '<div>Listed price $24,094 · Your vehicle price $23,594</div>' +
+    '<h1>Included Coverage</h1></body></html>';
+  const page = readAmazonHtml(body, vehicleUrl);
+  assert.equal(page.title, 'New 2026 Chevrolet Trax FWD LS');
+  assert.equal(page.priceCents, null);
+  assert.equal(page.problem, 'manual-vehicle-price');
+  for (const selected of [vehicle, parseAmazonLink('https://a.co/d/Car123').value]) {
+    const result = draftFromAmazonPage(selected, { ...page, priceCents: 39600 }, now);
+    assert.equal(result.draft.sourceUrl, vehicleUrl);
+    assert.equal(result.draft.priceCents, null);
+    assert.equal(result.draft.priceSource, 'manual');
+    assert.match(result.message, /full vehicle price/);
+    assert.equal(confirmAmazonProduct(result.draft, result.draft.title, 2409400, '', now).priceSource, 'manual');
+  }
+  for (const changedUrl of ['https://www.amazon.com/dp/B0HK2T5GPL', 'https://www.amazon.com/vindp/B0HK2KTP39']) {
+    assert.equal(draftFromAmazonPage(vehicle, { ...page, url: changedUrl }).draft.title, '');
+  }
+});
+
+test('Short links resolve to Autos and both lookup types pin route and listing across subsequent redirects', async () => {
+  const vehicleUrl = 'https://www.amazon.com/vindp/B0HK2T5GPL';
+  const vehicle = parseAmazonLink(vehicleUrl).value;
+  const short = parseAmazonLink('https://a.co/d/Car123').value;
+  const requests = [];
+  const page = await fetchAmazonPage(short, async destination => {
+    requests.push(destination);
+    return destination === short.sourceUrl ? response('', 302, { location: vehicleUrl }) :
+      response('<html><head><title>2026 Chevrolet Trax</title></head><body>$396 monthly</body></html>');
+  });
+  assert.deepEqual(requests, [short.sourceUrl, vehicleUrl]);
+  assert.equal(page.priceCents, null);
+  assert.equal(draftFromAmazonPage(short, page).draft.sourceUrl, vehicleUrl);
+  for (const destination of ['https://www.amazon.com/dp/B0HK2T5GPL', 'https://www.amazon.com/vindp/B0HK2KTP39', short.sourceUrl]) {
+    let count = 0;
+    await assert.rejects(fetchAmazonPage(vehicle, async () => { count++; return response('', 302, { location: destination }); }));
+    assert.equal(count, 1);
+  }
+  let count = 0;
+  await assert.rejects(fetchAmazonPage(short, async () => {
+    count++;
+    return response('', 302, { location: count === 1 ? vehicleUrl : 'https://www.amazon.com/vindp/B0HK2KTP39' });
+  }));
+  assert.equal(count, 2);
+});

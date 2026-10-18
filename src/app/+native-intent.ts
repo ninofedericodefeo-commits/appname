@@ -1,21 +1,13 @@
-import { parseAmazonLink } from '@/features/goals/amazonLink';
 import { clearSharedPayloads, getSharedPayloads } from 'expo-sharing';
 import { registerBankFile } from '@/features/bank/incomingBankFile';
+import { directAmazonRoute, isSharingPath, sharedPayloadRoute } from '@/features/sharing/incomingShare';
 
 export function redirectSystemPath({ path }: { path: string; initial: boolean }) {
   try {
     const fileToken = registerBankFile(path);
     if (fileToken) return `/bank-import?bankFileToken=${fileToken}`;
-    if (new URL(path, 'gasfinder://').hostname !== 'expo-sharing') return path;
-    const payloads = getSharedPayloads();
-    const file = payloads.find((payload) => payload.shareType === 'file');
-    const sharedToken = file ? registerBankFile(file.value, file.mimeType ?? undefined, Date.now(), true) : null;
-    const value = payloads.find((payload) => payload.shareType === 'url' || payload.shareType === 'text')?.value;
-    clearSharedPayloads();
-    if (sharedToken) return `/bank-import?bankFileToken=${sharedToken}`;
-    if (file) return '/bank-import';
-    const product = value?.match(/https?:\/\/[^\s<>]+/i)?.[0];
-    if (product && parseAmazonLink(product).value) return `/amazon-goal?product=${encodeURIComponent(product)}`;
-    return value ? `/on-route?destination=${encodeURIComponent(value)}&handoff=${Date.now()}` : '/on-route';
-  } catch { return path; }
+    if (!isSharingPath(path)) return directAmazonRoute(path) ?? path;
+    try { return sharedPayloadRoute(getSharedPayloads(), registerBankFile); }
+    finally { clearSharedPayloads(); }
+  } catch { return isSharingPath(path) ? '/investment' : path; }
 }

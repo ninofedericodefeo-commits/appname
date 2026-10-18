@@ -1,0 +1,76 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length 2579 >>
+stream
+BT /F1 16 Tf 1 0 0 1 40 752 Tm (Citizens Bank - Sample checking statement) Tj ET
+BT /F1 14 Tf 1 0 0 1 40 726 Tm (SAMPLE - NOT REAL - SYNTHETIC TEST DATA) Tj ET
+BT /F1 10 Tf 1 0 0 1 40 704 Tm (Not issued by Citizens. No real customer or account.) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 681 Tm (Statement period 09/01/2026 - 09/30/2026) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 660 Tm (Account number: 00000000 - SAMPLE ONLY) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 630 Tm (Beginning balance $1,200.00) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 610 Tm (Ending balance $3,280.54) Tj ET
+BT /F1 13 Tf 1 0 0 1 40 573 Tm (Deposits & Credits) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 550 Tm (Date) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 550 Tm (Description) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 550 Tm (Amount) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 529 Tm (09/02) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 529 Tm (Sample payroll deposit) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 529 Tm (2,500.00) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 508 Tm (09/16) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 508 Tm (Sample reimbursement) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 508 Tm (35.00) Tj ET
+BT /F1 13 Tf 1 0 0 1 40 470 Tm (Withdrawals & Debits) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 448 Tm (Date) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 448 Tm (Description) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 448 Tm (Amount) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 426 Tm (09/04) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 426 Tm (Sample Harbor Fuel) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 426 Tm (42.99) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 403 Tm (09/06) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 403 Tm (Sample Market Basket) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 403 Tm (68.50) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 380 Tm (09/08) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 380 Tm (Sample Music Plus) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 380 Tm (7.99) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 357 Tm (09/10) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 357 Tm (Sample Movie Night) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 357 Tm (12.99) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 334 Tm (09/13) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 334 Tm (Sample Corner Cafe) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 334 Tm (32.00) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 311 Tm (09/20) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 311 Tm (Online transfer to savings - SAMPLE) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 311 Tm (250.00) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 288 Tm (09/24) Tj ET
+BT /F1 11 Tf 1 0 0 1 110 288 Tm (Sample Auto Supplies) Tj ET
+BT /F1 11 Tf 1 0 0 1 460 288 Tm (39.99) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 205 Tm (All names, transactions and amounts are invented.) Tj ET
+BT /F1 11 Tf 1 0 0 1 40 185 Tm (For testing GasFinder only. Do not use as proof of funds.) Tj ET
+BT /F1 10 Tf 1 0 0 1 40 42 Tm (SAMPLE - NOT REAL | Page 1 of 1) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000241 00000 n 
+0000000311 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+2942
+%%EOF

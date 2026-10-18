@@ -1,4 +1,4 @@
-export type AmazonLink = { sourceUrl: `https://${string}`; asin: string | null; kind: 'product' | 'short' };
+export type AmazonLink = { sourceUrl: `https://${string}`; asin: string | null; kind: 'product' | 'auto' | 'short' };
 
 export type AmazonProductDraft = {
   sourceUrl: string;
@@ -27,10 +27,22 @@ export function parseAmazonLink(input: string): { value: AmazonLink; error?: nev
     return { value: { sourceUrl: `https://a.co${url.pathname.replace(/\/$/, '')}`, asin: null, kind: 'short' } };
   }
   if (!['amazon.com', 'www.amazon.com', 'm.amazon.com'].includes(url.hostname)) return { error: 'Use an amazon.com product link or an a.co short link. This flow supports USD only.' };
+  // Autos uses a distinct VIN detail route: never rewrite it into a retail /dp page.
+  const vehicle = url.pathname.match(/^\/vindp\/([a-zA-Z0-9]{10})(?:\/(?:ref=[a-zA-Z0-9_=.-]+)?\/?)?$/);
+  if (vehicle) {
+    const asin = vehicle[1].toUpperCase();
+    return { value: { sourceUrl: `https://www.amazon.com/vindp/${asin}`, asin, kind: 'auto' } };
+  }
   const product = url.pathname.match(/\/(?:dp|gp\/product|gp\/aw\/d)\/([a-zA-Z0-9]{10})(?:\/|$)/);
-  if (!product) return { error: 'This is not a product link. Open the item on Amazon and copy its product link.' };
+  if (!product) return { error: 'Open a specific Amazon product or Amazon Autos vehicle and share its link.' };
   const asin = product[1].toUpperCase();
   return { value: { sourceUrl: `https://www.amazon.com/dp/${asin}`, asin, kind: 'product' } };
+}
+
+// Once a short link resolves, pin both listing ID and listing type. A matching
+// ASIN on /dp is not the same destination as an Autos /vindp listing.
+export function mayFollowAmazonLink(selected: AmazonLink, destination: AmazonLink) {
+  return selected.kind === 'short' || (selected.kind === destination.kind && selected.asin === destination.asin);
 }
 
 export function amazonProductDraft(link: AmazonLink): AmazonProductDraft {

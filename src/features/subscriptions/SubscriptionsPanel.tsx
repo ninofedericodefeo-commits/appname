@@ -19,11 +19,17 @@ import CancelSubscriptionButton from './CancelSubscriptionButton';
 import SubscriptionButton from './SubscriptionButton';
 import SubscriptionEditor from './SubscriptionEditor';
 import { subscriptionBankAlerts, subscriptionBankEvidence, subscriptionRefunds } from './bankEvidence';
-import { subscriptionsForMode, renewalSnoozeUntil } from './reviewPreferences';
+import { renewalSnoozeUntil } from './reviewPreferences';
+import SampleDataControl from '@/features/samples/SampleDataControl';
+import { SampleSubscriptionPreviews } from '@/features/samples/SamplePreviews';
+import { useSampleDataStore } from '@/features/samples/store';
+import { isSampleRecord } from '@/features/samples/fixtures';
 
 export default function SubscriptionsPanel() {
   useThemeRevision();
-  const { subscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, dismissedBankAlerts, dismissBankAlert, sampleMode, reviewSnoozes, snoozeReviews, resumeReviews } = useSubscriptionStore();
+  const { subscriptions: storedSubscriptions, setActive, review, removeSubscription, dismissedBankSuggestions, dismissBankSuggestion, restoreBankSuggestions, dismissedBankAlerts, dismissBankAlert, reviewSnoozes, snoozeReviews, resumeReviews } = useSubscriptionStore();
+  const subscriptions = useMemo(() => storedSubscriptions.filter(item => !isSampleRecord(item)), [storedSubscriptions]);
+  const samplesVisible = useSampleDataStore(state => state.visible);
   const { purchases, accountTransactions, transactionDirections, linkedBankAccount, transactionDetails } = usePocketStore();
   const evidence = useMemo(() => subscriptionBankEvidence(accountTransactions, purchases, transactionDirections, linkedBankAccount, transactionDetails), [accountTransactions, purchases, transactionDirections, linkedBankAccount, transactionDetails]);
   const refunds = useMemo(() => subscriptionRefunds(accountTransactions, purchases, transactionDirections, linkedBankAccount, transactionDetails), [accountTransactions, purchases, transactionDirections, linkedBankAccount, transactionDetails]);
@@ -40,7 +46,7 @@ export default function SubscriptionsPanel() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestionLimit, setSuggestionLimit] = useState(5);
   const suggestions = useMemo(() => pocketReady && subsReady ? suggestBankSubscriptions(evidence, subscriptions.filter(item => !item.isSample), dismissedBankSuggestions, today) : [], [evidence, subscriptions, dismissedBankSuggestions, today, pocketReady, subsReady]);
-  const visibleSubscriptions = subscriptionsForMode(subscriptions, sampleMode);
+  const visibleSubscriptions = subscriptions;
   const due = subscriptionsToReviewTomorrow(visibleSubscriptions, today);
   const snoozed = due.filter(({ subscription, renewal }) => renewalSnoozeUntil(subscription, renewal, reviewSnoozes, today));
   const nextSnoozeEnd = snoozed.length ? new Date(Math.min(...snoozed.map(({ subscription, renewal }) => Date.parse(renewalSnoozeUntil(subscription, renewal, reviewSnoozes, today)!)))) : null;
@@ -82,7 +88,7 @@ export default function SubscriptionsPanel() {
 
   return <View style={styles.content}>
     <View><Text accessibilityRole="header" style={styles.title}>Subscriptions</Text><Text style={styles.intro}>Review upcoming charges.</Text></View>
-    {sampleMode && <View style={styles.review}><Text style={styles.reviewText}>Test subscriptions are on</Text><Text style={styles.note}>Sample renewals appear here for testing. Phone reminders only include your real subscriptions.</Text><SubscriptionButton label="Manage test mode in Settings" onPress={() => router.push('/settings')} /></View>}
+    <SampleDataControl compact />
     <SubscriptionCosts subscriptions={subscriptions} today={today} />
     {!!due.length && <View style={styles.card}><Text accessibilityRole="header" style={styles.sectionTitle}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))}</Text><Text style={styles.note}>{snoozed.length ? `${snoozed.length} review${snoozed.length === 1 ? '' : 's'} snoozed. Next returns ${snoozeEndLabel}. You can still review the cards below.` : 'Review the cards below, or snooze the reminder banner.'}</Text><View style={styles.actions}><SubscriptionButton label="Later · 2h" grow onPress={() => snoozeReviews('two-hours')} /><SubscriptionButton label="Hide for today" grow onPress={() => snoozeReviews('today')} /></View>{!!snoozed.length && <SubscriptionButton label="Show renewal banner again" onPress={resumeReviews} />}</View>}
     {pocketReady && subsReady && alerts.length > 0 && <><Text accessibilityRole="header" style={styles.sectionTitle}>Updates from your bank · {alerts.length}</Text>{alerts.map(alert => <View key={alert.id} style={styles.card}>
@@ -95,8 +101,9 @@ export default function SubscriptionsPanel() {
     {!active.length && <View style={styles.card}><Text style={styles.name}>No upcoming subscriptions</Text><Text style={styles.note}>Add one to keep track of its price and next renewal.</Text></View>}
     <View style={styles.segmented}>{(['list', 'calendar'] as const).map(view => <Pressable key={view} accessibilityRole="button" accessibilityLabel={view === 'list' ? 'List' : 'Calendar'} accessibilityState={{ selected: scheduleView === view }} aria-pressed={scheduleView === view} onPress={() => setScheduleView(view)} style={({ pressed }) => [styles.segment, scheduleView === view && styles.segmentActive, pressed && styles.pressed]}><Text style={[styles.segmentLabel, scheduleView === view && styles.segmentLabelActive]}>{view === 'list' ? 'List' : 'Calendar'}</Text></Pressable>)}</View>
     {scheduleView === 'calendar' && active.some(item => item.cancelBy) && <Text style={styles.note}>Switch to List to finish cancellation follow-ups.</Text>}
-    {scheduleView === 'calendar' ? <SubscriptionCalendar subscriptions={visibleSubscriptions} today={today} includeSamples={sampleMode} onEdit={subscription => setEditor({ subscription })} /> : active.map(card)}
+    {scheduleView === 'calendar' ? <SubscriptionCalendar subscriptions={visibleSubscriptions} today={today} includeSamples={false} onEdit={subscription => setEditor({ subscription })} /> : active.map(card)}
     {!!inactive.length && <><Text accessibilityRole="header" style={styles.sectionTitle}>Canceled · {inactive.length}</Text>{inactive.map(card)}</>}
+    {samplesVisible && <SampleSubscriptionPreviews today={today} />}
     <View style={styles.bankSection}>
       <View style={styles.heading}><Text accessibilityRole="header" style={styles.sectionTitle}>From bank history · {suggestions.length}</Text><SubscriptionButton label={showSuggestions ? 'Hide' : 'Review'} accessibilityLabel="Review bank subscription suggestions" accessibilityState={{ expanded: showSuggestions }} onPress={() => setShowSuggestions(!showSuggestions)} /></View>
       {showSuggestions && <View style={styles.suggestions}>
