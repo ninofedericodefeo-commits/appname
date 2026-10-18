@@ -11,7 +11,7 @@ export function TransactionRemovalNotice({ onUndo }: { onUndo: () => void }) {
 }
 
 const styles = themedStyles(() => ({
-  notice: { backgroundColor: colors.paleGreen, borderRadius: 10, paddingLeft: 14, paddingRight: 6, margin: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  notice: { backgroundColor: colors.paleGreen, borderRadius: 10, paddingLeft: 14, paddingRight: 6, margin: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   text: { color: colors.ink, fontSize: 13, flexShrink: 1 },
   button: { minHeight: 44, minWidth: 60, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8 },
   undo: { color: colors.primary, fontWeight: '800', fontSize: 14 },

@@ -34,3 +34,29 @@ test('Unavailable provider apps fall back to HTTPS and failed links remain a can
   }
   assert.equal(attempts, 0);
 });
+
+test('Android package selections launch only the validated package through the native launcher', async () => {
+  const app = { name: 'Uncatalogued app', url: 'gasfinder-app://com.example.MyApp' };
+  assert.deepEqual(subscriptionApp(app), app);
+  const packages = [], urls = [];
+  const result = await openSubscriptionApp(app, async url => { urls.push(url); }, 'android', async name => { packages.push(name); return true; });
+  assert.equal(result.opened, true);
+  assert.deepEqual(packages, ['com.example.MyApp']);
+  assert.deepEqual(urls, []);
+  assert.equal((await openSubscriptionApp(app, async url => urls.push(url), 'ios')).opened, false);
+  assert.equal((await openSubscriptionApp(app, async url => urls.push(url), 'web')).opened, false);
+  assert.deepEqual(urls, []);
+  for (const url of ['gasfinder-app://com.example.app/path', 'gasfinder-app://com.example.app?x=1', 'gasfinder-app://com.example.app#intent', 'gasfinder-app://com.example.app:80', 'gasfinder-app://com.example%2eapp', 'gasfinder-app://com.example.app@evil.test']) {
+    assert.throws(() => subscriptionAppURL(url), /Invalid/);
+  }
+  assert.throws(() => subscriptionAppURL(app.url, true), /Invalid/);
+});
+
+test('Removed Android apps retain the cancellation plan and can use an explicit account website', async () => {
+  const app = { name: 'Local app', url: 'gasfinder-app://org.example.local', fallbackUrl: 'https://provider.example/account' };
+  const calls = [];
+  const result = await openSubscriptionApp(app, async url => { calls.push(url); return true; }, 'android', async () => { throw Error('Removed'); });
+  assert.equal(result.opened, true);
+  assert.deepEqual(calls, [app.fallbackUrl]);
+  assert.match(result.message, /website/);
+});

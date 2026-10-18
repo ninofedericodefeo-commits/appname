@@ -140,7 +140,6 @@ export default function GasScreen() {
           {fontScale < 1.4 && <Link href="/report-price" asChild><Pressable accessibilityRole="button" accessibilityLabel="Report a price or refill" style={styles.addButton}><AppIcon name="plus" color={colors.primary} size={24} /></Pressable></Link>}
         </View>
 
-        <View style={styles.sampleControl}><SampleDataControl compact /></View>
         <View style={styles.searchBar}>
           <Pressable accessibilityRole="button" accessibilityLabel={location ? `Change search area, currently ${location.label}` : 'Search a city, ZIP or address'} accessibilityState={{ disabled: !ready }} disabled={!ready} onPress={() => setAreaSearchOpen(true)} style={({ pressed }) => [styles.searchControl, pressed && styles.pressed]}>
             <AppIcon name="search" color={colors.muted} size={21} />
@@ -220,6 +219,7 @@ export default function GasScreen() {
             <Link href="/report-receipt" asChild><Pressable accessibilityRole="button" style={styles.receiptCard}><View style={styles.actionIcon}><AppIcon name="receipt" color={colors.primary} /></View><View style={styles.actionCopy}><Text style={styles.actionTitle}>Reports & receipts</Text><Text style={styles.actionNote}>{receiptCount ? `${receiptCount} saved report${receiptCount === 1 ? '' : 's'}` : 'Your saved prices and fill-ups'}</Text></View><AppIcon name="chevron-right" size={17} color={colors.muted} /></Pressable></Link>
           </View>
         </View>
+        <View style={styles.sampleControl}><SampleDataControl compact /></View>
       </ScrollView>
       {areaSearchOpen && <AreaSearchSheet onChoose={chooseArea} onClose={() => setAreaSearchOpen(false)} />}
     </SafeAreaView>

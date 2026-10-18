@@ -35,3 +35,20 @@ test('App queries are unique custom schemes within iPhone limits', () => {
   assert.equal(new Set(schemes).size, schemes.length);
   assert.equal(schemes.some(scheme => ['http', 'https'].includes(scheme)), false);
 });
+
+test('Android launcher inventory includes uncatalogued apps, filters malformed entries and deduplicates packages', async () => {
+  const { launchableSubscriptionApps } = await import('../src/features/subscriptions/installedAppLogic.ts');
+  const result = launchableSubscriptionApps([
+    { name: ' My local app ', packageName: 'org.example.local' },
+    { name: 'Amazon', packageName: 'com.amazon.mShop.android.shopping' },
+    { name: 'My local app', packageName: 'org.example.local' },
+    { name: 'Unsafe', packageName: 'org.example/path?intent=x' },
+    { name: 'Bad\nlabel', packageName: 'org.example.bad' },
+    null,
+  ]);
+  assert.deepEqual(result, [
+    { name: 'Amazon', url: 'gasfinder-app://com.amazon.mShop.android.shopping' },
+    { name: 'My local app', url: 'gasfinder-app://org.example.local' },
+  ]);
+  assert.throws(() => launchableSubscriptionApps(null), /Invalid/);
+});

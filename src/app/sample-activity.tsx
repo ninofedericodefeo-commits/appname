@@ -16,7 +16,8 @@ export default function SampleActivityScreen() {
   const visible = useSampleDataStore(state => state.visible);
   const isReceipt = typeof id === 'string' && id.startsWith('sample-refill-');
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={s.safe}><Stack.Screen options={{ title: 'Sample activity' }} /><FormScrollView contentContainerStyle={s.content}>
-    <Text accessibilityRole="header" style={s.title}>Sample activity</Text><Text style={s.note}>Fictional examples. Nothing here is saved to your accounts, garage or financial records.</Text><SampleDataControl compact />
+    <Text accessibilityRole="header" style={s.title}>Sample activity</Text><Text style={s.note}>Fictional examples. Nothing here is saved to your accounts, garage or financial records.</Text>
     {visible && <>{isReceipt ? <SampleReceiptPreview id={id} /> : id === 'sample-spending' ? <><SampleInsightsPreview />{sampleSpendingSummary().selected.map(row => <Text key={row.id} style={s.body}>{row.sourceDate} · {row.title} · {formatMoney(row.amountCents)}</Text>)}</> : <><SampleCarsPreview /><SampleFuelStatisticsPreview /><SampleFillupsPreview /><SampleInsightsPreview /><SamplePastGoalsPreview /></>}</>}
+    <SampleDataControl compact />
   </FormScrollView></SafeAreaView>;
 }

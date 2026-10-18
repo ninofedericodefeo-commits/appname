@@ -46,7 +46,7 @@ export default function CarsScreen() {
       <Text style={styles.kicker}>DRIVING PROFILE</Text><Text accessibilityRole="header" style={styles.title}>Your cars</Text>
       <Text style={styles.description}>Save each car once. Choose it when planning a drive, then enter just your fuel level.</Text>
       {!draft && <>
-        <SampleDataControl compact /><SampleCarsPreview />
+        <SampleCarsPreview />
         {cars.map((car) => <View key={car.id} style={styles.card}>
           <Text accessibilityRole="header" style={styles.heading}>{car.name}</Text><Text style={styles.description}>{car.model} · {car.mpg} MPG · {car.tankGallons} gal tank</Text>
           <View style={styles.row}><Pressable accessibilityRole="button" accessibilityLabel={`Use ${car.name} for next drive`} accessibilityState={{ selected: selectedCarId === car.id }} onPress={() => selectCar(car.id)} style={styles.smallButton}><Text style={styles.link}>{selectedCarId === car.id ? '✓ Selected' : 'Use for next drive'}</Text></Pressable><Pressable accessibilityRole="button" onPress={() => edit(car)} style={styles.smallButton}><Text style={styles.link}>Edit</Text></Pressable>
@@ -71,6 +71,7 @@ export default function CarsScreen() {
         <Pressable accessibilityRole="button" style={styles.primary} onPress={save}><Text style={styles.primaryText}>Save car & use it</Text></Pressable>
         <Pressable accessibilityRole="button" style={styles.smallButton} onPress={() => guard.confirm(() => { setDraft(null); setError(''); })}><Text style={styles.link}>Cancel</Text></Pressable>
       </View>}
+    {!draft && <SampleDataControl compact />}
     {guard.dialog}</ScrollView>
   </SafeAreaView>;
 }

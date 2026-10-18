@@ -1,9 +1,10 @@
-import { Pressable, Text, View } from 'react-native';
 import { useDataStatus, updateDataStatus } from './operationStatus';
-import { colors, useThemeRevision } from '@/theme';
+import { NoticeCard } from '@/features/notices/NoticeCard';
+import { useNoticeTimeout } from '@/features/notices/useNoticeTimeout';
 export default function DataCompletionNotice() {
-  useThemeRevision();
-  const { notice } = useDataStatus();
+  const { notice, revision } = useDataStatus();
+  const dismiss = () => updateDataStatus({ notice: '' });
+  useNoticeTimeout(notice ? `${revision}:${notice}` : '', dismiss);
   if (!notice) return null;
-  return <View style={{ backgroundColor: colors.paleGreen, borderTopWidth: 1, borderColor: colors.lineStrong, padding: 12, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}><Text accessibilityLiveRegion="polite" style={{ color: colors.ink, flex: 1, minWidth: 150, fontSize: 14 }}>{notice}</Text><Pressable accessibilityRole="button" accessibilityLabel="Dismiss data completion notice" style={{ minHeight: 44, minWidth: 60, justifyContent: 'center' }} onPress={() => updateDataStatus({ notice: '' })}><Text style={{ color: colors.primary, fontWeight: '700' }}>Done</Text></Pressable></View>;
+  return <NoticeCard message={notice} action="Done" actionLabel="Dismiss data completion notice" onAction={dismiss} />;
 }

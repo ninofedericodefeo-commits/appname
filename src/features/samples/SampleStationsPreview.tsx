@@ -5,19 +5,22 @@ import { colors, themedStyles, useThemeRevision } from '@/theme';
 import type { FuelType } from '@/types/stations';
 import { sampleFuelPrice, sampleStations } from './stations';
 import { useSampleDataStore } from './store';
+import SampleStationMap from './SampleStationMap';
 
 export default function SampleStationsPreview({ fuelType }: { fuelType: FuelType }) {
   useThemeRevision();
   const visible = useSampleDataStore(state => state.visible);
   if (!visible) return null;
   return <View style={styles.group}>
-    <Text accessibilityRole="header" style={styles.heading}>Sample gas stations</Text>
-    <Text style={styles.note}>Fictional locations and prices. Open a station to explore fuel prices, amenities, history and a sample fill-up. These examples work offline.</Text>
+    <Text accessibilityRole="header" style={styles.heading}>Haddonfield sample stations</Text>
+    <Text style={styles.note}>Real locations in and near Haddonfield, NJ, with invented prices, history and fill-ups. Sample prices are not live reports. Map tiles require internet.</Text>
+    <SampleStationMap fuelType={fuelType} />
     {sampleStations().map((station, index) => <Link key={station.id} href={{ pathname: '/sample-station', params: { id: station.id } }} asChild>
       <Pressable accessibilityRole="button" accessibilityLabel={`Sample station ${station.name}, ${fuelType} ${sampleFuelPrice(station.prices[fuelType])} per gallon. View sample details.`} style={({ pressed }) => [styles.card, pressed && styles.pressed]}>
         <View style={styles.row}><Text style={styles.badge}>SAMPLE{index === 0 ? ' · LOWEST EXAMPLE PRICE' : ''}</Text><AppIcon name="chevron-right" size={17} color={colors.muted} /></View>
         <View style={styles.row}><Text style={styles.name}>{station.name}</Text><Text style={styles.price}>{sampleFuelPrice(station.prices[fuelType])}<Text style={styles.unit}> /gal</Text></Text></View>
-        <Text style={styles.note}>{station.distanceMiles} sample mi · {station.hours} · {fuelType.charAt(0).toUpperCase() + fuelType.slice(1)}</Text>
+        <Text style={styles.note}>{station.address}</Text>
+        <Text style={styles.note}>{station.locality} · {fuelType.charAt(0).toUpperCase() + fuelType.slice(1)}</Text>
       </Pressable>
     </Link>)}
   </View>;

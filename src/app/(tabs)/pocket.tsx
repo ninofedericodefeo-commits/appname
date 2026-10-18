@@ -55,7 +55,6 @@ export default function PocketScreen() {
     <PageToolbar />
     <FormScrollView contentContainerStyle={styles.content}>
       <Text accessibilityRole="header" style={styles.title}>Account</Text>
-      <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
       <View style={styles.balanceCard}>
         <View style={styles.accountHeading}><AppIcon name="wallet" color={colors.primary} /><Text style={styles.accountName}>{linkedBankAccount?.nickname ?? pocket.bankImportAccountLabel}</Text></View>
         <Text style={styles.balanceLabel}>{estimate.newerCount ? 'Estimated available to spend' : 'Available to spend'}</Text>
@@ -91,6 +90,7 @@ export default function PocketScreen() {
       <PocketTransactions transactions={transactions} />
       <SampleAccountPreview />
       <Pressable accessibilityRole="button" style={styles.textButton} onPress={() => router.push('/bank-imports')}><Text style={styles.link}>Saved imports ›</Text></Pressable>
+      <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
     </FormScrollView>
   </SafeAreaView>;
 }

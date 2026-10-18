@@ -14,7 +14,6 @@ export default function SampleDataScreen() {
     <Stack.Screen options={{ title: 'Sample data' }} />
     <Text accessibilityRole="header" style={s.title}>Explore sample data</Text>
     <Text style={s.note}>See populated examples without entering your own records. All invented records are labeled Sample. Your real records stay visible alongside them.</Text>
-    <SampleDataControl />
     {visible ? <>
       <View style={s.card}><Text accessibilityRole="header" style={s.heading}>Gas & driving</Text>
         <Text style={s.note}>Individual stations, fuel prices and history, cars, fill-ups and receipts.</Text>
@@ -36,6 +35,7 @@ export default function SampleDataScreen() {
         <SubscriptionButton label="View sample bills" onPress={() => router.push('/subscriptions')} />
       </View>
       <Text style={s.note}>Samples are previews. They do not change your real totals, exports, reminders or saved records. Hide sample data at any time to see only your records.</Text>
-    </> : <Text style={s.note}>Samples are hidden throughout the app. Show sample data above to explore the examples.</Text>}
+    </> : <Text style={s.note}>Samples are hidden throughout the app. Show sample data below to explore the examples.</Text>}
+    <SampleDataControl />
   </MoneyPage>;
 }

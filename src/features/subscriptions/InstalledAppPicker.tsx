@@ -1,7 +1,7 @@
 import { themedStyles, useThemeRevision , colors } from '@/theme';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, Text, TextInput, View } from 'react-native';
-import { APPLE_SUBSCRIPTIONS } from './providerApps';
+import { APPLE_SUBSCRIPTIONS, subscriptionApp } from './providerApps';
 import type { SubscriptionApp } from './providerApps';
 import type { InstalledAppResult } from './installedAppLogic';
 import { installedSubscriptionApps } from './installedApps';
@@ -13,6 +13,10 @@ export default function InstalledAppPicker({ selected, onSelect }: { selected?: 
   const [result, setResult] = useState<InstalledAppResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [manual, setManual] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [manualUrl, setManualUrl] = useState('');
+  const [manualError, setManualError] = useState('');
   const generation = useRef(0);
   async function refresh() {
     const current = ++generation.current;
@@ -30,6 +34,10 @@ export default function InstalledAppPicker({ selected, onSelect }: { selected?: 
     return () => { cancelRefresh(); listener.remove(); };
   }, [expanded]);
   const apps = useMemo(() => result?.apps.filter(app => app.name.toLowerCase().includes(search.trim().toLowerCase())) ?? [], [result, search]);
+  function chooseManual() {
+    try { choose(subscriptionApp({ name: manualName, url: manualUrl })); setManual(false); setManualError(''); }
+    catch (error) { setManualError(error instanceof Error ? error.message : 'Check the app name and link.'); }
+  }
   function choose(app?: SubscriptionApp) { onSelect(app); setExpanded(false); setSearch(''); }
   return <View style={styles.container}>
     <Text style={styles.label}>App to open when you plan to cancel</Text>
@@ -44,12 +52,20 @@ export default function InstalledAppPicker({ selected, onSelect }: { selected?: 
         {result?.status === 'update-required' && <Text style={styles.note}>Install the updated GasFinder build to choose apps on this phone. Reloading the app cannot add the app picker.</Text>}
         {result?.status === 'error' && <Text style={styles.note}>Some apps could not be checked. Try refreshing the list.</Text>}
         {!!result && (result.status === 'ready' || result.status === 'error') && <>
-          <Text style={styles.note}>Supported apps found on this phone. {Platform.OS === 'ios' ? 'iPhone does not allow access to your full app list.' : 'Apps without a supported launch link will not appear.'}</Text>
+          <Text style={styles.note}>{Platform.OS === 'ios' ? 'Supported apps installed on this iPhone. Apple limits which apps we can check; your full app list is private.' : 'Apps with a launcher on this Android device. Hidden, work-profile and non-launchable apps may not appear.'} Installing an app does not tell us whether you pay for it.</Text>
           {!!result.apps.length && <TextInput style={styles.search} accessibilityLabel="Search installed apps" placeholder="Search apps" value={search} onChangeText={setSearch} autoCorrect={false} />}
           {apps.map(app => <Pressable key={app.url} accessibilityRole="button" accessibilityLabel={`Select ${app.name}`} accessibilityState={{ selected: selected?.url === app.url }} style={styles.option} onPress={() => choose(app)}><Text style={styles.optionText}>{app.name}</Text><Text style={styles.check}>{selected?.url === app.url ? '✓' : '›'}</Text></Pressable>)}
-          {!apps.length && <Text style={styles.note}>{result.apps.length ? 'No matching apps.' : 'No supported apps found. You can save the subscription without an app.'}</Text>}
+          {!apps.length && <Text style={styles.note}>{result.apps.length ? 'No matching apps.' : 'No apps found. Add an app or website below, or save without an app.'}</Text>}
         </>}
         {Platform.OS === 'ios' && <><Text style={styles.label}>Billed through Apple?</Text><Pressable accessibilityRole="button" style={styles.option} onPress={() => choose(APPLE_SUBSCRIPTIONS)}><Text style={styles.optionText}>Apple subscriptions</Text><Text style={styles.check}>›</Text></Pressable></>}
+        <SubscriptionButton label={manual ? 'Hide manual app entry' : 'Add another app or website'} accessibilityState={{ expanded: manual }} onPress={() => setManual(!manual)} />
+        {manual && <View style={styles.list}>
+          <Text style={styles.note}>For an app that is missing, enter its name and HTTPS account website or a known app link. This does not check whether it is installed.</Text>
+          <Text style={styles.label}>App name</Text><TextInput style={styles.search} accessibilityLabel="Associated app name" value={manualName} onChangeText={setManualName} maxLength={80} placeholder="App or provider name" />
+          <Text style={styles.label}>Account website or app link</Text><TextInput style={styles.search} accessibilityLabel="Associated app website or link" value={manualUrl} onChangeText={setManualUrl} autoCapitalize="none" autoCorrect={false} keyboardType="url" maxLength={2048} placeholder="https://provider.example/account" />
+          {!!manualError && <Text accessibilityLiveRegion="polite" style={styles.error}>{manualError}</Text>}
+          <SubscriptionButton label="Use this app or website" onPress={chooseManual} />
+        </View>}
         {result?.status !== 'web' && <SubscriptionButton label="Refresh apps" onPress={() => void refresh()} />}
       </>}
     </View>}
@@ -61,5 +77,6 @@ const styles = themedStyles(() => ({
   note: { color: colors.muted, fontSize: 12, lineHeight: 18 }, list: { borderWidth: 1, borderColor: colors.line, borderRadius: 12, padding: 12, gap: 12 },
   option: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 46, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: 10 },
   optionText: { color: colors.ink, fontSize: 15, fontWeight: '600', flex: 1 }, check: { color: colors.primary, fontSize: 18 },
+  error: { color: colors.danger, fontSize: 13, lineHeight: 18 },
   search: { minHeight: 46, borderWidth: 1, borderColor: colors.lineStrong, borderRadius: 10, paddingHorizontal: 12, color: colors.ink },
 }));

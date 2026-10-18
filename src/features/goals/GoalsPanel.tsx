@@ -10,7 +10,6 @@ import SubscriptionButton from '@/features/subscriptions/SubscriptionButton';
 import type { Goal } from './logic';
 import { formatMoney } from '@/lib/money';
 import { usePocketStore } from '@/stores/pocketStore';
-import SampleDataControl from '@/features/samples/SampleDataControl';
 import { SampleGoalPreview } from '@/features/samples/SamplePreviews';
 import { useSampleDataStore } from '@/features/samples/store';
 
@@ -49,7 +48,6 @@ export default function GoalsPanel() {
   return <View style={styles.content}>
     <View style={styles.header}><Text accessibilityRole="header" style={styles.title}>Goals</Text><IconButton icon="activity" label="View transactions" onPress={() => router.push('/account-transactions')} /></View>
     <Text style={styles.intro}>Your savings stay in your bank account.</Text>
-    <SampleDataControl compact />
     <Link href="/amazon-goal" asChild><Pressable accessibilityRole="button" style={styles.link}><Text style={styles.linkText}>Goal from Amazon link ↗</Text></Pressable></Link>
     {activeGoal ? <>
       <GoalProgressCard key={activeGoal.id} goal={activeGoal} editing={editing} onEdit={() => editing ? closeEditor() : setEditingId(activeGoal.id)} />

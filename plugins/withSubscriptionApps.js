@@ -19,6 +19,9 @@ module.exports = config => {
         query.intent.push({ action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }], data: [{ $: { 'android:scheme': scheme } }] });
       }
     }
+    if (!query.intent.some(intent => intent.action?.some(action => action.$?.['android:name'] === 'android.intent.action.MAIN') && intent.category?.some(category => category.$?.['android:name'] === 'android.intent.category.LAUNCHER'))) {
+      query.intent.push({ action: [{ $: { 'android:name': 'android.intent.action.MAIN' } }], category: [{ $: { 'android:name': 'android.intent.category.LAUNCHER' } }] });
+    }
     const app = manifest.application[0];
     app['meta-data'] ??= [];
     app['meta-data'] = app['meta-data'].filter(item => item.$?.['android:name'] !== 'gasfinder.subscriptionAppSchemes');

@@ -11,6 +11,10 @@ export function subscriptionAppURL(input: string, websiteOnly = false): string {
   let url: URL;
   try { url = new URL(value); } catch { throw Error('Use a full HTTPS website or an app link, such as spotify:.'); }
   const scheme = url.protocol.toLowerCase();
+  if (scheme === 'gasfinder-app:') {
+    if (websiteOnly || !/^gasfinder-app:\/\/[A-Za-z][A-Za-z0-9_]*(?:\.[A-Za-z][A-Za-z0-9_]*)+$/.test(value) || value.length > 271) throw Error('Invalid installed app link.');
+    return value;
+  }
   if (url.username || url.password || (websiteOnly && scheme !== 'https:') ||
     /^(?:javascript|vbscript|data|file|http|intent|tel|sms|mailto|facetime|app-prefs|prefs|itms-services|exp|expo|gasfinder):$/.test(scheme) ||
     (scheme === 'https:' && (!url.hostname.includes('.') || url.port))) throw Error('Use an app link or HTTPS website without a login or port.');
@@ -25,16 +29,20 @@ export function subscriptionApp(input: SubscriptionApp): SubscriptionApp {
   return { name, url, ...(fallbackUrl ? { fallbackUrl } : {}) };
 }
 
-export async function openSubscriptionApp(input: SubscriptionApp | undefined, openURL: (url: string) => Promise<unknown>, platform: string) {
+export async function openSubscriptionApp(input: SubscriptionApp | undefined, openURL: (url: string) => Promise<unknown>, platform: string, openPackage?: (packageName: string) => Promise<unknown>) {
   if (!input) return { opened: false, message: 'Cancellation plan saved. Cancel with the provider to stop the charge.' };
   let app: SubscriptionApp;
   try { app = subscriptionApp(input); }
   catch { return { opened: false, message: 'Cancellation plan saved. Edit this subscription to choose its app again.' }; }
+  const packageApp = app.url.startsWith('gasfinder-app:');
   const website = app.url.startsWith('https:');
-  const target = platform === 'web' && !website ? app.fallbackUrl : app.url;
+  const target = ((platform === 'web' && !website) || (packageApp && platform !== 'android')) ? app.fallbackUrl : app.url;
   if (!target) return { opened: false, message: 'Cancellation plan saved. Open the associated app on your phone to cancel.' };
   try {
-    if (await openURL(target) === false) throw Error('Unavailable');
+    const opened = packageApp && target === app.url
+      ? await (openPackage ?? (await import('./installedApps')).openInstalledPackage)(target.slice('gasfinder-app://'.length))
+      : await openURL(target);
+    if (opened === false) throw Error('Unavailable');
     return { opened: true, message: `Opened ${app.name}. Complete cancellation there; the subscription is still active in GasFinder.` };
   } catch {
     if (app.fallbackUrl && app.fallbackUrl !== target) {

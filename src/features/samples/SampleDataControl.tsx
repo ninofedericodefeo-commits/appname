@@ -14,7 +14,7 @@ export default function SampleDataControl({ onPreviewStatement, compact = false,
     <View style={styles.header}><Text style={styles.title}>Sample data{visible ? ' is on' : ' is hidden'}</Text>
       <SubscriptionButton label={visible ? 'Hide sample data' : 'Show sample data'} accessibilityState={{ expanded: visible }}
         onPress={() => { setVisible(!visible); onVisibilityChange?.(!visible); }} /></View>
-    {!compact && <Text style={styles.note}>{visible ? 'Invented records are labeled Sample. ' : ''}Your real records and balances stay unchanged.</Text>}
+    {!compact && <Text style={styles.note}>{visible ? 'Example values are labeled Sample. ' : ''}Your real records and balances stay unchanged.</Text>}
     {visible && onPreviewStatement && <SubscriptionButton label="View sample Citizens statement" onPress={onPreviewStatement} />}
     {visible && pathname !== '/sample-data' && <SubscriptionButton label="Explore sample data" onPress={() => router.push('/sample-data')} />}
   </View>;

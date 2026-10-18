@@ -2,6 +2,7 @@ import AccessibilityBridge from '@/features/accessibility/AccessibilityBridge';
 import { StatusBar } from 'expo-status-bar';
 import { isDarkTheme , themedStyles, useThemeRevision , colors } from '@/theme';
 import DataCompletionNotice from '@/features/data/DataCompletionNotice';
+import { BottomNoticeArea } from '@/features/notices/BottomNoticeArea';
 import { configureBatchStorage } from '@/features/bank/batch';
 import { draftStorage } from '@/features/drafts/storage';
 import { saveDraft } from '@/features/drafts/persistence';
@@ -91,7 +92,7 @@ function ReadyLayout() {
           <Stack.Screen name="settings/index" options={{ headerRight: () => null }} />
           <Stack.Screen name="settings/[section]" options={{ headerRight: () => null, headerBackTitle: 'Settings' }} />
         </Stack>
-        <SubscriptionCancellationNotice /><DataCompletionNotice />
+        <BottomNoticeArea><SubscriptionCancellationNotice /><DataCompletionNotice /></BottomNoticeArea>
       </View>
       <SubscriptionReminderSync /><StatementReminderSync />
     </QueryClientProvider>

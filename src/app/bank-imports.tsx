@@ -28,7 +28,6 @@ export default function BankImportsScreen() {
   function choice(label: string, action: () => void, chosen = false) { return <Pressable key={label} accessibilityRole="button" disabled={busy} accessibilityState={{ selected: chosen, disabled: busy }} style={[s.choice, chosen && s.selected]} onPress={action}><Text style={s.choiceText}>{label}</Text></Pressable>; }
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={s.safe}><FlatList data={filtered} keyExtractor={entry => entry.id} contentContainerStyle={s.content}
     ListHeaderComponent={<View style={{ gap: 12 }}><Text accessibilityRole="header" style={s.title}>Saved imports</Text><Text style={s.note}>Originals live in the app’s Imports folder. Trash hides files from this library and can be undone here. Transactions and duplicate protection remain saved.</Text>
-      <SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} />
       <Pressable accessibilityRole="button" style={s.button} onPress={() => router.push('/bank-import')}><Text style={s.buttonText}>Import a statement</Text></Pressable>
       <TextInput accessibilityLabel="Search saved imports" placeholder="Search name, account or period" value={query} onChangeText={setQuery} style={s.input} />
       <View style={s.row}>{choice('Files', () => { setTrash(false); setSelected([]); }, !trash)}{choice(`Trash (${entries.filter(item => item.trashedAt).length})`, () => { setTrash(true); setSelected([]); }, trash)}</View>
@@ -37,6 +36,7 @@ export default function BankImportsScreen() {
       {download && Platform.OS === 'web' && <a href={download.url} download={download.name} style={{ minHeight: 44, display: 'flex', alignItems: 'center', color: colors.primary }}>Save {download.name}</a>}
       {(loading || busy) && <ActivityIndicator color={colors.accentDark} />}{!!error && <Text accessibilityRole="alert" style={s.danger}>{error}</Text>}
     </View>}
+    ListFooterComponent={<View style={{ marginTop: 16 }}><SampleDataControl onPreviewStatement={() => router.push('/sample-statement')} /></View>}
     ListEmptyComponent={!loading ? <Text style={s.note}>{trash ? 'Trash is empty.' : 'No files match. Confirm a PDF or CSV import to save its original here.'}</Text> : null}
     renderItem={({ item }) => <View style={s.card}>
       <View style={s.row}><Pressable accessibilityRole="checkbox" accessibilityLabel={`Select ${item.name}`} accessibilityState={{ checked: selected.includes(item.id) }} aria-checked={selected.includes(item.id)} style={s.choice} onPress={() => setSelected(ids => ids.includes(item.id) ? ids.filter(id => id !== item.id) : [...ids, item.id])}><Text style={s.choiceText}>{selected.includes(item.id) ? '✓ Selected' : 'Select'}</Text></Pressable><Text style={s.note}>{item.kind.toUpperCase()} · {item.accountLabel}</Text></View>

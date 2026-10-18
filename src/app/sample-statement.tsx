@@ -29,6 +29,6 @@ export default function SampleStatementScreen() {
       {download && Platform.OS === 'web' && <a href={download.url} download={download.name} style={{ minHeight: 44, display: 'flex', alignItems: 'center', color: colors.primary }}>Download sample Citizens PDF</a>}
       {!!error && <Text accessibilityRole="alert" style={s.danger}>{error}</Text>}
     </View>
-    <SampleDataControl /><SampleAccountPreview full />
+    <SampleAccountPreview full /><SampleDataControl />
   </MoneyPage>;
 }

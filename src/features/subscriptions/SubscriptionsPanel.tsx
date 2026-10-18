@@ -88,7 +88,6 @@ export default function SubscriptionsPanel() {
 
   return <View style={styles.content}>
     <View><Text accessibilityRole="header" style={styles.title}>Bills</Text><Text style={styles.intro}>Review upcoming subscription charges.</Text></View>
-    <SampleDataControl compact />
     <SubscriptionCosts subscriptions={subscriptions} today={today} />
     {!!due.length && <View style={styles.card}><Text accessibilityRole="header" style={styles.sectionTitle}>{due.length} renewal{due.length === 1 ? '' : 's'} tomorrow · {formatMoney(due.reduce((sum, item) => sum + item.subscription.amountCents, 0))}</Text><Text style={styles.note}>{snoozed.length ? `${snoozed.length} review${snoozed.length === 1 ? '' : 's'} snoozed. Next returns ${snoozeEndLabel}. You can still review the cards below.` : 'Review the cards below, or snooze the reminder banner.'}</Text><View style={styles.actions}><SubscriptionButton label="Later · 2h" grow onPress={() => snoozeReviews('two-hours')} /><SubscriptionButton label="Hide for today" grow onPress={() => snoozeReviews('today')} /></View>{!!snoozed.length && <SubscriptionButton label="Show renewal banner again" onPress={resumeReviews} />}</View>}
     {pocketReady && subsReady && alerts.length > 0 && <><Text accessibilityRole="header" style={styles.sectionTitle}>Updates from your bank · {alerts.length}</Text>{alerts.map(alert => <View key={alert.id} style={styles.card}>
@@ -121,6 +120,7 @@ export default function SubscriptionsPanel() {
       </View>}
     </View>
     <Text style={styles.footer}>Saved on this device. Planning to cancel does not stop charges.</Text>
+    <SampleDataControl compact />
     {editor && <SubscriptionEditor subscription={editor.subscription} suggestion={editor.suggestion} onClose={() => setEditor(null)} />}
   </View>;
 }

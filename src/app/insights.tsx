@@ -45,7 +45,7 @@ export default function InsightsScreen() {
   } catch (cause) { setError((cause as Error).message); } }
   return <SafeAreaView edges={['left', 'right', 'bottom']} style={s.safe}><Stack.Screen options={{ title: 'Insights' }} /><FormScrollView contentContainerStyle={s.content}>
     <Text accessibilityRole="header" style={s.title}>Spending insights</Text><Text style={s.note}>Recorded posted/logged activity for this account, including hidden rows. Pending activity and savings assignments are excluded. Correct transfers/refunds in transaction details before relying on classifications.</Text>
-    <SampleDataControl compact /><SampleInsightsPreview />
+    <SampleInsightsPreview />
     <TextInput accessibilityLabel="Insights start date" placeholder="From YYYY-MM-DD" style={s.input} value={from} onChangeText={setFrom} /><TextInput accessibilityLabel="Insights end date" placeholder="Through YYYY-MM-DD" style={s.input} value={to} onChangeText={setTo} />
     {!!validation && <Text style={s.danger}>{validation}</Text>}
     {summary && <><View style={s.card}><Text accessibilityRole="header" style={s.heading}>Recorded activity</Text><Pressable accessibilityRole="button" style={s.choice} onPress={() => openRows()}><Text style={s.choiceText}>View supporting transactions ›</Text></Pressable><Text style={s.body}>Spending {money(summary.spendingCents)}{'\n'}Income {money(summary.incomeCents)}{'\n'}Refunds {money(summary.refundCents)}{'\n'}Net transfers {money(summary.transferCents)}{'\n'}Net reversals {money(summary.reversalCents)}</Text><Text style={s.note}>{fullyCovered ? 'Saved statement periods cover this date range; check reconciliation in Saved imports.' : 'Coverage is incomplete or unknown. These totals may omit activity.'}{'\n'}Last confirmed balance date: {accountBalanceEstimate(pocket).snapshotDay ?? 'none'}.</Text></View>
@@ -56,5 +56,6 @@ export default function InsightsScreen() {
     <View style={s.card}><Text accessibilityRole="header" style={s.heading}>Next 30 days: planned bills</Text><Text style={s.body}>{money(billTotal)} in {bills.length} real subscription renewals</Text><Text style={s.note}>Assumes active subscriptions renew at their saved price/date. Excludes samples. This forecast is displayed separately and is never deducted from Account. Bank activity already affects the actual estimate.</Text></View>
     <View style={s.card}><Text accessibilityRole="header" style={s.heading}>Goal contributions</Text><Text style={s.body}>Currently set aside: {money(pocket.reservedCents)}</Text><Text style={s.note}>Set-aside contributions are recorded assignments. Paused or skipped purchases are intentions and are not counted as proven cash saved.</Text></View>
     {!!error && <Text accessibilityRole="alert" style={s.danger}>{error}</Text>}{Platform.OS === 'web' && link && <a href={link.url} download={link.name}>Download {link.name}</a>}
+    <SampleDataControl compact />
   </FormScrollView></SafeAreaView>;
 }
