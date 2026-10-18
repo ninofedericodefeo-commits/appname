@@ -6,6 +6,7 @@ import { AppState, Platform, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { FormScrollView } from '@/components/FormScrollView';
+import { isPurchaseInboxAvailable } from '@/features/goals/purchaseInboxBridge';
 import { installPurchaseShortcut } from '@/features/goals/installShortcut';
 import { automationSetupURL, firstSetupPurchase, PURCHASE_SHORTCUT_NAME } from '@/features/goals/shortcutSetup';
 import { formatMoney } from '@/lib/money';
@@ -44,6 +45,8 @@ export default function PurchaseAutomationScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [showHelp, setShowHelp] = useState(false);
+  const [showLegacy, setShowLegacy] = useState(false);
+  const backgroundAvailable = isPurchaseInboxAvailable();
   const [unifiedAutomations, setUnifiedAutomations] = useState(modernShortcuts || Platform.OS === 'web');
   const handoff = useRef<Handoff | null>(null);
   const stepNumber = stage === 'install' ? 1 : stage === 'automation' ? 2 : 3;
@@ -78,6 +81,14 @@ export default function PurchaseAutomationScreen() {
     } finally { setBusy(false); }
   }
 
+  async function openBackgroundSetup() {
+    if (busy || !isIPhone) return;
+    setBusy(true); setError('');
+    try { await Linking.openURL('shortcuts://'); }
+    catch { setError('Could not open Shortcuts. Open Apple’s Shortcuts app to follow these steps.'); }
+    finally { setBusy(false); }
+  }
+
   async function openAutomation() {
     if (busy || !isIPhone) return;
     setBusy(true); setError('');
@@ -105,8 +116,32 @@ export default function PurchaseAutomationScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>PURCHASE LOGGING</Text>
       <Text accessibilityRole="header" style={styles.title}>Connect Apple Pay</Text>
-      <Text style={styles.body}>Add our shortcut and connect your card. After a supported Wallet tap, review and save the purchase in GasFinder.</Text>
+      <Text style={styles.body}>Capture supported Wallet taps without opening GasFinder at the checkout. Unlock later, then review and save each purchase.</Text>
       {!isIPhone && <Text style={styles.notice}>Set this up in GasFinder on your iPhone. You can read the steps here; manual logging is available in Edit goal.</Text>}
+      <View style={styles.card}>
+        <Text style={styles.section}>Capture without opening GasFinder</Text>
+        <Text style={styles.body}>The old shortcut asks iOS to open GasFinder at checkout. If iOS reports the app is locked even when your phone is unlocked and no app lock is enabled, that message alone does not identify the cause. The new action avoids this foreground handoff.</Text>
+        {!backgroundAvailable && <Text style={styles.notice}>This installed build does not include background purchase capture. Install a new iPhone build with the GasFinder action before following these steps. An over-the-air update or Expo Go cannot add it.</Text>}
+        <Text style={styles.subheading}>Replace the old automation</Text>
+        <Text style={styles.body}>In Shortcuts, edit your existing Transaction automation or create one for the card you pay with. Remove Open URLs and any Run Shortcut action that runs GasFinder Log Purchase. Updating GasFinder does not change your saved automation.</Text>
+        <TapPath labels={['Shortcuts', 'Automation', 'Transaction', 'Your card', 'Run Immediately']} />
+        <Text style={styles.subheading}>Add the GasFinder action</Text>
+        <TapPath labels={['Add Action', 'GasFinder', 'Queue purchase for review']} />
+        <Text style={styles.body}>Set Merchant to Shortcut Input → Merchant. Set Amount to Shortcut Input → Amount → Currency Amount, and Currency to Shortcut Input → Amount → Currency Code. Use the transaction’s values, not typed example text. Only USD is accepted.</Text>
+        <Text style={styles.hint}>If Shortcuts shows an optional transaction ID, leave it empty unless the trigger supplies a stable transaction identifier. Do not use the card number.</Text>
+        <Text style={styles.body}>Keep this automation free of Open App and Open URLs actions. Enable Allow Running When Locked if Shortcuts offers it, then save. The GasFinder action queues a local draft without opening the app.</Text>
+        <Button label={busy ? 'Opening…' : 'Open Shortcuts ↗'} onPress={openBackgroundSetup} disabled={!isIPhone || busy || !backgroundAvailable} />
+        <Text style={styles.subheading}>Review after your next Wallet tap</Text>
+        <Text style={styles.body}>Unlock your phone, open GasFinder, and open Wallet purchases to review. Check the merchant and amount, then tap Save purchase. Queuing alone does not change your balance, savings or transactions.</Text>
+        <Button label="Open Wallet purchases" secondary onPress={() => router.push('/purchase-inbox')} disabled={!backgroundAvailable} />
+        <Text style={styles.hint}>Pending drafts are not included in backups. Erase all app data clears them; account reset and backup restore keep them until reviewed or their 30-day expiry.</Text>
+        <Text style={styles.hint}>The phone must have been unlocked once after restarting. iOS can still restrict background actions; test your installed build with your card. There is no need to make an extra purchase just to test.</Text>
+      </View>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showLegacy }} onPress={() => setShowLegacy(!showLegacy)} style={styles.helpButton}>
+        <Text style={styles.link}>{showLegacy ? 'Hide older shortcut setup −' : 'Older shortcut: unlocked phone only +'}</Text>
+      </Pressable>
+      {showLegacy && <>
+      <Text style={styles.notice}>This older shortcut opens GasFinder for immediate review. It requires an unlocked phone and does not capture in the background. Use the GasFinder action above to capture without opening the app.</Text>
       {!hydrated ? <Text style={styles.hint}>Loading your setup…</Text> : <>
         <View accessibilityLabel={`Setup step ${stepNumber} of 3`} style={styles.progress}>
           {['Add shortcut', 'Connect card', 'Check logging'].map((label, index) => <View key={label} style={styles.progressItem}>
@@ -170,6 +205,7 @@ export default function PurchaseAutomationScreen() {
           <Pressable accessibilityRole="button" onPress={startAgain} style={styles.textButton}><Text style={styles.link}>Add the shortcut again</Text></Pressable>
         </View>}
       </>}
+      </>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: showHelp }} onPress={() => setShowHelp(!showHelp)} style={styles.helpButton}>
         <Text style={styles.link}>{showHelp ? 'Hide setup help −' : 'Need help? +'}</Text>
@@ -180,8 +216,10 @@ export default function PurchaseAutomationScreen() {
         <Text style={styles.subheading}>The shortcut can’t be found</Text>
         <Text style={styles.body}>Add it again and keep the name “GasFinder Log Purchase”. If asked about an existing copy, replace that copy. Opening Shortcuts successfully does not confirm the shortcut exists.</Text>
         <Text style={styles.subheading}>I added it but no purchase arrives</Text>
-        <Text style={styles.body}>Check that Transaction uses the card you tapped and is enabled for automatic running. On older iOS, if you created a Run Shortcut action, set its Input to Shortcut Input so it receives the transaction.</Text>
-        <Text style={styles.body}>A Play button run without a Wallet transaction will not log a purchase. In an Expo development build, keep GasFinder and its dev server running while testing; an installed standalone build is needed to reliably open from a closed state.</Text>
+        <Text style={styles.body}>Check that Transaction uses the card you tapped and is enabled for automatic running. For background capture, use Queue purchase for review and remove the old Open URLs / Run Shortcut action. For the older unlocked-phone shortcut, set Run Shortcut’s Input to Shortcut Input.</Text>
+        <Text style={styles.body}>A Play button run without transaction values does not test a Wallet tap. The bundled GasFinder Log Purchase shortcut still uses Open URLs and needs an unlocked phone. Keep the dev server available for foreground review in development builds; use an installed standalone build for normal use.</Text>
+        <Text style={styles.subheading}>The GasFinder action is missing</Text>
+        <Text style={styles.body}>Install the updated native iPhone build and open it once while unlocked. Search Shortcuts actions for GasFinder. Installing a JavaScript update does not add an App Intent. Existing automations must still be edited manually.</Text>
         <Text style={styles.subheading}>Turn logging off</Text>
         <Text style={styles.body}>Disable the Transaction automation in Shortcuts. Starting this guide again does not disable or delete an existing automation.</Text>
       </View>}

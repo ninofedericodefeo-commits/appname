@@ -1,5 +1,6 @@
 import { completeErasure } from './erasure';
 import { clearDrafts } from '@/features/drafts/persistence';
+import { clearPurchaseInbox } from '@/features/goals/purchaseInboxBridge';
 import { Platform } from 'react-native';
 import { clearBatch } from '@/features/bank/batch';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -216,7 +217,7 @@ async function finishErasure() {
     resetRecords: async () => { await rehydrateStores(); resetStores(); await flushAppStorage(); },
     eraseOriginals: async () => { await archiveStorage.erase!(); },
     eraseAttachments: eraseAppPhotosAndExports,
-    eraseDrafts: clearDrafts,
+    eraseDrafts: async () => { await clearDrafts(); await clearPurchaseInbox(); },
     clearRecovery: async () => { await AsyncStorage.multiRemove([journalKey, importJournalKey, 'gasfinder-last-backup-created']); },
     clearCache: () => { clearBatch(); queryClient.clear(); },
     recordCompletion: async () => { await AsyncStorage.setItem('gasfinder-erasure-complete','App records, saved originals and drafts erased. There is no Undo. External backups and device privacy settings remain.'); },

@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import ts from 'typescript';
+import { pendingWalletId, walletPurchaseId } from '../src/features/goals/purchaseInbox.ts';
 import { parseImportedPurchase } from '../src/features/goals/importPurchase.ts';
 import { formatMoney } from '../src/lib/money.ts';
 import { validateJson } from '../src/features/data/backupFormat.ts';
@@ -29,9 +30,11 @@ function nodes(tree) {
 }
 const text = tree => typeof tree === 'string' ? tree : Array.isArray(tree) ? tree.map(text).join('') : text(tree?.props?.children ?? '');
 
-function purchaseHarness() {
+function purchaseHarness(walletDraft) {
   const control = { ready: true, privacyReady: true, privacy: { enabled: true }, session: { unlocked: true }, app: { currentState: 'active' }, data: { busy: false, recoveryError: '' } };
-  const writes = [], captures = [], effects = [], slots = [];
+  const writes = [], captures = [], effects = [], slots = [], acknowledgements = [];
+  control.flushError = false; control.ackError = false;
+  control.params = walletDraft ? { pendingWalletId: walletDraft.id } : { amount: '12.30', merchant: 'Corner Shop', id: 'security-synthetic' };
   let cursor = 0;
   const state = { purchases: [], activeGoal: null, addPurchase: (...args) => {
     if (state.purchases.some(item => item.id === args[0])) return false;
@@ -39,6 +42,7 @@ function purchaseHarness() {
   } };
   const pocket = selector => selector(state);
   pocket.getState = () => state;
+  pocket.setState = change => Object.assign(state, change);
   pocket.persist = { hasHydrated: () => control.ready, onFinishHydration: () => () => {} };
   const privacy = selector => selector ? selector(control.privacy) : control.privacy;
   privacy.getState = () => control.privacy;
@@ -53,20 +57,24 @@ function purchaseHarness() {
       useMemo: fn => fn(), useEffect: fn => effects.push(fn), useSyncExternalStore: (_subscribe, snapshot) => snapshot(),
     },
     'react/jsx-runtime': { jsx, jsxs: jsx },
-    'react-native': { AppState: { get currentState() { return control.app.currentState; }, addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'ios' }, Pressable: 'Pressable', Text: 'Text', View: 'View' },
+    'react-native': { AppState: { get currentState() { return control.app.currentState; }, addEventListener: () => ({ remove() {} }) }, Platform: { OS: 'ios' }, Pressable: 'Pressable', Text: 'Text', View: 'View', ScrollView: 'ScrollView' },
     'react-native-safe-area-context': { SafeAreaView: 'SafeAreaView' },
-    'expo-router': { useLocalSearchParams: () => ({ amount: '12.30', merchant: 'Corner Shop', id: 'security-synthetic' }), Link: 'Link' },
+    'expo-router': { useLocalSearchParams: () => control.params, Link: 'Link' },
     '@/theme': { useThemeRevision() {}, colors: {}, themedStyles: fn => fn() },
+    '@/features/preferences/amountVisibility': { useAmountsHidden: () => !!control.privacy.hideAmounts, useAmountVisibility: { getState: () => ({ revealed: false }) } },
     '@/features/data/operationStatus': { useDataStatus: () => control.data, getDataStatus: () => control.data },
     '@/features/privacy/deviceStore': { useDevicePrivacy: privacy, usePrivacySession: session },
     '@/stores/pocketStore': { usePocketStore: pocket },
     '@/stores/shortcutSetupStore': { useShortcutSetupStore: { getState: () => ({ recordCapture: outcome => captures.push(outcome) }) } },
+    '@/features/goals/purchaseInbox': { pendingWalletId, walletPurchaseId },
+    '@/features/goals/purchaseInboxBridge': { usePendingWalletPurchases: () => ({ items: walletDraft ? [walletDraft] : [], loading: false, error: '' }), removePendingWalletPurchase: async id => { if (control.ackError) throw new Error('Synthetic acknowledgement failed'); acknowledgements.push(id); } },
+    '@/lib/appStorage': { flushAppStorage: async () => { if (control.flushError) throw new Error('Synthetic durable storage failure'); } },
     '@/lib/money': { formatMoney }, '@/features/goals/importPurchase': { parseImportedPurchase },
   };
   const component = load('src/app/import-purchase.tsx', imports).default;
   function render() { cursor = 0; const content = component(); const tree = content.type(content.props); effects.splice(0).forEach(fn => fn()); return tree; }
   const save = tree => nodes(tree).find(node => node.type === 'Pressable' && text(node) === 'Save purchase');
-  return { control, writes, captures, state, render, save };
+  return { control, writes, captures, state, render, save, acknowledgements };
 }
 
 test('opening, rerendering or leaving a purchase draft never changes financial records', () => {
@@ -91,6 +99,7 @@ test('a duplicate arriving after render is not recorded again', () => {
   assert.equal(h.writes.length, 0); assert.deepEqual(h.captures, ['repeated']);
 });
 for (const [name, revoke] of [
+  ['hidden financial amounts', h => { h.control.privacy.hideAmounts = true; }],
   ['relocked session', h => { h.control.session.unlocked = false; }],
   ['background transition', h => { h.control.app.currentState = 'background'; }],
   ['inactive transition', h => { h.control.app.currentState = 'inactive'; }],
@@ -101,6 +110,37 @@ for (const [name, revoke] of [
 ]) test(`a previously rendered Save callback cannot bypass ${name}`, () => {
   const h = purchaseHarness(), button = h.save(h.render()); revoke(h); button.props.onPress();
   assert.equal(h.writes.length, 0); assert.deepEqual(h.captures, []);
+});
+
+
+const inboxDraft = { id: '7b42b069-6921-4793-811f-3451856ce000', merchant: 'Wallet Shop', amountCents: 1234, currency: 'USD', capturedAt: '2026-10-18T10:00:00.000Z' };
+test('pending Wallet drafts only save after confirmation and acknowledge durable records with the capture timestamp', async () => {
+  const h = purchaseHarness(inboxDraft), button = h.save(h.render());
+  assert.equal(h.writes.length, 0); assert.deepEqual(h.acknowledgements, []);
+  await button.props.onPress();
+  assert.equal(h.writes.length, 1); assert.equal(h.writes[0][0], `wallet-${inboxDraft.id}`); assert.equal(h.writes[0][5], inboxDraft.capturedAt);
+  assert.deepEqual(h.acknowledgements, [inboxDraft.id]);
+});
+test('failed persistence retains the Wallet draft and retry does not duplicate the purchase', async () => {
+  const h = purchaseHarness(inboxDraft); h.control.flushError = true;
+  await h.save(h.render()).props.onPress();
+  assert.equal(h.writes.length, 1); assert.deepEqual(h.acknowledgements, []);
+  h.control.flushError = false;
+  const retry = nodes(h.render()).find(node => node.type === 'Pressable' && text(node) === 'Remove saved draft');
+  await retry.props.onPress();
+  assert.equal(h.writes.length, 1); assert.deepEqual(h.acknowledgements, [inboxDraft.id]);
+});
+test('failed queue acknowledgement leaves the saved purchase deduplicated on retry', async () => {
+  const h = purchaseHarness(inboxDraft); h.control.ackError = true;
+  await h.save(h.render()).props.onPress();
+  assert.equal(h.writes.length, 1); assert.deepEqual(h.acknowledgements, []);
+  h.control.ackError = false;
+  await nodes(h.render()).find(node => node.type === 'Pressable' && text(node) === 'Remove saved draft').props.onPress();
+  assert.equal(h.writes.length, 1); assert.deepEqual(h.acknowledgements, [inboxDraft.id]);
+});
+for (const revoke of [h => { h.control.session.unlocked = false; }, h => { h.control.app.currentState = 'background'; }, h => { h.control.data.busy = true; }]) test('pending Wallet Save rechecks live authorization before writing or acknowledging', async () => {
+  const h = purchaseHarness(inboxDraft), button = h.save(h.render()); revoke(h);
+  await button.props.onPress(); assert.equal(h.writes.length, 0); assert.deepEqual(h.acknowledgements, []);
 });
 
 function gateTree({ locked = false, active = true, hidden = false, hydrated = true, os = 'ios' } = {}) {
@@ -172,4 +212,39 @@ test('real pocket hydration repairs old reserved aliases and preserves edit/undo
   assert.equal(store.getState().undoCorrection(store.getState().correctionHistory.at(-1).id), true);
   assert.equal(getMerchantAlias(store.getState().merchantAliases, '__proto__'), 'Old prototype');
   assert.doesNotThrow(() => validateJson(JSON.parse(JSON.stringify(store.getState()))));
+});
+
+function inboxBridgeHarness() {
+  const control = { active: true, ready: true, privacyReady: true, enabled: true, unlocked: true, busy: false, recoveryError: '', reads: 0, version: 1, wait: null, clears: 0, clearError: false };
+  const inbox = load('src/features/goals/purchaseInboxBridge.ts', {
+    'expo': { requireOptionalNativeModule: () => ({ getVersion: () => control.version, listPending: async () => { control.reads++; if (control.wait) await control.wait; return [inboxDraft]; }, removePending: async () => true, clearPending: async () => { if (control.clearError) throw Error('Storage unavailable'); control.clears++; } }) },
+    'react-native': { Platform: { OS: 'ios' }, AppState: { get currentState() { return control.active ? 'active' : 'background'; } } },
+    'react': {},
+    '@/features/data/operationStatus': { getDataStatus: () => control },
+    '@/features/preferences/amountVisibility': { useAmountVisibility: { getState: () => ({ revealed: false }) } },
+    '@/features/privacy/deviceStore': { useDevicePrivacy: { persist: { hasHydrated: () => control.privacyReady }, getState: () => ({ enabled: control.enabled }) }, usePrivacySession: { getState: () => ({ unlocked: control.unlocked }) } },
+    '@/stores/pocketStore': { usePocketStore: { persist: { hasHydrated: () => control.ready } } },
+    './purchaseInbox': { parsePendingWalletPurchases: values => values, pendingWalletId },
+  });
+  return { control, inbox };
+}
+test('native Wallet inbox never reads while private, backgrounded, unhydrated or during account operations', async () => {
+  for (const revoke of [h => { h.control.unlocked = false; }, h => { h.control.active = false; }, h => { h.control.ready = false; }, h => { h.control.privacyReady = false; }, h => { h.control.busy = true; }, h => { h.control.recoveryError = 'Recovery'; }, h => { h.control.version = 2; }]) {
+    const h = inboxBridgeHarness(); revoke(h);
+    assert.deepEqual(await h.inbox.listPendingWalletPurchases(), []); assert.equal(h.control.reads, 0);
+  }
+});
+test('native Wallet inbox discards an in-flight response if privacy locks before it resolves', async () => {
+  const h = inboxBridgeHarness(); let release;
+  h.control.wait = new Promise(resolve => { release = resolve; });
+  const pending = h.inbox.listPendingWalletPurchases();
+  assert.equal(h.control.reads, 1); h.control.unlocked = false; release();
+  assert.deepEqual(await pending, []);
+});
+test('erase-all clears Wallet drafts during the data barrier without reading them and propagates failures', async () => {
+  const h = inboxBridgeHarness(); h.control.busy = true;
+  await h.inbox.clearPurchaseInbox();
+  assert.equal(h.control.clears, 1); assert.equal(h.control.reads, 0);
+  h.control.clearError = true;
+  await assert.rejects(h.inbox.clearPurchaseInbox(), /Storage unavailable/);
 });

@@ -25,7 +25,7 @@ module.exports = ({ config }) => {
       // iOS gives us an Inbox copy; this works with a free Personal Team.
       LSSupportsOpeningDocumentsInPlace: false,
     } },
-    plugins: [...plugins, ['expo-sharing', {
+    plugins: [...plugins, './plugins/withPurchaseInbox', ['expo-sharing', {
       ios: { enabled: enableIosSharing, activationRule: { supportsText: true, supportsWebUrlWithMaxCount: 1, supportsFileWithMaxCount: 1 } },
       android: { enabled: true, singleShareMimeTypes: ['text/plain', 'application/pdf', 'text/csv'] },
     }]],
