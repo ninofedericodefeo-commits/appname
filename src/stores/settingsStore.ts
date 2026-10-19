@@ -72,4 +72,4 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   setSelectedFuelType: (selectedFuelType) => set({ selectedFuelType }),
   setSelectedRadius: (selectedRadius) => set({ selectedRadius }),
   setSortOrder: (sortOrder) => set({ sortOrder }),
-}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 5, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', ...(state as object) }) }));
+}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 6, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', hideUnnamedStations: false, ...(state as object) }) }));
