@@ -30,6 +30,8 @@ type SettingsState = PersonalPreferences & {
   selectedRadius: number;
   sortOrder: SortOption;
   hideUnpricedStations: boolean;
+  hideUnnamedStations: boolean;
+  setHideUnnamedStations: (hide: boolean) => void;
   recentPricesOnly: boolean;
   priceQualifier: PriceQualifier;
   setRecentPricesOnly: (value: boolean) => void;
@@ -57,6 +59,8 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   selectedRadius: 5,
   sortOrder: 'price',
   hideUnpricedStations: false,
+  hideUnnamedStations: false,
+  setHideUnnamedStations: hideUnnamedStations => set({ hideUnnamedStations }),
   recentPricesOnly: false, priceQualifier: 'standard',
   setRecentPricesOnly: recentPricesOnly => set({ recentPricesOnly }),
   setPriceQualifier: priceQualifier => set({ priceQualifier }),

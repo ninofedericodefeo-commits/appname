@@ -1,11 +1,20 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { filterPricedStations, parseStationsResponse, prepareStations, priceDescription } from '../src/features/stations/logic.ts';
+import { filterNamedStations, filterPricedStations, parseStationsResponse, prepareStations, priceDescription } from '../src/features/stations/logic.ts';
 
 const reportedAt = '2026-09-28T12:00:00Z';
 const closeStation = { id: 'close', name: 'Close', latitude: 39.9526, longitude: -75.1652, address: '1 A St', city: 'Philadelphia', state: 'PA', prices: [{ fuelType: 'regular', price: 3.6, currency: 'USD', reportedAt, source: 'Test source' }] };
 const cheapStation = { ...closeStation, id: 'cheap', name: 'Cheap', longitude: -75.18, prices: [{ ...closeStation.prices[0], price: 3.1 }] };
+
+test('unnamed station filter removes current and cached fallback names while preserving named stations and order', () => {
+  const unnamed = ['', '  ', 'Name not listed', ' GAS STATION '].map((name, i) => ({ ...closeStation, id: `unnamed-${i}`, name }));
+  const branded = { ...closeStation, id: 'brand', name: 'Sunoco', prices: [] };
+  const stations = [cheapStation, ...unnamed, branded, closeStation];
+  assert.equal(filterNamedStations(stations, false), stations);
+  assert.deepEqual(filterNamedStations(stations, true).map(s => s.id), ['cheap', 'brand', 'close']);
+  assert.deepEqual(filterNamedStations(filterPricedStations(stations, 'regular', true), true).map(s => s.id), ['cheap', 'close']);
+});
 
 test('The saved-price filter uses the selected fuel, rejects invalid prices and preserves ordering', () => {
   const missing = { ...closeStation, id: 'missing', prices: [] };

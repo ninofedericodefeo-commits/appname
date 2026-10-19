@@ -17,6 +17,13 @@ function selectedPrice(station: GasStation, fuelType: FuelType) {
   return station.prices.find((price) => price.fuelType === fuelType)?.price ?? Number.POSITIVE_INFINITY;
 }
 
+export function filterNamedStations(stations: GasStation[], hideUnnamed: boolean) {
+  return hideUnnamed ? stations.filter(station => {
+    const name = station.name.trim().toLowerCase();
+    return name.length > 0 && name !== 'name not listed' && name !== 'gas station';
+  }) : stations;
+}
+
 export function filterPricedStations(stations: GasStation[], fuelType: FuelType, hideUnpriced: boolean, recentOnly = false, now = Date.now()) {
   return hideUnpriced || recentOnly ? stations.filter((station) => {
     const price = selectedPrice(station, fuelType);

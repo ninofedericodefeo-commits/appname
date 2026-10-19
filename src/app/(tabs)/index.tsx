@@ -19,7 +19,7 @@ import StationMap from '@/components/StationMap';
 import { getCurrentLocation, requestLocationPermission } from '@/features/location/permissions';
 import { stationApiBaseUrl } from '@/features/stations/data';
 import { useNearbyStations } from '@/features/stations/hooks';
-import { filterPricedStations, isRecentPrice, prepareStations, recentStationPrice } from '@/features/stations/logic';
+import { filterNamedStations, filterPricedStations, isRecentPrice, prepareStations, recentStationPrice } from '@/features/stations/logic';
 import { priceQualifiers } from '@/features/fuel/logic';
 import { withLocalPrices, stationsFromSavedLocations } from '@/features/stations/localPrices';
 import { useSettingsStore } from '@/stores/settingsStore';
@@ -34,7 +34,7 @@ export default function GasScreen() {
   useThemeRevision();
   const { width, fontScale } = useWindowDimensions();
   const wide = width >= 900 && fontScale < 1.4;
-  const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
+  const { selectedFuelType, selectedRadius, sortOrder, hideUnpricedStations, hideUnnamedStations, setHideUnnamedStations, recentPricesOnly, priceQualifier, setRecentPricesOnly, setPriceQualifier, setHideUnpricedStations, setSelectedFuelType, setSelectedRadius, setSortOrder } = useSettingsStore();
   const [mode, setMode] = useState<'nearby' | 'online'>('nearby');
   const savedView = useSettingsStore(state => state.gasView);
   const preferList = useSettingsStore(state => state.preferStationList);
@@ -109,7 +109,7 @@ export default function GasScreen() {
     if (!location) return found;
     return prepareStations(withLocalPrices(found, receiptReports, priceReports, priceQualifier), { ...location, radius: selectedRadius, fuelType: selectedFuelType, sortOrder }, now);
   }, [data?.stations, location, receiptReports, priceReports, selectedRadius, selectedFuelType, sortOrder, priceQualifier, now]);
-  const stations = useMemo(() => filterPricedStations(allStations, selectedFuelType, hideUnpricedStations, recentPricesOnly, now), [allStations, selectedFuelType, hideUnpricedStations, recentPricesOnly, now]);
+  const stations = useMemo(() => filterNamedStations(filterPricedStations(allStations, selectedFuelType, hideUnpricedStations, recentPricesOnly, now), hideUnnamedStations), [allStations, selectedFuelType, hideUnpricedStations, hideUnnamedStations, recentPricesOnly, now]);
   const cheapest = stations.reduce<(typeof stations)[number] | undefined>((best, station) => {
     const price = recentStationPrice(station, selectedFuelType, now);
     const bestPrice = best ? recentStationPrice(best, selectedFuelType, now) : Infinity;
@@ -124,7 +124,7 @@ export default function GasScreen() {
   })), [stations, selectedFuelType, now, cheapest?.id]);
   const selectPin = useCallback(async (id: string) => setSelectedStationId(id), []);
 
-  const filterCount = Number(selectedRadius !== 5) + Number(sortOrder !== 'price') + Number(priceQualifier !== 'standard') + Number(recentPricesOnly) + Number(hideUnpricedStations) + Number(mode !== 'nearby');
+  const filterCount = Number(selectedRadius !== 5) + Number(sortOrder !== 'price') + Number(priceQualifier !== 'standard') + Number(recentPricesOnly) + Number(hideUnpricedStations) + Number(hideUnnamedStations) + Number(mode !== 'nearby');
   const fuelLabel = selectedFuelType.charAt(0).toUpperCase() + selectedFuelType.slice(1);
   const searching = canShowResults && (isLoading || isFetching);
 
@@ -165,7 +165,7 @@ export default function GasScreen() {
         </View>
 
         {filtersOpen && <View style={styles.filters}>
-          <View style={styles.filterHeading}><Text accessibilityRole="header" style={styles.sectionTitle}>Search filters</Text><SubscriptionButton label="Reset" onPress={() => { setSelectedRadius(5); setSortOrder('price'); setHideUnpricedStations(false); setRecentPricesOnly(false); setPriceQualifier('standard'); setMode('nearby'); }} /></View>
+          <View style={styles.filterHeading}><Text accessibilityRole="header" style={styles.sectionTitle}>Search filters</Text><SubscriptionButton label="Reset" onPress={() => { setSelectedRadius(5); setSortOrder('price'); setHideUnpricedStations(false); setHideUnnamedStations(false); setRecentPricesOnly(false); setPriceQualifier('standard'); setMode('nearby'); }} /></View>
           <Text style={styles.fieldLabel}>Price type</Text>
           <View style={styles.pillRow}>{priceQualifiers.map(value => <Pressable key={value.id} accessibilityRole="button" accessibilityState={{ selected: priceQualifier === value.id }} style={[styles.pill, priceQualifier === value.id && styles.activePill]} onPress={() => setPriceQualifier(value.id)}><Text style={[styles.pillText, priceQualifier === value.id && styles.activePillText]}>{value.label}</Text></Pressable>)}</View>
           <Text style={styles.fieldLabel}>Distance</Text>
@@ -175,6 +175,7 @@ export default function GasScreen() {
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Recent prices only" accessibilityState={{ checked: recentPricesOnly }} aria-checked={recentPricesOnly} onPress={() => setRecentPricesOnly(!recentPricesOnly)} style={styles.checkRow}><View style={styles.checkCopy}><Text style={styles.checkTitle}>Recent prices only</Text><Text style={styles.checkNote}>Reported in the last 24 hours</Text></View><View style={[styles.checkbox, recentPricesOnly && styles.checked]}>{recentPricesOnly && <AppIcon name="check" size={16} color={colors.surface} />}</View></Pressable>
           <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a price" accessibilityState={{ checked: hideUnpricedStations }} aria-checked={hideUnpricedStations} onPress={() => setHideUnpricedStations(!hideUnpricedStations)} style={styles.checkRow}><Text style={[styles.checkTitle, styles.checkCopy]}>Hide stations without a price</Text><View style={[styles.checkbox, hideUnpricedStations && styles.checked]}>{hideUnpricedStations && <AppIcon name="check" size={16} color={colors.surface} />}</View></Pressable>
           {!!stationApiBaseUrl && <><Text style={styles.fieldLabel}>Station source</Text><View style={styles.pillRow}>{(['nearby', 'online'] as const).map(source => <Pressable key={source} accessibilityRole="button" accessibilityState={{ selected: mode === source }} style={[styles.pill, mode === source && styles.activePill]} onPress={() => { setMode(source); if (source === 'online') setViewMode('list'); }}><Text style={[styles.pillText, mode === source && styles.activePillText]}>{source === 'nearby' ? 'OpenStreetMap' : 'Google prices'}</Text></Pressable>)}</View></>}
+          <Pressable accessibilityRole="checkbox" accessibilityLabel="Hide stations without a name" accessibilityState={{ checked: hideUnnamedStations }} aria-checked={hideUnnamedStations} onPress={() => setHideUnnamedStations(!hideUnnamedStations)} style={styles.checkRow}><Text style={[styles.checkTitle, styles.checkCopy]}>Hide stations without a name</Text><View style={[styles.checkbox, hideUnnamedStations && styles.checked]}>{hideUnnamedStations && <AppIcon name="check" size={16} color={colors.surface} />}</View></Pressable>
           <Text style={styles.footnote}>Filters apply to {fuelLabel.toLowerCase()} prices in both views.</Text>
           <SubscriptionButton label="Show results" tone="primary" onPress={() => setFiltersOpen(false)} />
         </View>}
@@ -195,7 +196,7 @@ export default function GasScreen() {
             {mode === 'online' && <Text style={styles.footnote}>Google prices are shown in List. Switch the station source in Filters to use the map.</Text>}
 
             {!canShowResults && viewMode === 'list' && locationStatus !== 'loading' && <View style={styles.emptyCard}><View style={styles.emptyIcon}><AppIcon name="fuel" size={32} color={colors.primary} /></View><Text style={styles.emptyTitle}>Start with a location</Text><Text style={styles.emptyText}>Search an area or use your current location to see nearby gas stations.</Text><SubscriptionButton label="Search an area" tone="primary" disabled={!ready} onPress={() => setAreaSearchOpen(true)} /></View>}
-            {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && <View style={styles.emptyCard}><AppIcon name="search" size={30} color={colors.muted} /><Text style={styles.emptyTitle}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? `No matching ${selectedFuelType} prices` : 'No stations found'}</Text><Text style={styles.emptyText}>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? 'Try including older prices or stations without a price.' : `Try a wider radius or another search area.`}</Text>{(hideUnpricedStations || recentPricesOnly) && allStations.length > 0 ? <SubscriptionButton label="Show all stations" onPress={() => { setHideUnpricedStations(false); setRecentPricesOnly(false); }} /> : <SubscriptionButton label="Adjust filters" onPress={() => setFiltersOpen(true)} />}</View>}
+            {canShowResults && !isLoading && !isFetching && !isError && stations.length === 0 && <View style={styles.emptyCard}><AppIcon name="search" size={30} color={colors.muted} /><Text style={styles.emptyTitle}>{(hideUnpricedStations || recentPricesOnly || hideUnnamedStations) && allStations.length > 0 ? 'No matching stations' : 'No stations found'}</Text><Text style={styles.emptyText}>{(hideUnpricedStations || recentPricesOnly || hideUnnamedStations) && allStations.length > 0 ? 'Try including unnamed stations, older prices or stations without a price.' : `Try a wider radius or another search area.`}</Text>{(hideUnpricedStations || recentPricesOnly || hideUnnamedStations) && allStations.length > 0 ? <SubscriptionButton label="Show all stations" onPress={() => { setHideUnpricedStations(false); setHideUnnamedStations(false); setRecentPricesOnly(false); }} /> : <SubscriptionButton label="Adjust filters" onPress={() => setFiltersOpen(true)} />}</View>}
 
             {viewMode === 'map' && <>
               <View style={styles.mapFrame}><StationMap key={`${mode}-${selectedRadius}`} dark={isDarkTheme()} height={wide ? 450 : 340} pins={mapPins} center={location} centerLabel="Search center" onSearchArea={searchMapArea} selectedId={selectedStationId} onSelect={selectPin} dom={{ useExpoDOMWebView: false, style: { height: wide ? 450 : 340 }, scrollEnabled: false, userAgent: 'GasFinder/1.0 (com.anonymous.gasfinder)' }} /></View>
