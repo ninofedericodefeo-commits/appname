@@ -30,7 +30,7 @@ export function validateJson(value: unknown, depth = 0, budget = { remaining: 50
 export function validateBackup(value: unknown): BackupPayload {
   validateJson(value);
   const data = value as BackupPayload;
-  if (!data || data.format !== 'gasfinder-data' || data.version !== 1 || !Number.isFinite(Date.parse(data.createdAt)) || typeof data.appVersion !== 'string' || typeof data.includesFiles !== 'boolean' || !data.stores || typeof data.stores !== 'object' || Array.isArray(data.stores) || !Array.isArray(data.archives) || !Array.isArray(data.attachments)) throw new Error('Unsupported or damaged Tally backup.');
+  if (!data || data.format !== 'gasfinder-data' || data.version !== 1 || !Number.isFinite(Date.parse(data.createdAt)) || typeof data.appVersion !== 'string' || typeof data.includesFiles !== 'boolean' || !data.stores || typeof data.stores !== 'object' || Array.isArray(data.stores) || !Array.isArray(data.archives) || !Array.isArray(data.attachments)) throw new Error('Unsupported or damaged Centsward backup.');
   if (data.attachmentScope && !['all','available','none'].includes(data.attachmentScope)) throw new Error('Unsupported attachment scope.');
   if (data.attachmentScope === 'none' && data.includesFiles || data.attachmentScope && data.attachmentScope !== 'none' && !data.includesFiles) throw new Error('Attachment scope is inconsistent.');
   if (!data.includesFiles && data.attachments.length) throw new Error('Backup attachment choice is inconsistent.');
@@ -63,7 +63,7 @@ export async function encryptBackup(data: BackupPayload, password: string, rando
 export async function decryptBackup(text: string, password: string): Promise<BackupPayload> {
   if (text.length > BACKUP_FILE_LIMIT || password.length > 1024) throw new Error('Backup file or password is too large.');
   let envelope: BackupEnvelope;
-  try { envelope = JSON.parse(text); } catch { throw new Error('This is not a readable Tally backup.'); }
+  try { envelope = JSON.parse(text); } catch { throw new Error('This is not a readable Centsward backup.'); }
   if (envelope?.format !== 'gasfinder-encrypted' || envelope.version !== 1 || envelope.kdf !== 'PBKDF2-SHA256' || envelope.iterations !== BACKUP_ITERATIONS || envelope.cipher !== 'AES-256-GCM' || typeof envelope.salt !== 'string' || typeof envelope.nonce !== 'string' || typeof envelope.ciphertext !== 'string') throw new Error('Unsupported backup version or encryption format.');
   const salt = decodeBase64(envelope.salt, 16), nonce = decodeBase64(envelope.nonce, 12), ciphertext = decodeBase64(envelope.ciphertext, BACKUP_LIMIT + 16);
   if (salt.length !== 16 || nonce.length !== 12 || ciphertext.length < 16) throw new Error('Damaged backup encryption header.');

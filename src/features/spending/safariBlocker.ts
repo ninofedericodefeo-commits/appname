@@ -12,6 +12,6 @@ export async function safariBlockerStatus(): Promise<SafariBlockerStatus> {
 }
 
 export async function openSafariBlockerSettings() {
-  if (!native) throw new Error('Install the updated Tally iPhone build, then open Settings → Apps → Safari → Extensions.');
+  if (!native) throw new Error('Install the updated Centsward iPhone build, then open Settings → Apps → Safari → Extensions.');
   await native.openSettings();
 }

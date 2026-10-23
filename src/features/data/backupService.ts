@@ -21,7 +21,7 @@ import { updateDataStatus, markDataReplacement } from './operationStatus';
 import { decodeBase64, encodeBase64 } from './encoding';
 import { exportDataFile, readBackupPhoto, writeBackupPhoto, eraseAppPhotosAndExports } from './fileIO';
 
-async function secureRandom(count: number) { if (Platform.OS === 'web') { if (!globalThis.crypto?.getRandomValues) throw Error('Secure random generation is unavailable in this browser.'); return globalThis.crypto.getRandomValues(new Uint8Array(count)); } try { return await (await import('expo-crypto')).getRandomBytesAsync(count); } catch { throw new Error('Secure backups need the updated Tally app build.'); } }
+async function secureRandom(count: number) { if (Platform.OS === 'web') { if (!globalThis.crypto?.getRandomValues) throw Error('Secure random generation is unavailable in this browser.'); return globalThis.crypto.getRandomValues(new Uint8Array(count)); } try { return await (await import('expo-crypto')).getRandomBytesAsync(count); } catch { throw new Error('Secure backups need the updated Centsward app build.'); } }
 const journalKey = 'gasfinder-data-restore-journal-v1';
 const eraseKey = 'gasfinder-erasure-in-progress-v1';
 const importJournalKey = 'gasfinder-bank-import-journal-v1';

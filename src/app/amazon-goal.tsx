@@ -79,7 +79,7 @@ export default function AmazonGoalScreen() {
     <FormScrollView contentContainerStyle={styles.content}>
       <Text style={styles.kicker}>SAVINGS GOALS</Text>
       <Text accessibilityRole="header" style={styles.title}>Goal from link</Text>
-      <Text style={styles.body}>Add an Amazon product or Amazon Autos vehicle as a savings goal. Share to Tally from a supported installed build, or paste its link here.</Text>
+      <Text style={styles.body}>Add an Amazon product or Amazon Autos vehicle as a savings goal. Share to Centsward from a supported installed build, or paste its link here.</Text>
       {!ready ? <View style={styles.row}><ActivityIndicator color={colors.primary} /><Text style={styles.body}>Loading your goals…</Text></View> : activeGoal ? <>
         <View style={styles.card}>
           <Text accessibilityRole="header" style={styles.heading}>You have an active goal</Text>

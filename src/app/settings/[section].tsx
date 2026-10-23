@@ -47,7 +47,11 @@ export default function SettingsSectionScreen() {
     {section === 'subscriptions' && <SubscriptionSettingsPanel />}
     {section === 'savings' && <GoalSettingsPanel section="suggestions" />}
     {section === 'widgets' && <><WidgetSettingsPanel /><GoalSettingsPanel section="widget" /></>}
-    {section === 'privacy' && <PrivacySettingsPanel />}
+    {section === 'privacy' && <>
+      <SettingsLink href="/privacy-disclosures" label="How your data is used" />
+      <SettingsLink href="/privacy-policy" label="Privacy policy (draft)" />
+      <PrivacySettingsPanel />
+    </>}
     {section === 'shortcuts' && <>
       <SettingsLink href="/automations" label="Quick actions & purchase capture" />
       <Text style={s.note}>Optional shortcuts for opening screens, plus Wallet purchase setup and recent capture results.</Text>
@@ -63,7 +67,9 @@ export default function SettingsSectionScreen() {
       <EraseDataPanel />
     </>}
     {section === 'about' && <>
-      <Text style={s.body}>Tally {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
+      <Text style={s.body}>Centsward {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
+      <SettingsLink href="/privacy-policy" label="Privacy policy (draft)" />
+      <SettingsLink href="/privacy-disclosures" label="How your data is used" />
       <BuildCapabilities />
       <Text style={s.note}>Your preferences are saved on this device.</Text>
     </>}

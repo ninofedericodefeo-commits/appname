@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Tally",
+    "name": "Centsward",
     "slug": "gasfinder",
     "scheme": "gasfinder",
     "version": "1.0.0",
@@ -15,7 +15,7 @@
       "bundleIdentifier": "com.anonymous.gasfinder",
       "infoPlist": {
         "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
-        "NSLocalNetworkUsageDescription": "Allow Tally to connect to the sample gas price API running on your local network."
+        "NSLocalNetworkUsageDescription": "Allow Centsward to connect to the sample gas price API running on your local network."
       }
     },
     "android": {
@@ -46,14 +46,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow Tally to use your location to find nearby gas stations."
+          "locationWhenInUsePermission": "Allow Centsward to use your location to find nearby gas stations."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Tally to select a gas receipt photo you choose to save in the app.",
-          "cameraPermission": "Allow Tally to photograph a gas receipt you choose to save in the app.",
+          "photosPermission": "Allow Centsward to select a gas receipt photo you choose to save in the app.",
+          "cameraPermission": "Allow Centsward to photograph a gas receipt you choose to save in the app.",
           "microphonePermission": false
         }
       ],
@@ -75,7 +75,7 @@
           "widgets": [
             {
               "name": "AccountWidget",
-              "displayName": "Tally account",
+              "displayName": "Centsward account",
               "description": "Your saved available balance and set-aside amount.",
               "ios": {
                 "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"]
@@ -95,7 +95,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Use Face ID to unlock your Tally account records."
+          "faceIDPermission": "Use Face ID to unlock your Centsward account records."
         }
       ]
     ]

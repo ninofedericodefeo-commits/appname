@@ -52,7 +52,7 @@ async function syncNow(subscriptions: Subscription[], enabled: boolean) {
     await Notifications.scheduleNotificationAsync({
       content: {
         title: group.cancelNames?.length ? 'Follow up on subscription cancellation' : count === 1 ? 'Upcoming subscription renewal' : `${count} upcoming subscription renewals`,
-        body: useDevicePrivacy.getState().hideAmounts ? 'Open Tally to review your subscriptions.' : group.cancelNames?.length ? `You planned to cancel ${group.cancelNames.length} subscription${group.cancelNames.length === 1 ? "" : "s"}. Open Tally to follow up.` : `Estimated renewal total: ${formatMoney(group.totalCents)}. Open Tally to decide what to keep.`,
+        body: useDevicePrivacy.getState().hideAmounts ? 'Open Centsward to review your subscriptions.' : group.cancelNames?.length ? `You planned to cancel ${group.cancelNames.length} subscription${group.cancelNames.length === 1 ? "" : "s"}. Open Centsward to follow up.` : `Estimated renewal total: ${formatMoney(group.totalCents)}. Open Centsward to decide what to keep.`,
         data: { kind: notificationKind, url: '/subscriptions' },
       },
       trigger: {

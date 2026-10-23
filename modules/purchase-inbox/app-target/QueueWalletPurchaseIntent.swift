@@ -4,7 +4,7 @@ internal import PurchaseInbox
 /// Compiled in the application target so Xcode extracts this action's metadata.
 struct QueueWalletPurchaseIntent: AppIntent {
   static var title: LocalizedStringResource = "Queue purchase for review"
-  static var description = IntentDescription("Save a purchase for review in Tally without opening the app. This does not change balances or savings.")
+  static var description = IntentDescription("Save a purchase for review in Centsward without opening the app. This does not change balances or savings.")
   static var openAppWhenRun: Bool = false
   static var authenticationPolicy: IntentAuthenticationPolicy = .alwaysAllowed
 

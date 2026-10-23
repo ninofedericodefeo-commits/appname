@@ -8,7 +8,7 @@ export default function WidgetSettingsPanel() {
   const { enabled, showAmounts, setEnabled, setShowAmounts } = useWidgetSettingsStore();
   return <View style={styles.card}>
     <Text accessibilityRole="header" style={styles.heading}>Account widget</Text>
-    <Text style={styles.note}>Add Tally account from your iPhone’s widget gallery. It shows the same dated balance estimate and set-aside amount as Account. This is not a live bank feed.</Text>
+    <Text style={styles.note}>Add Centsward account from your iPhone’s widget gallery. It shows the same dated balance estimate and set-aside amount as Account. This is not a live bank feed.</Text>
     {accountWidgetsAvailable ? <>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: enabled }} style={styles.choice} onPress={() => setEnabled(!enabled)}><Text style={styles.label}>{enabled ? 'Account widget enabled ✓' : 'Enable account widget'}</Text></Pressable>
       <Pressable accessibilityRole="switch" accessibilityState={{ checked: showAmounts }} style={styles.choice} onPress={() => setShowAmounts(!showAmounts)}><Text style={styles.label}>{showAmounts ? 'Amounts visible on widget ✓' : 'Amounts hidden on widget'}</Text></Pressable>

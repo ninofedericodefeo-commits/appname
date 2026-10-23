@@ -6,8 +6,8 @@ export const settingsSections = [
   { id: 'shortcuts', title: 'Shortcuts & spending pause', detail: 'Quick actions, purchase capture and checkout blocking' },
   { id: 'widgets', title: 'Widgets', detail: 'Account and savings goal widgets' },
   { id: 'data', title: 'Data & backups', detail: 'Backup, restore, export and account reset' },
-  { id: 'privacy', title: 'Privacy', detail: 'App lock and app-switcher preview' },
+  { id: 'privacy', title: 'Privacy', detail: 'Data use, privacy policy and device protection' },
   { id: 'general', title: 'General & appearance', detail: 'Start screen, theme and quick setup' },
   { id: 'accessibility', title: 'Accessibility', detail: 'Text, controls, motion and screen readers' },
-  { id: 'about', title: 'About Tally', detail: 'App version and available features' },
+  { id: 'about', title: 'About Centsward', detail: 'App version and available features' },
 ] as const;

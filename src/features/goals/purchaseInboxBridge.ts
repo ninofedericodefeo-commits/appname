@@ -22,7 +22,7 @@ export async function listPendingWalletPurchases(): Promise<PendingWalletPurchas
   return canReadPurchaseInbox() ? parsePendingWalletPurchases(values) : [];
 }
 export async function removePendingWalletPurchase(id: string) {
-  if (!pendingWalletId(id) || !canReadPurchaseInbox()) throw new Error('Unlock Tally before changing pending purchases.');
+  if (!pendingWalletId(id) || !canReadPurchaseInbox()) throw new Error('Unlock Centsward before changing pending purchases.');
   await native!.removePending(id);
   listeners.forEach(listener => listener());
 }

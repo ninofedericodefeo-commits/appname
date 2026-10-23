@@ -13,7 +13,7 @@ export function DataGate({ children }: { children: ReactNode }) {
     catch { setError('Saved data could not be recovered. Retry recovery; keep your backup and app installed.'); }
   }
   useEffect(() => { let active = true; void recoverInterruptedRestore().then(() => { if (active) setReady(true); }).catch(() => { if (active) setError('Saved data could not be recovered. Retry recovery; keep your backup and app installed.'); }); return () => { active = false; }; }, []);
-  const panel = <View style={styles.panel}><Text accessibilityRole="header" style={styles.title}>Tally</Text><Text style={styles.note}>{error || recoveryError || (ready ? 'Saving your data…' : 'Opening saved data…')}</Text>{error || recoveryError ? <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setError(''); void recover(); }}><Text style={styles.buttonText}>Retry recovery</Text></Pressable> : <ActivityIndicator color={colors.accentDark} />}</View>;
+  const panel = <View style={styles.panel}><Text accessibilityRole="header" style={styles.title}>Centsward</Text><Text style={styles.note}>{error || recoveryError || (ready ? 'Saving your data…' : 'Opening saved data…')}</Text>{error || recoveryError ? <Pressable accessibilityRole="button" style={styles.button} onPress={() => { setError(''); void recover(); }}><Text style={styles.buttonText}>Retry recovery</Text></Pressable> : <ActivityIndicator color={colors.accentDark} />}</View>;
   if (!ready) return <View style={styles.cover}>{panel}</View>;
   return <><Fragment key={revision}>{children}</Fragment><Modal visible={busy || !!recoveryError} transparent animationType="none" onRequestClose={() => {}}><View style={styles.cover}>{panel}</View></Modal></>;
 }

@@ -20,9 +20,9 @@ export default function PurchaseInboxScreen() {
   return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.content}>
     <Text accessibilityRole="header" style={s.title}>Wallet purchases</Text>
     <Text style={s.note}>These are drafts captured by your Shortcuts automation. Review each purchase before adding it to your account. Captures expire after 30 days.</Text>
-    {available && !allowed && <Text style={s.body}>Unlock Tally and reveal financial amounts to review pending purchases. Wait for any account operation to finish.</Text>}
+    {available && !allowed && <Text style={s.body}>Unlock Centsward and reveal financial amounts to review pending purchases. Wait for any account operation to finish.</Text>}
     {!available && <Text style={s.body}>Install the latest iPhone build to capture Wallet purchases while locked.</Text>}
-    {available && allowed && !items.length && !loadError && <Text style={s.body}>No pending purchases. New captures will appear here after you unlock and open Tally.</Text>}
+    {available && allowed && !items.length && !loadError && <Text style={s.body}>No pending purchases. New captures will appear here after you unlock and open Centsward.</Text>}
     {items.map(item => <View key={item.id} style={s.card}>
       <Text accessibilityRole="header" style={s.heading}>{item.merchant}</Text>
       <Text style={s.body}>{formatMoney(item.amountCents)} · {new Date(item.capturedAt).toLocaleString()}</Text>

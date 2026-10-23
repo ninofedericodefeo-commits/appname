@@ -7,8 +7,8 @@ const AccountWidget = (props: AccountWidgetProps, environment: WidgetEnvironment
   'widget';
   const color = environment.colorScheme === 'dark' ? '#D7E7A7' : '#173A35';
   return <VStack alignment="leading" spacing={8}>
-    <Text modifiers={[font({ weight: 'bold', size: 14 }), foregroundStyle(color)]}>Tally · Account</Text>
-    <Text modifiers={[font({ weight: 'bold', size: environment.widgetFamily === 'accessoryRectangular' ? 16 : 25 })]}>{props.enabled ? props.balance : 'Open Tally'}</Text>
+    <Text modifiers={[font({ weight: 'bold', size: 14 }), foregroundStyle(color)]}>Centsward · Account</Text>
+    <Text modifiers={[font({ weight: 'bold', size: environment.widgetFamily === 'accessoryRectangular' ? 16 : 25 })]}>{props.enabled ? props.balance : 'Open Centsward'}</Text>
     {props.enabled && <Text modifiers={[font({ size: 12 })]}>{props.savings}</Text>}
     {props.enabled && environment.widgetFamily === 'systemMedium' && <Text modifiers={[font({ size: 11 })]}>{props.updated}</Text>}
   </VStack>;
