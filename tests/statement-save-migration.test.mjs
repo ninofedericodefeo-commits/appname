@@ -27,7 +27,7 @@ function load(file, adapters) {
   return module.exports;
 }
 const serial = value => JSON.parse(JSON.stringify(value));
-async function fixture(savedHideUnnamed, buildVersion = 6) {
+async function fixture(savedHideUnnamed, buildVersion = 7) {
   const data = new Map(); let dropNextPocketWrite = false;
   const disk = {
     getItem: async name => data.get(name) ?? null,
@@ -82,7 +82,7 @@ test('the previous same-version settings schema reproduces the reported verifica
 test('upgraded settings are durable before the sample Citizens import verifies and commits', async () => {
   const h = await fixture();
   const saved = JSON.parse(h.data.get('gasfinder-settings'));
-  assert.equal(saved.version, 6);
+  assert.equal(saved.version, 7);
   assert.equal(saved.state.hideUnnamedStations, false);
   assert.equal(saved.state.selectedRadius, 25);
   assert.equal(saved.state.hideUnpricedStations, true);

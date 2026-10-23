@@ -42,7 +42,7 @@ export default function EraseDataPanel({ disabled = false }: { disabled?: boolea
         <Pressable accessibilityRole="button" disabled={blocked || !ready} style={[s.button, (blocked || !ready) && s.disabled]} onPress={() => { if (ready && !blocked) setFinalReview(true); }}><Text style={s.buttonText}>Continue to final confirmation</Text></Pressable>
       </> : <>
         <Text accessibilityRole="header" style={s.heading}>Final confirmation</Text>
-        <Text style={s.danger}>Permanently erase all GasFinder data on this installation now? This also removes the local recovery copies.</Text>
+        <Text style={s.danger}>Permanently erase all Tally data on this installation now? This also removes the local recovery copies.</Text>
         <Pressable accessibilityRole="button" disabled={blocked || !ready} style={[s.button, (blocked || !ready) && s.disabled]} onPress={() => void erase()}><Text style={s.buttonText}>{busy ? 'Erasing app data…' : 'Yes, permanently erase all app data'}</Text></Pressable>
         <Pressable accessibilityRole="button" disabled={blocked} style={s.choice} onPress={() => setFinalReview(false)}><Text style={s.choiceText}>Go back</Text></Pressable>
       </>}

@@ -13,7 +13,7 @@ export function SettingsButton() {
 
 export function PageToolbar({ brandHidden = false, maxWidth = 760 }: { brandHidden?: boolean; maxWidth?: number }) {
   useThemeRevision();
-  return <View style={[styles.container, { maxWidth }]}><View style={styles.toolbar}>{brandHidden ? <View /> : <Text maxFontSizeMultiplier={1.5} style={styles.brand}>GasFinder</Text>}<SettingsButton /></View><RenewalBanner /></View>;
+  return <View style={[styles.container, { maxWidth }]}><View style={styles.toolbar}>{brandHidden ? <View /> : <Text maxFontSizeMultiplier={1.5} style={styles.brand}>Tally</Text>}<SettingsButton /></View><RenewalBanner /></View>;
 }
 const styles = themedStyles(() => ({
   container: { width: '100%', maxWidth: 760, alignSelf: 'center' },

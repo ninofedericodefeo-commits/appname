@@ -13,7 +13,7 @@ function writeExtension(projectRoot, platformRoot, version, buildNumber) {
   fs.cpSync(path.join(projectRoot, 'extensions/spending-pause'), path.join(directory, 'Resources'), { recursive: true });
   fs.copyFileSync(path.join(projectRoot, 'native/spending-pause/SafariWebExtensionHandler.swift'), path.join(directory, 'SafariWebExtensionHandler.swift'));
   fs.writeFileSync(path.join(directory, 'Info.plist'), plist.build({
-    CFBundleDevelopmentRegion: '$(DEVELOPMENT_LANGUAGE)', CFBundleDisplayName: 'GasFinder Spending Pause',
+    CFBundleDevelopmentRegion: '$(DEVELOPMENT_LANGUAGE)', CFBundleDisplayName: 'Tally Spending Pause',
     CFBundleExecutable: '$(EXECUTABLE_NAME)', CFBundleIdentifier: '$(PRODUCT_BUNDLE_IDENTIFIER)',
     CFBundleInfoDictionaryVersion: '6.0', CFBundleName: '$(PRODUCT_NAME)', CFBundlePackageType: 'XPC!',
     CFBundleShortVersionString: version, CFBundleVersion: buildNumber,

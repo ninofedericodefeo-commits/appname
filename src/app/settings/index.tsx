@@ -7,9 +7,9 @@ import { settingsSections } from '@/features/settings/navigation';
 import { AppIcon } from '@/components/AppIcon';
 
 const groups: { label: string; ids: readonly string[] }[] = [
-  { label: 'Preferences', ids: ['general', 'accessibility'] },
-  { label: 'Accounts & activity', ids: ['account', 'gas', 'subscriptions', 'savings'] },
-  { label: 'App & data', ids: ['widgets', 'privacy', 'shortcuts', 'data', 'about'] },
+  { label: 'Your money', ids: ['account', 'savings', 'subscriptions'] },
+  { label: 'Everyday savings', ids: ['gas', 'shortcuts'] },
+  { label: 'App & data', ids: ['widgets', 'privacy', 'data', 'general', 'accessibility', 'about'] },
 ];
 
 export default function SettingsScreen() {

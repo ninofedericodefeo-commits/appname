@@ -15,7 +15,7 @@ export type GoalWidgetProps = {
 const GoalProgress = (props: GoalWidgetProps, environment: WidgetEnvironment) => {
   'widget';
   if (!props.enabled) {
-    return <VStack><Text>Enable goal widget in GasFinder</Text></VStack>;
+    return <VStack><Text>Enable goal widget in Tally</Text></VStack>;
   }
   if (environment.widgetFamily === 'accessoryRectangular') {
     return <VStack>

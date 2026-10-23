@@ -58,7 +58,7 @@ function ImportPurchaseContent({ params }: {params: ImportParams}) {
       status.busy || status.recoveryError || AppState.currentState !== 'active' ||
       (useDevicePrivacy.getState().hideAmounts && !useAmountVisibility.getState().revealed) ||
       (Platform.OS !== 'web' && useDevicePrivacy.getState().enabled && !usePrivacySession.getState().unlocked)) {
-      setError('Unlock GasFinder and wait for your account to finish loading, then try again.');
+      setError('Unlock Tally and wait for your account to finish loading, then try again.');
       return;
     }
     if (walletDraft) setSubmittedDraft(walletDraft);

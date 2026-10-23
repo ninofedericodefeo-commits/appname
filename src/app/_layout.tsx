@@ -79,7 +79,7 @@ function ReadyLayout() {
     <QueryClientProvider client={queryClient}>
       <View style={styles.appShell}><StatusBar style={isDarkTheme() ? 'light' : 'dark'} animated={!reduced} />
         <Stack screenOptions={{
-          title: 'GasFinder',
+          title: 'Tally',
           animation: reduced ? 'none' : 'default',
           headerRight: () => <SettingsButton />,
           headerTintColor: colors.ink,

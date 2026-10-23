@@ -9,7 +9,7 @@ function openArchive(): Promise<IDBDatabase> {
     request.onupgradeneeded = () => { request.result.createObjectStore('imports', { keyPath: 'id' }); request.result.createObjectStore('files'); };
     request.onerror = () => reject(new Error('Could not open the Imports folder in this browser.'));
     request.onsuccess = () => { request.result.onversionchange = () => request.result.close(); resolve(request.result); };
-    request.onblocked = () => reject(new Error('Close other GasFinder tabs, then try opening Imports again.'));
+    request.onblocked = () => reject(new Error('Close other Tally tabs, then try opening Imports again.'));
   });
 }
 async function readStore<T>(store: string, id?: string): Promise<T> {

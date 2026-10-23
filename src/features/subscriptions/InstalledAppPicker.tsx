@@ -48,8 +48,8 @@ export default function InstalledAppPicker({ selected, onSelect }: { selected?: 
     {expanded && <View style={styles.list}>
       <Pressable accessibilityRole="button" accessibilityLabel="Select no associated app" style={styles.option} onPress={() => choose()}><Text style={styles.optionText}>No associated app</Text></Pressable>
       {loading ? <Text accessibilityLiveRegion="polite" style={styles.note}>Checking apps on your phone…</Text> : <>
-        {result?.status === 'web' && <Text style={styles.note}>Choose installed apps in GasFinder on your phone. A browser cannot check which phone apps are installed.</Text>}
-        {result?.status === 'update-required' && <Text style={styles.note}>Install the updated GasFinder build to choose apps on this phone. Reloading the app cannot add the app picker.</Text>}
+        {result?.status === 'web' && <Text style={styles.note}>Choose installed apps in Tally on your phone. A browser cannot check which phone apps are installed.</Text>}
+        {result?.status === 'update-required' && <Text style={styles.note}>Install the updated Tally build to choose apps on this phone. Reloading the app cannot add the app picker.</Text>}
         {result?.status === 'error' && <Text style={styles.note}>Some apps could not be checked. Try refreshing the list.</Text>}
         {!!result && (result.status === 'ready' || result.status === 'error') && <>
           <Text style={styles.note}>{Platform.OS === 'ios' ? 'Supported apps installed on this iPhone. Apple limits which apps we can check; your full app list is private.' : 'Apps with a launcher on this Android device. Hidden, work-profile and non-launchable apps may not appear.'} Installing an app does not tell us whether you pay for it.</Text>

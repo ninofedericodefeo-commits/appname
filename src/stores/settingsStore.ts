@@ -19,7 +19,7 @@ export type PersonalPreferences = AccessibilityPreferences & {
   reminderHour: number; reminderLeadDays: number;
   setupDismissed: boolean;
 };
-export const personalDefaults: PersonalPreferences = { ...accessibilityDefaults, appearance: 'system', strongerContrast: false, startScreen: 'index', gasView: 'map', subscriptionView: 'list', reminderHour: 9, reminderLeadDays: 1, setupDismissed: false };
+export const personalDefaults: PersonalPreferences = { ...accessibilityDefaults, appearance: 'system', strongerContrast: false, startScreen: 'pocket', gasView: 'map', subscriptionView: 'list', reminderHour: 9, reminderLeadDays: 1, setupDismissed: false };
 type SettingsState = PersonalPreferences & {
   configure: (change: Partial<PersonalPreferences>) => void;
   statementReminderDays: number;
@@ -72,4 +72,8 @@ export const useSettingsStore = create<SettingsState>()(persist((rawSet) => { co
   setSelectedFuelType: (selectedFuelType) => set({ selectedFuelType }),
   setSelectedRadius: (selectedRadius) => set({ selectedRadius }),
   setSortOrder: (sortOrder) => set({ sortOrder }),
-}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 6, migrate: state => ({ ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', hideUnnamedStations: false, ...(state as object) }) }));
+}); }, { name: 'gasfinder-settings', storage: createJSONStorage(() => appStorage), merge: mergePersistedState, version: 7, migrate: (state, version) => {
+  const saved = state as Partial<SettingsState>;
+  return { ...personalDefaults, statementReminderDays: 0, budgets: {}, recentPricesOnly: false, priceQualifier: 'standard', hideUnnamedStations: false, ...saved,
+    startScreen: version < 7 && saved.startScreen === 'index' ? 'pocket' : saved.startScreen ?? personalDefaults.startScreen };
+} }));

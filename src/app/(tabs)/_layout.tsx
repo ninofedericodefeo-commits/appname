@@ -1,26 +1,44 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as Linking from 'expo-linking';
-import { router, usePathname , Tabs } from 'expo-router';
+import { Redirect, usePathname, Tabs } from 'expo-router';
+import { ActivityIndicator, View } from 'react-native';
 import { useSettingsStore } from '@/stores/settingsStore';
+import { initialStartPath } from '@/features/preferences/startScreen';
+import { colors, useThemeRevision } from '@/theme';
 
 import { BottomNavigation, type Tab } from '@/components/BottomNavigation';
 
 export default function MainTabsLayout() {
-  const pathname = usePathname(), started = useRef(false);
+  useThemeRevision();
+  const pathname = usePathname(), initialPath = useRef(pathname);
+  const [startup, setStartup] = useState<{ from: string; target: ReturnType<typeof initialStartPath> } | null>(null);
+  const [settled, setSettled] = useState(false);
   useEffect(() => {
-    let canceled = false;
+    let canceled = false, started = false;
     async function open() {
-      if (started.current) return;
-      started.current = true;
-      const incoming = await Linking.getInitialURL();
+      if (started) return;
+      started = true;
+      const incoming = await Linking.getInitialURL().catch(() => null);
       const start = useSettingsStore.getState().startScreen;
-      if (!canceled && pathname === '/' && start !== 'index' && (!incoming || /^https?:\/\/[^/]+\/?$/.test(incoming))) router.replace(`/${start}`);
+      if (!canceled) setStartup({ from: initialPath.current, target: initialStartPath(initialPath.current, start, incoming) });
     }
     if (useSettingsStore.persist.hasHydrated()) void open();
     const stop = useSettingsStore.persist.onFinishHydration(() => { void open(); });
     return () => { canceled = true; stop(); };
-  }, [pathname]);
+  }, []);
+  useEffect(() => {
+    let current = true;
+    if (startup && !settled && (!startup.target || pathname !== startup.from)) {
+      void Promise.resolve().then(() => { if (current) setSettled(true); });
+    }
+    return () => { current = false; };
+  }, [pathname, startup, settled]);
+  // Resolve plain launches before mounting the Gas screen. Existing Gas links
+  // still own '/', and subsequent tab changes never rerun the launch redirect.
+  if (!startup) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}><ActivityIndicator color={colors.primary} accessibilityLabel="Opening Tally" /></View>;
+  if (!settled && startup.target && pathname === startup.from) return <Redirect href={startup.target} />;
   return <Tabs
+    initialRouteName="pocket"
     screenOptions={{ headerShown: false }}
     tabBar={({ state, navigation }) => (
       <BottomNavigation
@@ -29,9 +47,9 @@ export default function MainTabsLayout() {
       />
     )}
   >
-    <Tabs.Screen name="index" options={{ title: 'Gas' }} />
-    <Tabs.Screen name="investment" options={{ title: 'Goals' }} />
     <Tabs.Screen name="pocket" options={{ title: 'Account' }} />
+    <Tabs.Screen name="investment" options={{ title: 'Goals' }} />
     <Tabs.Screen name="subscriptions" options={{ title: 'Bills' }} />
+    <Tabs.Screen name="index" options={{ title: 'Gas' }} />
   </Tabs>;
 }

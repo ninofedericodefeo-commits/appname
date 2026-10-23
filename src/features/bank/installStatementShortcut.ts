@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import shortcut from '../../../assets/shortcuts/import-statement.signed.json';
 
 export async function installStatementShortcut() {
-  if (Platform.OS !== 'ios') throw new Error('Add the statement shortcut from GasFinder on your iPhone.');
+  if (Platform.OS !== 'ios') throw new Error('Add the statement shortcut from Tally on your iPhone.');
   if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable. Try again on your iPhone.');
   const file = new File(Paths.cache, shortcut.filename);
   file.create({ overwrite: true });

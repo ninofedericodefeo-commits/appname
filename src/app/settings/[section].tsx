@@ -63,7 +63,7 @@ export default function SettingsSectionScreen() {
       <EraseDataPanel />
     </>}
     {section === 'about' && <>
-      <Text style={s.body}>GasFinder {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
+      <Text style={s.body}>Tally {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
       <BuildCapabilities />
       <Text style={s.note}>Your preferences are saved on this device.</Text>
     </>}

@@ -273,7 +273,7 @@ export default function BankImportScreen() {
       if (current !== request.current) return;
       const message = cause instanceof Error ? cause.message : '';
       setError(/native module|ExpoDocumentPicker|Cannot find native/i.test(message)
-        ? 'File picking needs the latest app build. Update GasFinder and choose your PDF or CSV again.'
+        ? 'File picking needs the latest app build. Update Tally and choose your PDF or CSV again.'
         : message || 'Could not open this file. Choose a PDF or CSV from Files.');
     } finally { if (current === request.current && !readingPDF) setBusy(false); }
   }

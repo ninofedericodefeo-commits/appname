@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "GasFinder",
+    "name": "Tally",
     "slug": "gasfinder",
     "scheme": "gasfinder",
     "version": "1.0.0",
@@ -15,12 +15,12 @@
       "bundleIdentifier": "com.anonymous.gasfinder",
       "infoPlist": {
         "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
-        "NSLocalNetworkUsageDescription": "Allow GasFinder to connect to the sample gas price API running on your local network."
+        "NSLocalNetworkUsageDescription": "Allow Tally to connect to the sample gas price API running on your local network."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#173A35",
+        "backgroundColor": "#122B2A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -46,14 +46,14 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Allow GasFinder to use your location to find nearby gas stations."
+          "locationWhenInUsePermission": "Allow Tally to use your location to find nearby gas stations."
         }
       ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow GasFinder to select a gas receipt photo you choose to save in the app.",
-          "cameraPermission": "Allow GasFinder to photograph a gas receipt you choose to save in the app.",
+          "photosPermission": "Allow Tally to select a gas receipt photo you choose to save in the app.",
+          "cameraPermission": "Allow Tally to photograph a gas receipt you choose to save in the app.",
           "microphonePermission": false
         }
       ],
@@ -75,7 +75,7 @@
           "widgets": [
             {
               "name": "AccountWidget",
-              "displayName": "GasFinder account",
+              "displayName": "Tally account",
               "description": "Your saved available balance and set-aside amount.",
               "ios": {
                 "supportedFamilies": ["systemSmall", "systemMedium", "accessoryRectangular"]
@@ -95,7 +95,7 @@
       [
         "expo-local-authentication",
         {
-          "faceIDPermission": "Use Face ID to unlock your GasFinder account records."
+          "faceIDPermission": "Use Face ID to unlock your Tally account records."
         }
       ]
     ]

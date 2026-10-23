@@ -8,10 +8,10 @@ import { AppIcon, type AppIconName } from './AppIcon';
 export type Tab = 'index' | 'investment' | 'pocket' | 'subscriptions';
 
 const tabs: readonly { id: Tab; label: string; icon: AppIconName }[] = [
-  { id: 'index', label: 'Gas', icon: 'fuel' },
-  { id: 'investment', label: 'Goals', icon: 'target' },
   { id: 'pocket', label: 'Account', icon: 'wallet' },
+  { id: 'investment', label: 'Goals', icon: 'target' },
   { id: 'subscriptions', label: 'Bills', icon: 'repeat' },
+  { id: 'index', label: 'Gas', icon: 'fuel' },
 ];
 
 export function BottomNavigation({ activeTab, onSelect }: { activeTab: Tab; onSelect: (tab: Tab) => void }) {
