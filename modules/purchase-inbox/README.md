@@ -19,6 +19,8 @@ The JS caller must wait for foreground, hydrated, unlocked privacy state before 
 
 Run `sh modules/purchase-inbox/tests/run-native-tests.sh` on macOS with Xcode to test the real Swift queue with an isolated test directory. The compile-only `PURCHASE_INBOX_TESTS` flag swaps the base directory for this harness; production builds use the app's Application Support directory.
 
+Run `sh modules/purchase-inbox/tests/check-app-intent.sh` to compile the action alongside Expo's generated-provider import access level. This catches Swift import conflicts that compiling the action in isolation does not expose. The config-plugin tests also verify the serialized Xcode source path and repair of older generated groups.
+
 During implementation the queue and AppIntent compiled against the iOS simulator SDK targeting iOS 16.4, and Apple's AppIntents metadata processor successfully extracted the action, its inputs, `openAppWhenRun: false`, and explicit always-allowed authentication policy. This is not a substitute for a signed device build and a locked-phone Wallet automation test.
 
 The setup guide and unavailable-inbox state were inspected on web at 320 and 1024 pixels in light and dark themes. The review boundary has regression coverage for explicit Save, failed persistence, failed acknowledgement, duplicate retries, foreground/privacy revocation, and erasure errors. Populated native inbox rendering and a real Wallet trigger still require iPhone acceptance; the web preview cannot exercise the native action.

@@ -16,13 +16,17 @@ function addIntent(project) {
   const relativePath = `${DIRECTORY}/${SOURCE}`;
   // Keep the AppIntent in the main target; a pod-only source is not discovered
   // as an application action by the AppIntents metadata build phase.
+  let group = project.findPBXGroupKey({ name: DIRECTORY });
+  if (!group) {
+    const created = project.addPbxGroup([], DIRECTORY);
+    group = created.uuid;
+    project.addToPbxGroup(group, project.getFirstProject().firstProject.mainGroup);
+  }
+  // This is a virtual group: the file reference already includes DIRECTORY.
+  // node-xcode otherwise serializes an omitted group path as `undefined`,
+  // which Xcode interprets as a real directory. Also repair existing projects.
+  delete project.getPBXGroupByKey(group).path;
   if (!project.hasFile(relativePath)) {
-    let group = project.findPBXGroupKey({ name: DIRECTORY });
-    if (!group) {
-      const created = project.addPbxGroup([], DIRECTORY);
-      group = created.uuid;
-      project.addToPbxGroup(group, project.getFirstProject().firstProject.mainGroup);
-    }
     project.addSourceFile(relativePath, { target: target.uuid }, group);
   }
 }

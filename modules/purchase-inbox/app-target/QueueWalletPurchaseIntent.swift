@@ -1,5 +1,5 @@
 import AppIntents
-import PurchaseInbox
+internal import PurchaseInbox
 
 /// Compiled in the application target so Xcode extracts this action's metadata.
 struct QueueWalletPurchaseIntent: AppIntent {
