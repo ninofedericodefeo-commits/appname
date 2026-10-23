@@ -37,7 +37,7 @@ export default function SubscriptionSettingsPanel() {
     try {
       if (!enabled) { setRemindersEnabled(false); await syncSubscriptionReminders(useSubscriptionStore.getState().subscriptions, false); }
       else if (await requestSubscriptionReminderPermission()) { await syncSubscriptionReminders(useSubscriptionStore.getState().subscriptions, true); setRemindersEnabled(true); }
-      else setMessage('Notifications are off. You can still review renewals inside Centsward.');
+      else setMessage('Notifications are off. You can still review renewals inside Savemage.');
       await refresh();
     } catch { setMessage(enabled ? 'Could not schedule reminders. Try Refresh.' : 'Could not clear reminders. Try Refresh.'); await refresh(); }
     finally { changing.current = false; setBusy(false); }
@@ -57,7 +57,7 @@ export default function SubscriptionSettingsPanel() {
       <SubscriptionButton label={timeOpen ? 'Hide reminder timing' : 'Reminder time & lead'} accessibilityState={{ expanded: timeOpen }} onPress={() => setTimeOpen(!timeOpen)} />{timeOpen && <><Text style={styles.note}>Preferences save immediately. Phone permission and delivery status are separate below.</Text><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{[0,1,2,3,7].map(days => <SubscriptionButton key={days} label={days === 0 ? 'Renewal day' : `${days} day${days === 1 ? '' : 's'} before`} accessibilityState={{ selected: reminderLeadDays === days }} tone={reminderLeadDays === days ? 'primary' : 'secondary'} onPress={() => configure({ reminderLeadDays: days })} />)}</View><View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>{Array.from({ length: 24 },(_,hour) => hour).map(hour => <SubscriptionButton key={hour} label={new Date(2026,0,1,hour).toLocaleTimeString(undefined,{ hour: 'numeric' })} accessibilityState={{ selected: reminderHour === hour }} tone={reminderHour === hour ? 'primary' : 'secondary'} onPress={() => configure({ reminderHour: hour })} />)}</View></>}
       <Text accessibilityLiveRegion="polite" style={styles.status}>{busy ? 'Updating reminders…' : description?.label ?? 'Checking phone reminders…'}</Text>
       {Platform.OS !== 'web' && <View style={styles.actions}>
-        {status?.permission === 'denied' ? <SubscriptionButton grow disabled={busy} label="Open phone settings" onPress={() => { void Linking.openSettings().catch(() => setMessage('Open your phone settings and find Centsward → Notifications.')); }} />
+        {status?.permission === 'denied' ? <SubscriptionButton grow disabled={busy} label="Open phone settings" onPress={() => { void Linking.openSettings().catch(() => setMessage('Open your phone settings and find Savemage → Notifications.')); }} />
           : status?.permission === 'undetermined' && <SubscriptionButton grow disabled={!ready || busy} label="Allow notifications" onPress={() => void toggle(true)} />}
         <SubscriptionButton grow disabled={!ready || busy} label="Refresh reminders" onPress={() => void retry()} />
       </View>}

@@ -21,12 +21,12 @@ export default function SetupScreen() {
     </View>
     <View style={s.card}>
       <Text accessibilityRole="header" style={s.heading}>Goals</Text>
-      <Text style={s.note}>Choose something to save for and track your set-asides toward it. Your plan stays in Centsward; no money moves between bank accounts.</Text>
+      <Text style={s.note}>Choose something to save for and track your set-asides toward it. Your plan stays in Savemage; no money moves between bank accounts.</Text>
       <Button label="Open Goals" onPress={() => router.navigate('/investment')} />
     </View>
     <View style={s.card}>
       <Text accessibilityRole="header" style={s.heading}>{subscriptions ? '✓ ' : ''}Bills</Text>
-      <Text style={s.note}>Add recurring services manually or review bank suggestions. Set the billing destination to start cancellation with the provider. Centsward cannot cancel on your behalf. Samples and phone reminders are optional in Settings.</Text>
+      <Text style={s.note}>Add recurring services manually or review bank suggestions. Set the billing destination to start cancellation with the provider. Savemage cannot cancel on your behalf. Samples and phone reminders are optional in Settings.</Text>
       <Button label="Open Bills" onPress={() => router.navigate('/subscriptions')} />
     </View>
     <View style={s.card}>

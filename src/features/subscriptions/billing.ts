@@ -20,7 +20,7 @@ export function billingDestination(subscription: Subscription, platform: string)
 export async function openCancellationDestination(subscription: Subscription, openURL: (url: string) => Promise<unknown>, platform: string) {
   const destination = billingDestination(subscription, platform);
   if (destination) {
-    try { if (await openURL(destination.url) === false) throw new Error('Unavailable'); return { opened: true, message: `${destination.instructions} Opening this page does not mark the subscription canceled in Centsward.` }; }
+    try { if (await openURL(destination.url) === false) throw new Error('Unavailable'); return { opened: true, message: `${destination.instructions} Opening this page does not mark the subscription canceled in Savemage.` }; }
     catch { return { opened: false, message: 'Cancellation plan saved. The billing page could not open. Retry or open the provider’s billing settings manually.' }; }
   }
   if (subscription.billingChannel === 'website') return { opened: false, message: 'Cancellation plan saved. Choose an associated provider app in Edit to find its account website, or visit its billing page manually.' };

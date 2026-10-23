@@ -1,4 +1,4 @@
-# Centsward — draft privacy disclosures
+# Savemage — draft privacy disclosures
 
 Updated October 22, 2026. Private development app; these are preparation notes, **not submitted App Store Connect answers or a declaration of legal compliance**. Publisher, privacy contact, public hosting and provider retention remain unconfirmed. The owner requested a draft only.
 

@@ -6,6 +6,6 @@ import { createLiveActivity } from 'expo-widgets';
 // There is no start call for this activity in the app.
 const RetiredPurchaseActivity = () => {
   'widget';
-  return { banner: <VStack><Text modifiers={[font({ size: 16, weight: 'bold' })]}>Open Centsward</Text></VStack> };
+  return { banner: <VStack><Text modifiers={[font({ size: 16, weight: 'bold' })]}>Open Savemage</Text></VStack> };
 };
 export default createLiveActivity('PurchasePauseActivity', RetiredPurchaseActivity);

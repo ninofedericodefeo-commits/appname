@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
 import shortcut from '../../../assets/shortcuts/log-purchase.signed.json';
 
 export async function installPurchaseShortcut() {
-  if (Platform.OS !== 'ios') throw new Error('Install the logging shortcut from Centsward on your iPhone.');
+  if (Platform.OS !== 'ios') throw new Error('Install the logging shortcut from Savemage on your iPhone.');
   if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable. Open Shortcuts to set up the automation manually.');
   const file = new File(Paths.cache, shortcut.filename);
   file.create({ overwrite: true });

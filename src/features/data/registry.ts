@@ -33,7 +33,7 @@ export function captureStores(initial = false): Record<string, StoreRecord> {
 }
 export async function prepareStores(records: Record<string, StoreRecord>) {
   const names = managedStores.map(store => store.persist.getOptions().name);
-  if (Object.keys(records).some(name => !names.includes(name))) throw new Error('Backup contains data from a newer or unsupported app. Update Centsward before restoring.');
+  if (Object.keys(records).some(name => !names.includes(name))) throw new Error('Backup contains data from a newer or unsupported app. Update Savemage before restoring.');
   const prepared: Record<string, StoreRecord> = {};
   for (const store of managedStores) {
     const options = store.persist.getOptions(), record = records[options.name];

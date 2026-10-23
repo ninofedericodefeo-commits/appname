@@ -67,7 +67,7 @@ export default function SettingsSectionScreen() {
       <EraseDataPanel />
     </>}
     {section === 'about' && <>
-      <Text style={s.body}>Centsward {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
+      <Text style={s.body}>Savemage {Constants.expoConfig?.version ?? '1.0'} · {Platform.OS} build {Platform.OS === 'ios' ? Constants.expoConfig?.ios?.buildNumber ?? 'development' : Constants.expoConfig?.android?.versionCode ?? 'development'}</Text>
       <SettingsLink href="/privacy-policy" label="Privacy policy (draft)" />
       <SettingsLink href="/privacy-disclosures" label="How your data is used" />
       <BuildCapabilities />

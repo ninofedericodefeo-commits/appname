@@ -1,13 +1,13 @@
 {
-  "appName": "Centsward",
+  "appName": "Savemage",
   "status": "Draft — not published",
   "updated": "October 22, 2026",
-  "intro": "This draft describes the current private version of Centsward, a personal money-management app with optional gas search and shopping tools. Publisher identity and a privacy contact have not been supplied. Review and complete this policy before distributing the app.",
+  "intro": "This draft describes the current private version of Savemage, a personal money-management app with optional gas search and shopping tools. Publisher identity and a privacy contact have not been supplied. Review and complete this policy before distributing the app.",
   "sections": [
     {
       "title": "Your financial records stay on your device",
       "paragraphs": [
-        "The app saves your account name, balances, transactions, goals, bills, budgets, cars, gas receipts, statement imports and preferences in local app storage. It does not require a Centsward account or your bank login. Statements and receipt images are parsed on your device; the current app does not upload them to a financial-data service.",
+        "The app saves your account name, balances, transactions, goals, bills, budgets, cars, gas receipts, statement imports and preferences in local app storage. It does not require a Savemage account or your bank login. Statements and receipt images are parsed on your device; the current app does not upload them to a financial-data service.",
         "Optional device authentication uses the operating system. The app receives an authentication result, not your fingerprint or Face ID template. App lock and hidden amounts protect access and display; they do not add encryption to the local ledger. Password-encrypted exported backups have separate protection.",
         "Home Screen widgets can display selected balances or goal information outside the app. Use widget privacy settings to control this. Local reminders may display bill or statement information in notifications, depending on your device notification settings."
       ]
@@ -32,7 +32,7 @@
     {
       "title": "Files, sharing and device backups",
       "paragraphs": [
-        "You choose which statements, receipt photos or files to import. Exporting a statement report, transaction CSV or encrypted backup gives the file to the destination you select. Files can contain sensitive financial information. Copies you save to Files, cloud storage, email or another app are handled by that destination and are not removed when you erase Centsward.",
+        "You choose which statements, receipt photos or files to import. Exporting a statement report, transaction CSV or encrypted backup gives the file to the destination you select. Files can contain sensitive financial information. Copies you save to Files, cloud storage, email or another app are handled by that destination and are not removed when you erase Savemage.",
         "Local app data may be included in operating-system or device backups, subject to your device settings. Browser users share the privacy boundary of their browser profile. Do not rely on hidden amounts or app lock to protect an exported file or a shared browser profile."
       ]
     },

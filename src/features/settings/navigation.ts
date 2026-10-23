@@ -9,5 +9,5 @@ export const settingsSections = [
   { id: 'privacy', title: 'Privacy', detail: 'Data use, privacy policy and device protection' },
   { id: 'general', title: 'General & appearance', detail: 'Start screen, theme and quick setup' },
   { id: 'accessibility', title: 'Accessibility', detail: 'Text, controls, motion and screen readers' },
-  { id: 'about', title: 'About Centsward', detail: 'App version and available features' },
+  { id: 'about', title: 'About Savemage', detail: 'App version and available features' },
 ] as const;

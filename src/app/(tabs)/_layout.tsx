@@ -35,7 +35,7 @@ export default function MainTabsLayout() {
   }, [pathname, startup, settled]);
   // Resolve plain launches before mounting the Gas screen. Existing Gas links
   // still own '/', and subsequent tab changes never rerun the launch redirect.
-  if (!startup) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}><ActivityIndicator color={colors.primary} accessibilityLabel="Opening Centsward" /></View>;
+  if (!startup) return <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.paper }}><ActivityIndicator color={colors.primary} accessibilityLabel="Opening Savemage" /></View>;
   if (!settled && startup.target && pathname === startup.from) return <Redirect href={startup.target} />;
   return <Tabs
     initialRouteName="pocket"

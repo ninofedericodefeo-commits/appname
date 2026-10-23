@@ -43,7 +43,7 @@ export async function openSubscriptionApp(input: SubscriptionApp | undefined, op
       ? await (openPackage ?? (await import('./installedApps')).openInstalledPackage)(target.slice('gasfinder-app://'.length))
       : await openURL(target);
     if (opened === false) throw Error('Unavailable');
-    return { opened: true, message: `Opened ${app.name}. Complete cancellation there; the subscription is still active in Centsward.` };
+    return { opened: true, message: `Opened ${app.name}. Complete cancellation there; the subscription is still active in Savemage.` };
   } catch {
     if (app.fallbackUrl && app.fallbackUrl !== target) {
       try {

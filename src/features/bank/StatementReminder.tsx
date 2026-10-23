@@ -33,7 +33,7 @@ export function StatementReminderSync() {
       const due = new Date(`${last}T09:00:00`); due.setDate(due.getDate() + statementReminderDays);
       if (due.getTime() <= Date.now()) { due.setTime(Date.now()); due.setDate(due.getDate()+1); due.setHours(9,0,0,0); }
       if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('statements', { name: 'Bank statements', importance: Notifications.AndroidImportance.DEFAULT });
-      await Notifications.scheduleNotificationAsync({ content: { title: 'Time to check your bank statement', body: 'Download and share a statement if one is available. Centsward cannot check Citizens for you.', data: { kind: 'statement-reminder', signature } }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: due, ...(Platform.OS === 'android' ? { channelId: 'statements' } : {}) } });
+      await Notifications.scheduleNotificationAsync({ content: { title: 'Time to check your bank statement', body: 'Download and share a statement if one is available. Savemage cannot check Citizens for you.', data: { kind: 'statement-reminder', signature } }, trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: due, ...(Platform.OS === 'android' ? { channelId: 'statements' } : {}) } });
     }).catch(() => console.warn('Could not schedule statement reminder'));
     return () => { canceled = true; };
   }, [statementReminderDays, balanceUpdatedAt, linkedBankAccount, busy, revision, foreground]);

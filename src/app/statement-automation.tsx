@@ -58,18 +58,18 @@ export default function StatementAutomationScreen() {
       <Text accessibilityRole="header" style={styles.title}>Quick statement import</Text>
       <Link href="/bank-batch" asChild><Pressable accessibilityRole="button" style={styles.secondary}><Text style={styles.secondaryText}>Import from a saved Files folder ›</Text></Pressable></Link>
       <Text style={styles.hint}>Save downloaded statements in one folder, then choose that folder to find unarchived files. For a Home Screen shortcut, use URL → Open URLs with gasfinder://bank-batch. Folder permission is requested in the app; there is no background Citizens download.</Text>
-      <Text style={styles.body}>Open your PDF in Citizens, tap Share, then send it here. Centsward handles reading, saving and updating your account.</Text>
-      <View style={styles.path}><Text style={styles.pathText}>Citizens PDF</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>Share</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>{isIPhone || Platform.OS === 'web' ? 'Import Statement' : 'Centsward'}</Text></View>
+      <Text style={styles.body}>Open your PDF in Citizens, tap Share, then send it here. Savemage handles reading, saving and updating your account.</Text>
+      <View style={styles.path}><Text style={styles.pathText}>Citizens PDF</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>Share</Text><Text style={styles.arrow}>›</Text><Text style={styles.pathText}>{isIPhone || Platform.OS === 'web' ? 'Import Statement' : 'Savemage'}</Text></View>
       <View style={styles.card}>
-        <Text style={styles.section}>{Platform.OS === 'android' ? '1. Share to Centsward' : '1. Add the shortcut once'}</Text>
-        {Platform.OS === 'android' ? <Text style={styles.body}>In Citizens’ PDF viewer, tap Share and choose Centsward. You can also share a downloaded PDF from Files.</Text> : <>
-          <Text style={styles.body}>The shortcut sends the shared PDF straight to Centsward. In the sheet that opens, choose Shortcuts → Add Shortcut.</Text>
+        <Text style={styles.section}>{Platform.OS === 'android' ? '1. Share to Savemage' : '1. Add the shortcut once'}</Text>
+        {Platform.OS === 'android' ? <Text style={styles.body}>In Citizens’ PDF viewer, tap Share and choose Savemage. You can also share a downloaded PDF from Files.</Text> : <>
+          <Text style={styles.body}>The shortcut sends the shared PDF straight to Savemage. In the sheet that opens, choose Shortcuts → Add Shortcut.</Text>
           <Button label={busy ? 'Opening…' : 'Add Import Statement shortcut'} onPress={() => void addShortcut()} disabled={!isIPhone || busy} />
-          {!isIPhone && <Text style={styles.hint}>Add this shortcut from Centsward on your iPhone. You can configure automatic import below.</Text>}
+          {!isIPhone && <Text style={styles.hint}>Add this shortcut from Savemage on your iPhone. You can configure automatic import below.</Text>}
           <Text style={styles.hint}>Keep the name “{STATEMENT_SHORTCUT_NAME}”. Returning here does not confirm it was added.</Text>
         </>}
         <Text style={styles.section}>Get your Citizens PDF</Text>
-        <Text style={styles.body}>Open a checking or savings statement in the Citizens app, or Document Center in online banking. Tap Share → {Platform.OS === 'android' ? 'Centsward' : 'GasFinder Import Statement'}. Centsward reads and saves the PDF, then asks whether to use its closing balance.</Text>
+        <Text style={styles.body}>Open a checking or savings statement in the Citizens app, or Document Center in online banking. Tap Share → {Platform.OS === 'android' ? 'Savemage' : 'GasFinder Import Statement'}. Savemage reads and saves the PDF, then asks whether to use its closing balance.</Text>
         <Text style={styles.hint}>If the share option isn’t listed, save the PDF to Files and choose it in Account → Import statement. Use the original PDF, not a scan or photo.</Text>
         <Button label="Open Citizens online banking" secondary onPress={() => { void Linking.openURL('https://www.citizensbank.com/mobile-and-online-banking/online-banking.aspx').catch(() => setError('Could not open Citizens. Open online banking in your browser and use Document Center.')); }} />
         <Text style={styles.hint}>Citizens requires you to sign in to download statements. Enable its e-statement alerts to know when the next one is ready.</Text>
@@ -95,7 +95,7 @@ export default function StatementAutomationScreen() {
       </View>
       <View style={styles.card}>
         <Text style={styles.section}>3. Send your next statement</Text>
-        <Text style={styles.body}>Open the checking or savings statement in Citizens. Tap Share, then {Platform.OS === 'android' ? 'Centsward' : `“${STATEMENT_SHORTCUT_NAME}” in the list of actions`}. Allow the file handoff if iOS asks the first time.</Text>
+        <Text style={styles.body}>Open the checking or savings statement in Citizens. Tap Share, then {Platform.OS === 'android' ? 'Savemage' : `“${STATEMENT_SHORTCUT_NAME}” in the list of actions`}. Allow the file handoff if iOS asks the first time.</Text>
         <Text style={styles.hint}>No need to save to Files or pick the PDF again. If your viewer offers only Download, open that PDF and share from there.</Text>
         {settings.lastImport && <View style={styles.receipt}>
           <Text style={styles.label}>{settings.lastImport.automatic ? 'Last automatic import' : 'Last confirmed statement'}</Text>
@@ -109,16 +109,16 @@ export default function StatementAutomationScreen() {
         <Text style={styles.link}>{help ? 'Hide setup help −' : 'Shortcut or file-opening help +'}</Text>
       </Pressable>
       {help && <View style={styles.card}>
-        <Text style={styles.section}>Centsward can’t open the PDF?</Text>
-        <Text style={styles.body}>If Shortcuts says Centsward isn’t installed or can’t open the file, update Centsward and open it once, then share the PDF again. The app needs PDF opening support for this shortcut to work.</Text>
+        <Text style={styles.section}>Savemage can’t open the PDF?</Text>
+        <Text style={styles.body}>If Shortcuts says Savemage isn’t installed or can’t open the file, update Savemage and open it once, then share the PDF again. The app needs PDF opening support for this shortcut to work.</Text>
         <Text style={styles.section}>Keep it near the top</Text>
         <Text style={styles.body}>In the PDF’s Share sheet, scroll to Edit Actions. Add “{STATEMENT_SHORTCUT_NAME}” to Favorites and move it up.</Text>
-        <Text style={styles.body}>If it is missing, open the shortcut’s Details in Shortcuts and turn on Show in Share Sheet. Check that it receives PDFs and its Open File action uses Centsward.</Text>
+        <Text style={styles.body}>If it is missing, open the shortcut’s Details in Shortcuts and turn on Show in Share Sheet. Check that it receives PDFs and its Open File action uses Savemage.</Text>
         <Button label="Open statement shortcut ↗" secondary disabled={!isIPhone || busy} onPress={() => {
           void Linking.openURL(statementShortcutURL).catch(() => setError('Open Apple’s Shortcuts app and find GasFinder Import Statement.'));
         }} />
         <Text style={styles.body}>If Shortcuts isn’t offered while adding the file, choose Save to Files, open “GasFinder Import Statement.shortcut” there, then Add Shortcut.</Text>
-        <Text style={styles.hint}>Use the installed Centsward build with PDF opening support. Expo Go cannot receive PDFs for Centsward; a development build also needs its dev server running.</Text>
+        <Text style={styles.hint}>Use the installed Savemage build with PDF opening support. Expo Go cannot receive PDFs for Savemage; a development build also needs its dev server running.</Text>
         <Text style={styles.hint}>This app tracks one linked bank account. Renaming it does not switch accounts. To stop automatic saving, uncheck the option and save.</Text>
       </View>}
       {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}

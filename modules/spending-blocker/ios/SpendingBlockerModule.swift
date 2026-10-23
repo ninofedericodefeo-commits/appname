@@ -29,11 +29,11 @@ public class SpendingBlockerModule: Module {
       guard self.bundled else { promise.reject("MISSING_EXTENSION", "Update the iPhone app to include Spending Pause."); return }
       if #available(iOS 26.2, *) {
         SFSafariSettings.openExtensionsSettings(forIdentifiers: [self.identifier]) { error in
-          if error != nil { promise.reject("SETTINGS_UNAVAILABLE", "Open Settings → Apps → Safari → Extensions → Centsward Spending Pause.") }
+          if error != nil { promise.reject("SETTINGS_UNAVAILABLE", "Open Settings → Apps → Safari → Extensions → Savemage Spending Pause.") }
           else { promise.resolve() }
         }
       } else {
-        promise.reject("SETTINGS_UNAVAILABLE", "Open Settings → Apps → Safari → Extensions → Centsward Spending Pause.")
+        promise.reject("SETTINGS_UNAVAILABLE", "Open Settings → Apps → Safari → Extensions → Savemage Spending Pause.")
       }
     }.runOnQueue(.main)
   }
